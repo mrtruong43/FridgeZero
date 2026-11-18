@@ -44,8 +44,9 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   var COMP_INSET = 0.014;
 
   var DEG = Math.PI / 180;
-  var DEFAULT_YAW = -18 * DEG;
-  var DEFAULT_PITCH = -5 * DEG;
+  const DESIGNER_YAW = -18 * DEG;
+  const HOME_REST_YAW = 0;
+  var DEFAULT_PITCH = -4.5 * DEG;
   var PITCH_MIN = -8 * DEG;
   var PITCH_MAX = 4 * DEG;
   var SPRING_SOFT_LIMIT = 55 * DEG;
@@ -56,11 +57,46 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   var OPEN_DURATION_MS = 380;
 
   var SHELL_SPECS = {
-    inox:        { color: 0xCBD5E1, roughness: 0.36, metalness: 0.34 },
-    butter:      { color: 0xFEF08A, roughness: 0.42, metalness: 0.12 },
-    mint:        { color: 0xA7F3D0, roughness: 0.42, metalness: 0.12 },
-    matte:       { color: 0x27272A, roughness: 0.54, metalness: 0.22 },
-    matte_black: { color: 0x27272A, roughness: 0.54, metalness: 0.22 }
+    inox: {
+      color: 0xD8E1EB,
+      metalness: 0.38,
+      roughness: 0.16,
+      clearcoat: 0.85,
+      clearcoatRoughness: 0.10,
+      envMapIntensity: 1.15
+    },
+    butter: {
+      color: 0xFDE68A,
+      metalness: 0.06,
+      roughness: 0.14,
+      clearcoat: 0.92,
+      clearcoatRoughness: 0.08,
+      envMapIntensity: 1.10
+    },
+    mint: {
+      color: 0xA7F3D0,
+      metalness: 0.06,
+      roughness: 0.14,
+      clearcoat: 0.92,
+      clearcoatRoughness: 0.08,
+      envMapIntensity: 1.10
+    },
+    matte: {
+      color: 0x27272A,
+      metalness: 0.22,
+      roughness: 0.26,
+      clearcoat: 0.55,
+      clearcoatRoughness: 0.18,
+      envMapIntensity: 1.05
+    },
+    matte_black: {
+      color: 0x27272A,
+      metalness: 0.22,
+      roughness: 0.26,
+      clearcoat: 0.55,
+      clearcoatRoughness: 0.18,
+      envMapIntensity: 1.05
+    }
   };
 
   var PROP_COLORS = [0xA3E635, 0xFACC15, 0xFB7185, 0xC084FC];
@@ -102,76 +138,64 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     return tex;
   }
 
-  // Procedural 256x256 vertical brushed-metal / satin texture for map & bumpMap.
-  function createBrushedMetalTexture(isBump) {
-    var size = 256;
-    var canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    var ctx = canvas.getContext("2d");
-    ctx.fillStyle = isBump ? "#808080" : "#FFFFFF";
-    ctx.fillRect(0, 0, size, size);
-
-    var seed = 4219;
-    function rand() {
-      seed = (seed * 16807) % 2147483647;
-      return (seed - 1) / 2147483646;
-    }
-
-    for (var i = 0; i < 620; i++) {
-      var x = Math.floor(rand() * size);
-      var y = Math.floor(rand() * size);
-      var len = 20 + Math.floor(rand() * 92);
-      var bright = rand() > 0.48;
-      if (isBump) {
-        ctx.fillStyle = bright ? "rgba(215,215,215,0.34)" : "rgba(45,45,45,0.30)";
-      } else {
-        ctx.fillStyle = bright ? "rgba(255,255,255,0.42)" : "rgba(182,190,202,0.16)";
-      }
-      ctx.fillRect(x, y, 1, Math.min(len, size - y));
-      if (y + len > size) {
-        ctx.fillRect(x, 0, 1, (y + len) - size);
-      }
-    }
-
-    var tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1.25, 1.25);
-    if (!isBump) tex.encoding = THREE.sRGBEncoding;
-    return tex;
-  }
-
-  // Lightweight studio equirectangular environment for realistic metallic bevel highlights.
+  // Smooth 512x256 equirectangular studio reflection map with cool-slate gradient & angled softbox bands.
   function createStudioEnvMap() {
     var c = document.createElement("canvas");
-    c.width = 128;
-    c.height = 64;
+    c.width = 512;
+    c.height = 256;
     var ctx = c.getContext("2d");
-    var g = ctx.createLinearGradient(0, 0, 0, 64);
-    g.addColorStop(0.0, "#FFFFFF");
-    g.addColorStop(0.32, "#E2E8F0");
-    g.addColorStop(0.62, "#94A3B8");
-    g.addColorStop(1.0, "#475569");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 128, 64);
 
-    var softbox = ctx.createRadialGradient(42, 18, 2, 42, 18, 24);
-    softbox.addColorStop(0.0, "rgba(255,253,245,0.95)");
-    softbox.addColorStop(1.0, "rgba(255,253,245,0.0)");
-    ctx.fillStyle = softbox;
-    ctx.fillRect(0, 0, 128, 64);
+    var g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0.00, "#F8FAFC");
+    g.addColorStop(0.24, "#CBD5E1");
+    g.addColorStop(0.50, "#64748B");
+    g.addColorStop(0.76, "#334155");
+    g.addColorStop(1.00, "#0F172A");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 512, 256);
+
+    function drawSoftboxBand(cx, cy, angleRad, scaleX, scaleY, radius, innerRgba, midRgba, outerRgba) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angleRad);
+      ctx.scale(scaleX, scaleY);
+      var grad = ctx.createRadialGradient(0, 0, radius * 0.14, 0, 0, radius);
+      grad.addColorStop(0.00, innerRgba);
+      grad.addColorStop(0.42, midRgba);
+      grad.addColorStop(0.76, outerRgba);
+      grad.addColorStop(1.00, "rgba(255, 255, 255, 0.0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Primary angled studio softbox band (sweeping highlight on front doors & top-left bevels)
+    drawSoftboxBand(
+      166, 78, -0.38, 2.15, 0.56, 76,
+      "rgba(255, 255, 255, 0.96)",
+      "rgba(255, 253, 248, 0.68)",
+      "rgba(241, 245, 249, 0.22)"
+    );
+
+    // Secondary angled cool-white softbox reflection band (subtle counter-glint on bevel edges)
+    drawSoftboxBand(
+      374, 94, 0.42, 1.68, 0.42, 64,
+      "rgba(248, 252, 255, 0.85)",
+      "rgba(224, 242, 254, 0.45)",
+      "rgba(224, 242, 254, 0.14)"
+    );
 
     var env = new THREE.CanvasTexture(c);
     env.mapping = THREE.EquirectangularReflectionMapping;
     env.encoding = THREE.sRGBEncoding;
+    env.needsUpdate = true;
     return env;
   }
 
   var dotGridTex = createDotGridTexture();
   var solidBgColor = new THREE.Color(currentSurfaceBg);
-  var brushedMap = createBrushedMetalTexture(false);
-  var brushedBump = createBrushedMetalTexture(true);
   var studioEnv = createStudioEnvMap();
 
   var scene = new THREE.Scene();
@@ -182,16 +206,16 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   camera.position.set(0, 1.30, 4.18);
   camera.lookAt(0, 1.15, 0);
 
-  // 3-point studio lighting: front-left key casts darker shading onto the right side wall for 3D depth.
-  var hemiLight = new THREE.HemisphereLight(0xFFFFFF, 0x94A3B8, 0.56);
+  // Sculpted high-contrast 3-point studio lighting: upper-front-left key creates bold light/shadow planes.
+  var hemiLight = new THREE.HemisphereLight(0xFFFFFF, 0x334155, 0.52);
   scene.add(hemiLight);
 
-  var keyLight = new THREE.DirectionalLight(0xFFFDF7, 0.92);
-  keyLight.position.set(-2.8, 4.2, 4.5);
+  var keyLight = new THREE.DirectionalLight(0xFFFDF8, 1.45);
+  keyLight.position.set(-3.2, 4.5, 3.8);
   scene.add(keyLight);
 
-  var rimLight = new THREE.DirectionalLight(0xBAE6FD, 0.36);
-  rimLight.position.set(3.2, 2.2, -2.8);
+  var rimLight = new THREE.DirectionalLight(0x93C5FD, 0.48);
+  rimLight.position.set(3.5, 2.2, -2.6);
   scene.add(rimLight);
 
   // Soft circular floor contact shadow beneath y = 0.
@@ -228,11 +252,11 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   turntable.position.set(0, 0, 0);
   scene.add(turntable);
 
-  // Shared materials with brushed metal / satin PBR and softened ink accents.
-  var inkLineMat = new THREE.LineBasicMaterial({ color: 0x1E293B, transparent: true, opacity: 0.46 });
-  var inkMeshMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.80, metalness: 0.08 });
-  var cavityMat = new THREE.MeshStandardMaterial({ color: 0x1E293B, roughness: 0.90, metalness: 0.05 });
-  var seamMat = new THREE.MeshStandardMaterial({ color: 0x1E293B, roughness: 0.72, metalness: 0.12 });
+  // Shared materials: sleek glossy tempered-glass/enamel MeshPhysicalMaterial & crisp recessed chassis.
+  var inkLineMat = new THREE.LineBasicMaterial({ color: 0x0F172A, transparent: true, opacity: 0.34 });
+  var inkMeshMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.80, metalness: 0.08, envMapIntensity: 0.20 });
+  var cavityMat = new THREE.MeshStandardMaterial({ color: 0x1E293B, roughness: 0.90, metalness: 0.05, envMapIntensity: 0.20 });
+  var seamMat = new THREE.MeshStandardMaterial({ color: 0x0F172A, roughness: 0.85, metalness: 0.06, envMapIntensity: 0.22 });
   var ledMat = new THREE.MeshBasicMaterial({ color: 0xE0F2FE });
   var glassMat = new THREE.MeshStandardMaterial({
     color: 0xBAE6FD,
@@ -241,22 +265,21 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     transparent: true,
     opacity: 0.54
   });
-  var handleMat = new THREE.MeshStandardMaterial({
-    color: 0x27272A,
-    roughness: 0.35,
-    metalness: 0.45,
-    envMap: studioEnv,
-    envMapIntensity: 0.65
+  var handleMat = new THREE.MeshPhysicalMaterial({
+    color: 0x1E293B,
+    metalness: 0.5,
+    roughness: 0.25,
+    clearcoat: 0.4,
+    clearcoatRoughness: 0.18,
+    envMapIntensity: 0.95
   });
-  var shellMat = new THREE.MeshStandardMaterial({
-    color: 0xCBD5E1,
-    roughness: 0.36,
-    metalness: 0.34,
-    map: brushedMap,
-    bumpMap: brushedBump,
-    bumpScale: 0.008,
-    envMap: studioEnv,
-    envMapIntensity: 0.58
+  var shellMat = new THREE.MeshPhysicalMaterial({
+    color: SHELL_SPECS.inox.color,
+    metalness: SHELL_SPECS.inox.metalness,
+    roughness: SHELL_SPECS.inox.roughness,
+    clearcoat: SHELL_SPECS.inox.clearcoat,
+    clearcoatRoughness: SHELL_SPECS.inox.clearcoatRoughness,
+    envMapIntensity: SHELL_SPECS.inox.envMapIntensity
   });
   var propMats = PROP_COLORS.map(function (c) {
     return new THREE.MeshStandardMaterial({ color: c, roughness: 0.46, metalness: 0.06 });
@@ -300,7 +323,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     var mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
     if (userData) Object.assign(mesh.userData, userData);
-    var edges = new THREE.EdgesGeometry(geo, 26);
+    var edges = new THREE.EdgesGeometry(geo, 28);
     var line = new THREE.LineSegments(edges, inkLineMat);
     mesh.add(line);
     parent.add(mesh);
@@ -337,9 +360,11 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   function updateShellMaterial(colorKey) {
     var spec = SHELL_SPECS[colorKey] || SHELL_SPECS.inox;
     shellMat.color.setHex(spec.color);
-    shellMat.roughness = spec.roughness;
     shellMat.metalness = spec.metalness;
-    shellMat.envMapIntensity = (colorKey === "inox") ? 0.65 : 0.42;
+    shellMat.roughness = spec.roughness;
+    shellMat.clearcoat = spec.clearcoat;
+    shellMat.clearcoatRoughness = spec.clearcoatRoughness;
+    shellMat.envMapIntensity = spec.envMapIntensity;
     shellMat.needsUpdate = true;
   }
 
@@ -615,12 +640,17 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     });
   }
 
+  function getRestYaw() {
+    return state.springReturn ? HOME_REST_YAW : DESIGNER_YAW;
+  }
+
   // Turntable rotation & welcome spin state
-  var yaw = DEFAULT_YAW;
+  var yaw = getRestYaw();
   var pitch = DEFAULT_PITCH;
   var yawVel = 0;
   var isDragging = false;
-  var welcomeSpin = null; // { startTime, startYaw }
+  var hasReceivedConfig = false;
+  var welcomeSpin = null; // { startTime, startYaw, targetYaw }
   var resetAnim = null;   // { startTime, startYaw, targetYaw, startPitch }
   var bounceAnim = null;  // { startTime, impulseApplied }
 
@@ -636,6 +666,8 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     try {
       var cfg = typeof configJson === "string" ? JSON.parse(configJson) : configJson;
       var wasSpring = state.springReturn;
+      var isInitialConfig = !hasReceivedConfig;
+      hasReceivedConfig = true;
       state.template = cfg.template || "top_freezer";
       state.colorKey = cfg.colorKey || "inox";
       state.openCompartmentId = cfg.openCompartmentId || null;
@@ -644,10 +676,22 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       state.showDotGrid = cfg.showDotGrid !== false;
       state.compartments = Array.isArray(cfg.compartments) ? cfg.compartments : [];
 
-      if (!wasSpring && state.springReturn && !welcomeSpin) {
-        yaw = nearestYaw(DEFAULT_YAW, yaw);
+      if (isInitialConfig && !welcomeSpin) {
+        yaw = getRestYaw();
         yawVel = 0;
         resetAnim = null;
+      } else if (!wasSpring && state.springReturn) {
+        if (welcomeSpin) {
+          welcomeSpin.targetYaw = HOME_REST_YAW;
+        } else {
+          var wrapped = nearestYaw(HOME_REST_YAW, yaw);
+          yaw = Math.max(
+            HOME_REST_YAW - SPRING_HARD_LIMIT,
+            Math.min(HOME_REST_YAW + SPRING_HARD_LIMIT, wrapped)
+          );
+          yawVel = 0;
+          resetAnim = null;
+        }
       }
 
       var nextBg = cfg.surfaceBg || (state.showDotGrid ? "#FAF8F5" : "#FFFFFF");
@@ -682,21 +726,24 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   };
 
   window.playWelcomeSpin = function () {
+    var restYaw = getRestYaw();
     resetAnim = null;
     yawVel = 0;
-    yaw = DEFAULT_YAW;
+    yaw = restYaw;
     pitch = DEFAULT_PITCH;
     welcomeSpin = {
       startTime: performance.now(),
-      startYaw: DEFAULT_YAW
+      startYaw: restYaw,
+      targetYaw: restYaw
     };
   };
 
   window.resetView = function () {
+    var restYaw = getRestYaw();
     welcomeSpin = null;
     if (state.springReturn) {
       resetAnim = null;
-      if (Math.abs(yaw - DEFAULT_YAW) < 6 * DEG) {
+      if (Math.abs(yaw - restYaw) < 6 * DEG) {
         yawVel = 3.4;
       } else {
         yawVel = 0;
@@ -707,7 +754,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     resetAnim = {
       startTime: performance.now(),
       startYaw: yaw,
-      targetYaw: nearestYaw(yaw, DEFAULT_YAW),
+      targetYaw: nearestYaw(yaw, restYaw),
       startPitch: pitch
     };
   };
@@ -763,12 +810,12 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
 
     var dyaw = dx * 0.0095;
     if (state.springReturn) {
-      var offset = yaw - DEFAULT_YAW;
+      var offset = yaw - HOME_REST_YAW;
       if (Math.abs(offset) > SPRING_SOFT_LIMIT && (offset * dyaw > 0)) {
         var over = Math.min(1, (Math.abs(offset) - SPRING_SOFT_LIMIT) / (SPRING_HARD_LIMIT - SPRING_SOFT_LIMIT));
         dyaw *= Math.max(0.08, 1 - over * 0.88);
       }
-      yaw = Math.max(DEFAULT_YAW - SPRING_HARD_LIMIT, Math.min(DEFAULT_YAW + SPRING_HARD_LIMIT, yaw + dyaw));
+      yaw = Math.max(HOME_REST_YAW - SPRING_HARD_LIMIT, Math.min(HOME_REST_YAW + SPRING_HARD_LIMIT, yaw + dyaw));
       yawVel = Math.max(-8, Math.min(8, (dyaw / moveDt) * 0.35));
     } else {
       yaw += dyaw;
@@ -853,10 +900,11 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
 
     if (welcomeSpin) {
       var t = Math.min(1, (now - welcomeSpin.startTime) / 1000);
-      yaw = welcomeSpin.startYaw + Math.PI * 2 * easeInOutCubic(t);
+      var spinTarget = (welcomeSpin.targetYaw !== undefined) ? welcomeSpin.targetYaw : getRestYaw();
+      yaw = welcomeSpin.startYaw + (spinTarget + Math.PI * 2 - welcomeSpin.startYaw) * easeInOutCubic(t);
       pitch = DEFAULT_PITCH;
       if (t >= 1) {
-        yaw = DEFAULT_YAW;
+        yaw = spinTarget;
         welcomeSpin = null;
         if (window.AndroidBridge && window.AndroidBridge.onWelcomeSpinFinished) {
           window.AndroidBridge.onWelcomeSpinFinished();
@@ -868,7 +916,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       yaw = resetAnim.startYaw + (resetAnim.targetYaw - resetAnim.startYaw) * re;
       pitch = resetAnim.startPitch + (DEFAULT_PITCH - resetAnim.startPitch) * re;
       if (rt >= 1) {
-        yaw = DEFAULT_YAW;
+        yaw = getRestYaw();
         pitch = DEFAULT_PITCH;
         resetAnim = null;
       }
@@ -876,12 +924,16 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       if (state.springReturn) {
         var subDt = dt * 0.5;
         for (var k = 0; k < 2; k++) {
-          var accel = -SPRING_STIFFNESS * (yaw - DEFAULT_YAW) - SPRING_DAMPING * yawVel;
+          var displacement = yaw - HOME_REST_YAW;
+          var accel = -SPRING_STIFFNESS * displacement - SPRING_DAMPING * yawVel;
           yawVel += accel * subDt;
-          yaw = Math.max(DEFAULT_YAW - SPRING_HARD_LIMIT, Math.min(DEFAULT_YAW + SPRING_HARD_LIMIT, yaw + yawVel * subDt));
+          yaw = Math.max(
+            HOME_REST_YAW - SPRING_HARD_LIMIT,
+            Math.min(HOME_REST_YAW + SPRING_HARD_LIMIT, yaw + yawVel * subDt)
+          );
         }
-        if (Math.abs(yaw - DEFAULT_YAW) < 0.0005 && Math.abs(yawVel) < 0.002) {
-          yaw = DEFAULT_YAW;
+        if (Math.abs(yaw - HOME_REST_YAW) < 0.0005 && Math.abs(yawVel) < 0.002) {
+          yaw = HOME_REST_YAW;
           yawVel = 0;
         }
       } else {
@@ -892,7 +944,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
           yawVel = 0;
         }
       }
-      // Spring pitch back to grounded -5 deg
+      // Spring pitch back to grounded -4.5 deg
       pitch += (DEFAULT_PITCH - pitch) * Math.min(1, dt * 10);
     }
 

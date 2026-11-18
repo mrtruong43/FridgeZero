@@ -1,8 +1,8 @@
 # FridgeZero — Complete Source Code & Architecture Summary
 
-> **Generated:** 2026-11-18 16:51:19 +07:00
+> **Generated:** 2026-11-18 23:06:03 +07:00
 > **Architecture:** Jetpack Compose + Room + WorkManager + CameraX 1.4.2 + Offline Three.js r128 WebGL Stage (Single Shared WebView Host at MainActivity Root + v3 Neo-Brutalist)
-> **Excluded:** `local.properties` (machine-specific paths/sensitive config), binary files (`.apk`, `.jar`, `.ttf`, `.webp`), build outputs (`build/`, `.gradle/`), and third-party minified vendor bundle `app/src/main/assets/fridge3d/three.min.js` (603,445 bytes).
+> **Excluded:** `local.properties` (machine-specific paths/sensitive config), binary files (`.apk`, `.jar`, `.ttf`, `.webp`), build outputs (`build/`, `.gradle/`), and third-party minified vendor bundle `app/src/main/assets/fridge3d/three.min.js` (603,451 bytes).
 
 ## 1. Directory Structure
 
@@ -523,7 +523,7 @@ dependencies {
 ### `app/src/main/res/values/strings.xml` (135 lines)
 
 ```xml
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">FridgeZero</string>
     <string name="days_left_fmt">còn %1$d ngày</string>
@@ -596,7 +596,7 @@ dependencies {
     <string name="home_weather_badge">☀️ 28°C · Đà Nẵng</string>
     <string name="home_urgent_badge_fmt">🔔 %1$d sắp hết hạn</string>
     <string name="home_all_fresh_badge">✨ Tất cả đều tươi</string>
-    <string name="home_stage_hint">↔ Vuốt xoay 360° · Chạm cửa để mở</string>
+    <string name="home_stage_hint">↔ Kéo nghiêng xem tủ · Chạm cửa để mở</string>
     <string name="home_fab_quick_add">+ Thêm nhanh</string>
     <string name="home_tab_fridge">🧊 Tủ lạnh</string>
     <string name="home_tab_scan_ai">📷 Quét AI</string>
@@ -670,7 +670,7 @@ dependencies {
 </resources>
 ```
 
-### `app/src/main/assets/fridge3d/index.html` (691 lines)
+### `app/src/main/assets/fridge3d/index.html` (1047 lines)
 
 ```html
 <!DOCTYPE html>
@@ -685,7 +685,7 @@ dependencies {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: transparent;
+    background: #FAF8F5;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
@@ -694,7 +694,7 @@ dependencies {
     display: block;
     width: 100%;
     height: 100%;
-    background: transparent;
+    background: #FAF8F5;
     touch-action: none;
   }
 </style>
@@ -714,57 +714,183 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   var CAB_D = 1.00;
   var FOOT_H = 0.09;
   var WALL = 0.065;
-  var DOOR_T = 0.068;
-  var DOOR_Z_GAP = 0.016;
+  var DOOR_T = 0.086;
+  var DOOR_Z_GAP = 0.022;
   var COMP_INSET = 0.014;
 
   var DEG = Math.PI / 180;
-  var DEFAULT_YAW = -16 * DEG;
-  var DEFAULT_PITCH = -4 * DEG;
-  var PITCH_MIN = -6 * DEG;
+  const DESIGNER_YAW = -18 * DEG;
+  const HOME_REST_YAW = 0;
+  var DEFAULT_PITCH = -4.5 * DEG;
+  var PITCH_MIN = -8 * DEG;
   var PITCH_MAX = 4 * DEG;
+  var SPRING_SOFT_LIMIT = 55 * DEG;
+  var SPRING_HARD_LIMIT = 78 * DEG;
+  var SPRING_STIFFNESS = 135;
+  var SPRING_DAMPING = 13.5;
   var BACKFACE_COS = Math.cos(82 * DEG);
   var OPEN_DURATION_MS = 380;
 
   var SHELL_SPECS = {
-    inox:        { color: 0xCBD5E1, roughness: 0.40, metalness: 0.30 },
-    butter:      { color: 0xFEF08A, roughness: 0.44, metalness: 0.10 },
-    mint:        { color: 0xA7F3D0, roughness: 0.44, metalness: 0.10 },
-    matte:       { color: 0x27272A, roughness: 0.58, metalness: 0.18 },
-    matte_black: { color: 0x27272A, roughness: 0.58, metalness: 0.18 }
+    inox: {
+      color: 0xD8E1EB,
+      metalness: 0.38,
+      roughness: 0.16,
+      clearcoat: 0.85,
+      clearcoatRoughness: 0.10,
+      envMapIntensity: 1.15
+    },
+    butter: {
+      color: 0xFDE68A,
+      metalness: 0.06,
+      roughness: 0.14,
+      clearcoat: 0.92,
+      clearcoatRoughness: 0.08,
+      envMapIntensity: 1.10
+    },
+    mint: {
+      color: 0xA7F3D0,
+      metalness: 0.06,
+      roughness: 0.14,
+      clearcoat: 0.92,
+      clearcoatRoughness: 0.08,
+      envMapIntensity: 1.10
+    },
+    matte: {
+      color: 0x27272A,
+      metalness: 0.22,
+      roughness: 0.26,
+      clearcoat: 0.55,
+      clearcoatRoughness: 0.18,
+      envMapIntensity: 1.05
+    },
+    matte_black: {
+      color: 0x27272A,
+      metalness: 0.22,
+      roughness: 0.26,
+      clearcoat: 0.55,
+      clearcoatRoughness: 0.18,
+      envMapIntensity: 1.05
+    }
   };
 
   var PROP_COLORS = [0xA3E635, 0xFACC15, 0xFB7185, 0xC084FC];
 
-  // Renderer with transparent clear so #FAF8F5 Dot-Grid shines directly behind.
+  // Solid surface-matched WebGL renderer with crisp MSAA anti-aliasing.
+  var dpr = window.devicePixelRatio || 1;
+  var currentSurfaceBg = "#FAF8F5";
   var renderer = new THREE.WebGLRenderer({
-    alpha: true,
+    alpha: false,
     antialias: true,
     powerPreference: "high-performance"
   });
-  renderer.setClearColor(0x000000, 0);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setClearColor(currentSurfaceBg, 1);
+  renderer.setPixelRatio(Math.min(dpr, 2.0));
   renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.02;
   document.body.appendChild(renderer.domElement);
 
+  // Power-of-two 64x64 tiled dot-grid matching Compose dotGridBackground() (#FAF8F5 + #D6D3CD @ 18dp).
+  var DOT_STEP_PX = 18;
+  var lastCssW = window.innerWidth || 360;
+  var lastCssH = window.innerHeight || 480;
+  function createDotGridTexture() {
+    var size = 64;
+    var canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#FAF8F5";
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = "#D6D3CD";
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, (0.72 / DOT_STEP_PX) * size, 0, Math.PI * 2);
+    ctx.fill();
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.encoding = THREE.sRGBEncoding;
+    tex.repeat.set(lastCssW / DOT_STEP_PX, lastCssH / DOT_STEP_PX);
+    return tex;
+  }
+
+  // Smooth 512x256 equirectangular studio reflection map with cool-slate gradient & angled softbox bands.
+  function createStudioEnvMap() {
+    var c = document.createElement("canvas");
+    c.width = 512;
+    c.height = 256;
+    var ctx = c.getContext("2d");
+
+    var g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0.00, "#F8FAFC");
+    g.addColorStop(0.24, "#CBD5E1");
+    g.addColorStop(0.50, "#64748B");
+    g.addColorStop(0.76, "#334155");
+    g.addColorStop(1.00, "#0F172A");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 512, 256);
+
+    function drawSoftboxBand(cx, cy, angleRad, scaleX, scaleY, radius, innerRgba, midRgba, outerRgba) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angleRad);
+      ctx.scale(scaleX, scaleY);
+      var grad = ctx.createRadialGradient(0, 0, radius * 0.14, 0, 0, radius);
+      grad.addColorStop(0.00, innerRgba);
+      grad.addColorStop(0.42, midRgba);
+      grad.addColorStop(0.76, outerRgba);
+      grad.addColorStop(1.00, "rgba(255, 255, 255, 0.0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Primary angled studio softbox band (sweeping highlight on front doors & top-left bevels)
+    drawSoftboxBand(
+      166, 78, -0.38, 2.15, 0.56, 76,
+      "rgba(255, 255, 255, 0.96)",
+      "rgba(255, 253, 248, 0.68)",
+      "rgba(241, 245, 249, 0.22)"
+    );
+
+    // Secondary angled cool-white softbox reflection band (subtle counter-glint on bevel edges)
+    drawSoftboxBand(
+      374, 94, 0.42, 1.68, 0.42, 64,
+      "rgba(248, 252, 255, 0.85)",
+      "rgba(224, 242, 254, 0.45)",
+      "rgba(224, 242, 254, 0.14)"
+    );
+
+    var env = new THREE.CanvasTexture(c);
+    env.mapping = THREE.EquirectangularReflectionMapping;
+    env.encoding = THREE.sRGBEncoding;
+    env.needsUpdate = true;
+    return env;
+  }
+
+  var dotGridTex = createDotGridTexture();
+  var solidBgColor = new THREE.Color(currentSurfaceBg);
+  var studioEnv = createStudioEnvMap();
+
   var scene = new THREE.Scene();
+  scene.background = dotGridTex;
+  scene.environment = studioEnv;
 
-  var camera = new THREE.PerspectiveCamera(34, 1, 0.1, 30);
-  camera.position.set(0, 1.32, 4.55);
-  camera.lookAt(0, 1.18, 0);
+  var camera = new THREE.PerspectiveCamera(38, 1, 0.1, 30);
+  camera.position.set(0, 1.30, 4.18);
+  camera.lookAt(0, 1.15, 0);
 
-  // Balanced 3-point studio lighting (zero glare blowout).
-  var hemiLight = new THREE.HemisphereLight(0xFFFFFF, 0xD6D3CD, 0.92);
+  // Sculpted high-contrast 3-point studio lighting: upper-front-left key creates bold light/shadow planes.
+  var hemiLight = new THREE.HemisphereLight(0xFFFFFF, 0x334155, 0.52);
   scene.add(hemiLight);
 
-  var keyLight = new THREE.DirectionalLight(0xFFFDF7, 0.72);
-  keyLight.position.set(2.8, 4.4, 4.2);
+  var keyLight = new THREE.DirectionalLight(0xFFFDF8, 1.45);
+  keyLight.position.set(-3.2, 4.5, 3.8);
   scene.add(keyLight);
 
-  var rimLight = new THREE.DirectionalLight(0xE0F2FE, 0.40);
-  rimLight.position.set(-3.2, 2.2, -2.6);
+  var rimLight = new THREE.DirectionalLight(0x93C5FD, 0.48);
+  rimLight.position.set(3.5, 2.2, -2.6);
   scene.add(rimLight);
 
   // Soft circular floor contact shadow beneath y = 0.
@@ -774,7 +900,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     canvas.height = 256;
     var ctx = canvas.getContext("2d");
     var g = ctx.createRadialGradient(128, 128, 16, 128, 128, 124);
-    g.addColorStop(0.0, "rgba(17, 17, 17, 0.30)");
+    g.addColorStop(0.0, "rgba(17, 17, 17, 0.32)");
     g.addColorStop(0.6, "rgba(17, 17, 17, 0.14)");
     g.addColorStop(1.0, "rgba(17, 17, 17, 0.0)");
     ctx.fillStyle = g;
@@ -785,7 +911,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   }
 
   var floorShadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.96, 48),
+    new THREE.CircleGeometry(1.02, 48),
     new THREE.MeshBasicMaterial({
       map: createShadowTexture(),
       transparent: true,
@@ -801,28 +927,43 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   turntable.position.set(0, 0, 0);
   scene.add(turntable);
 
-  // Shared materials
-  var inkLineMat = new THREE.LineBasicMaterial({ color: 0x111111 });
-  var inkMeshMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.85, metalness: 0.05 });
-  var cavityMat = new THREE.MeshStandardMaterial({ color: 0x1E293B, roughness: 0.90, metalness: 0.05 });
+  // Shared materials: sleek glossy tempered-glass/enamel MeshPhysicalMaterial & crisp recessed chassis.
+  var inkLineMat = new THREE.LineBasicMaterial({ color: 0x0F172A, transparent: true, opacity: 0.34 });
+  var inkMeshMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.80, metalness: 0.08, envMapIntensity: 0.20 });
+  var cavityMat = new THREE.MeshStandardMaterial({ color: 0x1E293B, roughness: 0.90, metalness: 0.05, envMapIntensity: 0.20 });
+  var seamMat = new THREE.MeshStandardMaterial({ color: 0x0F172A, roughness: 0.85, metalness: 0.06, envMapIntensity: 0.22 });
   var ledMat = new THREE.MeshBasicMaterial({ color: 0xE0F2FE });
   var glassMat = new THREE.MeshStandardMaterial({
     color: 0xBAE6FD,
-    roughness: 0.12,
-    metalness: 0.08,
+    roughness: 0.14,
+    metalness: 0.10,
     transparent: true,
     opacity: 0.54
   });
-  var handleMat = new THREE.MeshStandardMaterial({ color: 0xE5E7EB, roughness: 0.28, metalness: 0.72 });
-  var shellMat = new THREE.MeshStandardMaterial({ color: 0xCBD5E1, roughness: 0.40, metalness: 0.30 });
-  var propMats = PROP_COLORS.map(function (c) {
-    return new THREE.MeshStandardMaterial({ color: c, roughness: 0.52, metalness: 0.05 });
+  var handleMat = new THREE.MeshPhysicalMaterial({
+    color: 0x1E293B,
+    metalness: 0.5,
+    roughness: 0.25,
+    clearcoat: 0.4,
+    clearcoatRoughness: 0.18,
+    envMapIntensity: 0.95
   });
-  var magnetYellowMat = new THREE.MeshStandardMaterial({ color: 0xFACC15, roughness: 0.45, metalness: 0.08 });
-  var magnetPinkMat = new THREE.MeshStandardMaterial({ color: 0xFB7185, roughness: 0.45, metalness: 0.08 });
+  var shellMat = new THREE.MeshPhysicalMaterial({
+    color: SHELL_SPECS.inox.color,
+    metalness: SHELL_SPECS.inox.metalness,
+    roughness: SHELL_SPECS.inox.roughness,
+    clearcoat: SHELL_SPECS.inox.clearcoat,
+    clearcoatRoughness: SHELL_SPECS.inox.clearcoatRoughness,
+    envMapIntensity: SHELL_SPECS.inox.envMapIntensity
+  });
+  var propMats = PROP_COLORS.map(function (c) {
+    return new THREE.MeshStandardMaterial({ color: c, roughness: 0.46, metalness: 0.06 });
+  });
+  var magnetYellowMat = new THREE.MeshStandardMaterial({ color: 0xFACC15, roughness: 0.40, metalness: 0.10 });
+  var magnetPinkMat = new THREE.MeshStandardMaterial({ color: 0xFB7185, roughness: 0.40, metalness: 0.10 });
 
   // Build rounded box geometry centered at origin with crisp bevels.
-  function createRoundedBoxGeometry(w, h, d, radius) {
+  function createRoundedBoxGeometry(w, h, d, radius, bevelOverride) {
     var r = Math.min(radius, w * 0.42, h * 0.42);
     var hw = w / 2;
     var hh = h / 2;
@@ -837,7 +978,8 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     shape.lineTo(-hw, -hh + r);
     shape.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
 
-    var bevel = Math.min(0.012, d * 0.18, r * 0.45);
+    var targetBevel = bevelOverride || 0.012;
+    var bevel = Math.min(targetBevel, d * 0.24, r * 0.45);
     var depth = Math.max(0.004, d - bevel * 2);
     var geo = new THREE.ExtrudeGeometry(shape, {
       depth: depth,
@@ -845,7 +987,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       bevelThickness: bevel,
       bevelSize: bevel,
       bevelSegments: 2,
-      curveSegments: 4
+      curveSegments: 5
     });
     geo.center();
     geo.computeVertexNormals();
@@ -856,7 +998,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     var mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
     if (userData) Object.assign(mesh.userData, userData);
-    var edges = new THREE.EdgesGeometry(geo, 24);
+    var edges = new THREE.EdgesGeometry(geo, 28);
     var line = new THREE.LineSegments(edges, inkLineMat);
     mesh.add(line);
     parent.add(mesh);
@@ -881,7 +1023,9 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     colorKey: "inox",
     compartments: [],
     openCompartmentId: null,
-    showStickers: false
+    showStickers: false,
+    springReturn: false,
+    showDotGrid: true
   };
   var layoutSignature = "";
   var doorControllers = []; // { id, kind, rightHinge, pivot, anchor, progress }
@@ -891,8 +1035,11 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   function updateShellMaterial(colorKey) {
     var spec = SHELL_SPECS[colorKey] || SHELL_SPECS.inox;
     shellMat.color.setHex(spec.color);
-    shellMat.roughness = spec.roughness;
     shellMat.metalness = spec.metalness;
+    shellMat.roughness = spec.roughness;
+    shellMat.clearcoat = spec.clearcoat;
+    shellMat.clearcoatRoughness = spec.clearcoatRoughness;
+    shellMat.envMapIntensity = spec.envMapIntensity;
     shellMat.needsUpdate = true;
   }
 
@@ -920,18 +1067,31 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     var cabData = { isCabinet: true };
     var backMesh = addOutlinedMesh(
       turntable,
-      createRoundedBoxGeometry(CAB_W, CAB_H, WALL, 0.045),
+      createRoundedBoxGeometry(CAB_W, CAB_H, WALL, 0.045, 0.014),
       shellMat,
       0, midY, -CAB_D / 2 + WALL / 2,
       cabData
     );
-    var sideGeo = createRoundedBoxGeometry(WALL, CAB_H, CAB_D, 0.02);
+    var sideGeo = createRoundedBoxGeometry(WALL, CAB_H, CAB_D, 0.02, 0.012);
     var leftMesh = addOutlinedMesh(turntable, sideGeo, shellMat, -halfW + WALL / 2, midY, 0, cabData);
     var rightMesh = addOutlinedMesh(turntable, sideGeo.clone(), shellMat, halfW - WALL / 2, midY, 0, cabData);
-    var capGeo = createRoundedBoxGeometry(CAB_W, WALL, CAB_D, 0.04);
+    var capGeo = createRoundedBoxGeometry(CAB_W, WALL, CAB_D, 0.04, 0.012);
     var topMesh = addOutlinedMesh(turntable, capGeo, shellMat, 0, topY - WALL / 2, 0, cabData);
     var botMesh = addOutlinedMesh(turntable, capGeo.clone(), shellMat, 0, FOOT_H + WALL / 2, 0, cabData);
     raycastTargets.push(backMesh, leftMesh, rightMesh, topMesh, botMesh);
+
+    // Dark recessed shadow perimeter frame (#1E293B) behind outer door seams
+    var seamZ = CAB_D / 2 + 0.004;
+    var seamD = 0.014;
+    var topSeam = new THREE.Mesh(new THREE.BoxGeometry(CAB_W - 0.04, WALL * 0.85, seamD), seamMat);
+    topSeam.position.set(0, topY - WALL * 0.5, seamZ);
+    var botSeam = new THREE.Mesh(new THREE.BoxGeometry(CAB_W - 0.04, WALL * 0.85, seamD), seamMat);
+    botSeam.position.set(0, FOOT_H + WALL * 0.5, seamZ);
+    var leftSeam = new THREE.Mesh(new THREE.BoxGeometry(WALL * 0.82, CAB_H - 0.04, seamD), seamMat);
+    leftSeam.position.set(-halfW + WALL * 0.48, midY, seamZ);
+    var rightSeam = new THREE.Mesh(new THREE.BoxGeometry(WALL * 0.82, CAB_H - 0.04, seamD), seamMat);
+    rightSeam.position.set(halfW - WALL * 0.48, midY, seamZ);
+    turntable.add(topSeam, botSeam, leftSeam, rightSeam);
 
     // Dark interior cavity + ceiling LED light
     var cavGeo = new THREE.BoxGeometry(CAB_W - WALL * 2, CAB_H - WALL * 2, 0.015);
@@ -956,18 +1116,32 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       var top = worldY(c.y);
       var bottom = worldY(c.y + c.h);
 
-      // Divider shelf between stacked compartments
+      // Divider shelf + dark recessed seam strip between compartments
       if (c.y + c.h < 0.96) {
         var divGeo = new THREE.BoxGeometry(intW, WALL * 0.55, depthInt);
         var divMesh = new THREE.Mesh(divGeo, shellMat);
         divMesh.position.set(cxInt, bottom, 0);
         turntable.add(divMesh);
+
+        var hGapStrip = new THREE.Mesh(
+          new THREE.BoxGeometry(intW + WALL * 0.4, WALL * 0.72, 0.018),
+          seamMat
+        );
+        hGapStrip.position.set(cxInt, bottom, seamZ);
+        turntable.add(hGapStrip);
       }
       if (c.x + c.w < 0.94) {
         var vDivGeo = new THREE.BoxGeometry(WALL * 0.55, top - bottom, depthInt);
         var vDivMesh = new THREE.Mesh(vDivGeo, shellMat);
         vDivMesh.position.set(worldX(c.x + c.w), (top + bottom) / 2, 0);
         turntable.add(vDivMesh);
+
+        var vGapStrip = new THREE.Mesh(
+          new THREE.BoxGeometry(WALL * 0.72, top - bottom, 0.018),
+          seamMat
+        );
+        vGapStrip.position.set(worldX(c.x + c.w), (top + bottom) / 2, seamZ);
+        turntable.add(vGapStrip);
       }
 
       // Glass shelves & colorful 3D food props
@@ -990,7 +1164,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
         turntable.add(p2);
       }
 
-      // Door / Drawer mesh bounds with deep separation gap
+      // Door / Drawer mesh bounds with deep separation gap & pop-out 3D relief
       var doorW = Math.max(0.16, c.w * CAB_W - COMP_INSET * 2);
       var doorH = Math.max(0.16, c.h * CAB_H - COMP_INSET * 2);
       var centerY = worldY(c.y + c.h / 2);
@@ -1011,30 +1185,46 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
         var dir = isRightHinge ? -1 : 1;
         pivot.position.set(hingeX, centerY, zFront);
 
+        // Recessed magnetic door gasket backing (#1E293B) behind the beveled door slab
+        var gasketMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(Math.max(0.12, doorW - 0.026), Math.max(0.12, doorH - 0.026), 0.014),
+          seamMat
+        );
+        gasketMesh.position.set(dir * doorW / 2, 0, -0.005);
+        pivot.add(gasketMesh);
+
         var doorMesh = addOutlinedMesh(
           pivot,
-          createRoundedBoxGeometry(doorW, doorH, DOOR_T, 0.042),
+          createRoundedBoxGeometry(doorW, doorH, DOOR_T, 0.044, 0.018),
           shellMat,
           dir * doorW / 2, 0, DOOR_T / 2,
           doorUserData
         );
         raycastTargets.push(doorMesh);
 
-        // Rounded metallic vertical bar handle
+        // Dark charcoal anodized bar handle + subtle shadow backing strip
         var hLen = Math.min(0.75, doorH * 0.44);
-        var handleGeo = new THREE.CylinderGeometry(0.018, 0.018, hLen, 12);
+        var handleX = dir * (doorW - 0.082);
+        var stripMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.026, hLen * 0.94, 0.006),
+          seamMat
+        );
+        stripMesh.position.set(handleX, 0, DOOR_T + 0.003);
+        pivot.add(stripMesh);
+
+        var handleGeo = new THREE.CylinderGeometry(0.019, 0.019, hLen, 16);
         var handleMesh = addOutlinedMesh(
           pivot,
           handleGeo,
           handleMat,
-          dir * (doorW - 0.075), 0, DOOR_T + 0.032,
+          handleX, 0, DOOR_T + 0.036,
           doorUserData
         );
         raycastTargets.push(handleMesh);
 
         // Signature magnets on top-right corner of top door (index == 0)
         if (index === 0) {
-          var mag1Geo = new THREE.CylinderGeometry(0.045, 0.045, 0.02, 20);
+          var mag1Geo = new THREE.CylinderGeometry(0.045, 0.045, 0.022, 20);
           mag1Geo.rotateX(Math.PI / 2);
           var mag1X = isRightHinge ? dir * (doorW * 0.24) : dir * (doorW * 0.72);
           var mag1 = addOutlinedMesh(
@@ -1047,7 +1237,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
           var mag2X = isRightHinge ? dir * (doorW * 0.38) : dir * (doorW * 0.84);
           var mag2 = addOutlinedMesh(
             pivot,
-            createRoundedBoxGeometry(0.09, 0.06, 0.02, 0.015),
+            createRoundedBoxGeometry(0.09, 0.06, 0.022, 0.015, 0.005),
             magnetPinkMat,
             mag2X, doorH * 0.16, DOOR_T + 0.012,
             doorUserData
@@ -1055,36 +1245,51 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
           raycastTargets.push(mag1, mag2);
         }
 
-        anchor.position.set(dir * doorW * 0.5, 0, DOOR_T + 0.05);
+        anchor.position.set(dir * doorW * 0.5, 0, DOOR_T + 0.055);
         pivot.add(anchor);
       } else {
         // DRAWER
         pivot.position.set(centerX, centerY, zFront);
 
+        var drawerGasket = new THREE.Mesh(
+          new THREE.BoxGeometry(Math.max(0.12, doorW - 0.026), Math.max(0.12, doorH - 0.026), 0.014),
+          seamMat
+        );
+        drawerGasket.position.set(0, 0, -0.005);
+        pivot.add(drawerGasket);
+
         var drawerMesh = addOutlinedMesh(
           pivot,
-          createRoundedBoxGeometry(doorW, doorH, DOOR_T, 0.038),
+          createRoundedBoxGeometry(doorW, doorH, DOOR_T, 0.040, 0.018),
           shellMat,
           0, 0, DOOR_T / 2,
           doorUserData
         );
         raycastTargets.push(drawerMesh);
 
-        // Horizontal rounded metallic handle near top edge
+        // Horizontal charcoal anodized handle + subtle shadow backing strip
         var hWidth = Math.min(0.56, doorW * 0.48);
-        var dhGeo = new THREE.CylinderGeometry(0.018, 0.018, hWidth, 12);
+        var handleY = doorH * 0.32;
+        var dhStrip = new THREE.Mesh(
+          new THREE.BoxGeometry(hWidth * 0.94, 0.026, 0.006),
+          seamMat
+        );
+        dhStrip.position.set(0, handleY, DOOR_T + 0.003);
+        pivot.add(dhStrip);
+
+        var dhGeo = new THREE.CylinderGeometry(0.019, 0.019, hWidth, 16);
         dhGeo.rotateZ(Math.PI / 2);
         var dhMesh = addOutlinedMesh(
           pivot,
           dhGeo,
           handleMat,
-          0, doorH * 0.32, DOOR_T + 0.032,
+          0, handleY, DOOR_T + 0.036,
           doorUserData
         );
         raycastTargets.push(dhMesh);
 
         // Inner pulled-out tray
-        var trayGeo = createRoundedBoxGeometry(doorW - 0.12, doorH * 0.68, CAB_D * 0.65, 0.02);
+        var trayGeo = createRoundedBoxGeometry(doorW - 0.12, doorH * 0.68, CAB_D * 0.65, 0.02, 0.008);
         var trayMesh = addOutlinedMesh(
           pivot,
           trayGeo,
@@ -1094,7 +1299,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
         );
         raycastTargets.push(trayMesh);
 
-        anchor.position.set(0, 0, DOOR_T + 0.05);
+        anchor.position.set(0, 0, DOOR_T + 0.055);
         pivot.add(anchor);
       }
 
@@ -1110,13 +1315,19 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     });
   }
 
+  function getRestYaw() {
+    return state.springReturn ? HOME_REST_YAW : DESIGNER_YAW;
+  }
+
   // Turntable rotation & welcome spin state
-  var yaw = DEFAULT_YAW;
+  var yaw = getRestYaw();
   var pitch = DEFAULT_PITCH;
   var yawVel = 0;
   var isDragging = false;
-  var welcomeSpin = null; // { startTime, startYaw }
+  var hasReceivedConfig = false;
+  var welcomeSpin = null; // { startTime, startYaw, targetYaw }
   var resetAnim = null;   // { startTime, startYaw, targetYaw, startPitch }
+  var bounceAnim = null;  // { startTime, impulseApplied }
 
   function nearestYaw(current, desired) {
     var delta = (desired - current) % (Math.PI * 2);
@@ -1129,11 +1340,51 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   window.updateFridge = function (configJson) {
     try {
       var cfg = typeof configJson === "string" ? JSON.parse(configJson) : configJson;
+      var wasSpring = state.springReturn;
+      var isInitialConfig = !hasReceivedConfig;
+      hasReceivedConfig = true;
       state.template = cfg.template || "top_freezer";
       state.colorKey = cfg.colorKey || "inox";
       state.openCompartmentId = cfg.openCompartmentId || null;
       state.showStickers = !!cfg.showStickers;
+      state.springReturn = (cfg.springReturn !== undefined) ? !!cfg.springReturn : state.showStickers;
+      state.showDotGrid = cfg.showDotGrid !== false;
       state.compartments = Array.isArray(cfg.compartments) ? cfg.compartments : [];
+
+      if (isInitialConfig && !welcomeSpin) {
+        yaw = getRestYaw();
+        yawVel = 0;
+        resetAnim = null;
+      } else if (!wasSpring && state.springReturn) {
+        if (welcomeSpin) {
+          welcomeSpin.targetYaw = HOME_REST_YAW;
+        } else {
+          var wrapped = nearestYaw(HOME_REST_YAW, yaw);
+          yaw = Math.max(
+            HOME_REST_YAW - SPRING_HARD_LIMIT,
+            Math.min(HOME_REST_YAW + SPRING_HARD_LIMIT, wrapped)
+          );
+          yawVel = 0;
+          resetAnim = null;
+        }
+      }
+
+      var nextBg = cfg.surfaceBg || (state.showDotGrid ? "#FAF8F5" : "#FFFFFF");
+      if (nextBg !== currentSurfaceBg) {
+        currentSurfaceBg = nextBg;
+        document.documentElement.style.backgroundColor = nextBg;
+        document.body.style.backgroundColor = nextBg;
+        if (renderer.domElement) renderer.domElement.style.backgroundColor = nextBg;
+      }
+      renderer.setClearColor(nextBg, 1);
+
+      if (state.showDotGrid) {
+        dotGridTex.repeat.set(lastCssW / DOT_STEP_PX, lastCssH / DOT_STEP_PX);
+        scene.background = dotGridTex;
+      } else {
+        solidBgColor.set(nextBg);
+        scene.background = solidBgColor;
+      }
 
       updateShellMaterial(state.colorKey);
 
@@ -1150,24 +1401,43 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   };
 
   window.playWelcomeSpin = function () {
+    var restYaw = getRestYaw();
     resetAnim = null;
     yawVel = 0;
-    yaw = DEFAULT_YAW;
+    yaw = restYaw;
     pitch = DEFAULT_PITCH;
     welcomeSpin = {
       startTime: performance.now(),
-      startYaw: DEFAULT_YAW
+      startYaw: restYaw,
+      targetYaw: restYaw
     };
   };
 
   window.resetView = function () {
+    var restYaw = getRestYaw();
     welcomeSpin = null;
+    if (state.springReturn) {
+      resetAnim = null;
+      if (Math.abs(yaw - restYaw) < 6 * DEG) {
+        yawVel = 3.4;
+      } else {
+        yawVel = 0;
+      }
+      return;
+    }
     yawVel = 0;
     resetAnim = {
       startTime: performance.now(),
       startYaw: yaw,
-      targetYaw: nearestYaw(yaw, DEFAULT_YAW),
+      targetYaw: nearestYaw(yaw, restYaw),
       startPitch: pitch
+    };
+  };
+
+  window.playItemAddedBounce = function () {
+    bounceAnim = {
+      startTime: performance.now(),
+      impulseApplied: false
     };
   };
 
@@ -1175,10 +1445,18 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   var raycaster = new THREE.Raycaster();
   var downPos = { x: 0, y: 0 };
   var lastPos = { x: 0, y: 0 };
+  var lastMoveTime = performance.now();
   var totalDrag = 0;
   var activePointerId = null;
 
   var dom = renderer.domElement;
+  dom.addEventListener("touchstart", function (e) {
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+  dom.addEventListener("touchmove", function (e) {
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+
   dom.addEventListener("pointerdown", function (e) {
     activePointerId = e.pointerId;
     isDragging = true;
@@ -1187,6 +1465,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     yawVel = 0;
     downPos = { x: e.clientX, y: e.clientY };
     lastPos = { x: e.clientX, y: e.clientY };
+    lastMoveTime = performance.now();
     totalDrag = 0;
     if (dom.setPointerCapture) {
       try { dom.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1195,14 +1474,28 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
 
   dom.addEventListener("pointermove", function (e) {
     if (!isDragging || e.pointerId !== activePointerId) return;
+    var nowMs = performance.now();
+    var moveDt = Math.max(0.008, (nowMs - lastMoveTime) / 1000);
+    lastMoveTime = nowMs;
+
     var dx = e.clientX - lastPos.x;
     var dy = e.clientY - lastPos.y;
     lastPos = { x: e.clientX, y: e.clientY };
     totalDrag += Math.hypot(dx, dy);
 
     var dyaw = dx * 0.0095;
-    yaw += dyaw;
-    yawVel = dyaw * 0.75;
+    if (state.springReturn) {
+      var offset = yaw - HOME_REST_YAW;
+      if (Math.abs(offset) > SPRING_SOFT_LIMIT && (offset * dyaw > 0)) {
+        var over = Math.min(1, (Math.abs(offset) - SPRING_SOFT_LIMIT) / (SPRING_HARD_LIMIT - SPRING_SOFT_LIMIT));
+        dyaw *= Math.max(0.08, 1 - over * 0.88);
+      }
+      yaw = Math.max(HOME_REST_YAW - SPRING_HARD_LIMIT, Math.min(HOME_REST_YAW + SPRING_HARD_LIMIT, yaw + dyaw));
+      yawVel = Math.max(-8, Math.min(8, (dyaw / moveDt) * 0.35));
+    } else {
+      yaw += dyaw;
+      yawVel = dyaw * 0.75;
+    }
     pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, pitch - dy * 0.0022));
   });
 
@@ -1242,6 +1535,11 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   function applyResize(w, h) {
     if (!w || !h || w <= 0 || h <= 0) return;
     console.log("CANVAS_RESIZE", w, h);
+    lastCssW = w;
+    lastCssH = h;
+    if (dotGridTex) {
+      dotGridTex.repeat.set(w / DOT_STEP_PX, h / DOT_STEP_PX);
+    }
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
@@ -1277,10 +1575,11 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
 
     if (welcomeSpin) {
       var t = Math.min(1, (now - welcomeSpin.startTime) / 1000);
-      yaw = welcomeSpin.startYaw + Math.PI * 2 * easeInOutCubic(t);
+      var spinTarget = (welcomeSpin.targetYaw !== undefined) ? welcomeSpin.targetYaw : getRestYaw();
+      yaw = welcomeSpin.startYaw + (spinTarget + Math.PI * 2 - welcomeSpin.startYaw) * easeInOutCubic(t);
       pitch = DEFAULT_PITCH;
       if (t >= 1) {
-        yaw = DEFAULT_YAW;
+        yaw = spinTarget;
         welcomeSpin = null;
         if (window.AndroidBridge && window.AndroidBridge.onWelcomeSpinFinished) {
           window.AndroidBridge.onWelcomeSpinFinished();
@@ -1292,19 +1591,76 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       yaw = resetAnim.startYaw + (resetAnim.targetYaw - resetAnim.startYaw) * re;
       pitch = resetAnim.startPitch + (DEFAULT_PITCH - resetAnim.startPitch) * re;
       if (rt >= 1) {
-        yaw = DEFAULT_YAW;
+        yaw = getRestYaw();
         pitch = DEFAULT_PITCH;
         resetAnim = null;
       }
     } else if (!isDragging) {
-      if (Math.abs(yawVel) > 0.0002) {
-        yaw += yawVel * (dt * 60);
-        yawVel *= Math.pow(0.91, dt * 60);
+      if (state.springReturn) {
+        var subDt = dt * 0.5;
+        for (var k = 0; k < 2; k++) {
+          var displacement = yaw - HOME_REST_YAW;
+          var accel = -SPRING_STIFFNESS * displacement - SPRING_DAMPING * yawVel;
+          yawVel += accel * subDt;
+          yaw = Math.max(
+            HOME_REST_YAW - SPRING_HARD_LIMIT,
+            Math.min(HOME_REST_YAW + SPRING_HARD_LIMIT, yaw + yawVel * subDt)
+          );
+        }
+        if (Math.abs(yaw - HOME_REST_YAW) < 0.0005 && Math.abs(yawVel) < 0.002) {
+          yaw = HOME_REST_YAW;
+          yawVel = 0;
+        }
       } else {
-        yawVel = 0;
+        if (Math.abs(yawVel) > 0.0002) {
+          yaw += yawVel * (dt * 60);
+          yawVel *= Math.pow(0.91, dt * 60);
+        } else {
+          yawVel = 0;
+        }
       }
-      // Spring pitch back to grounded -4 deg
+      // Spring pitch back to grounded -4.5 deg
       pitch += (DEFAULT_PITCH - pitch) * Math.min(1, dt * 10);
+    }
+
+    if (bounceAnim) {
+      var elapsed = now - bounceAnim.startTime;
+      if (elapsed < 90) {
+        var p1 = elapsed / 90;
+        var e1 = easeInOutCubic(p1);
+        var sy1 = 1 + (0.94 - 1) * e1;
+        var sxz1 = 1 + (1.032 - 1) * e1;
+        turntable.scale.set(sxz1, sy1, sxz1);
+        turntable.position.y = 0;
+        floorShadow.scale.set(1, 1, 1);
+      } else if (elapsed < 220) {
+        if (!bounceAnim.impulseApplied) {
+          bounceAnim.impulseApplied = true;
+          yawVel += 1.5;
+        }
+        var p2 = (elapsed - 90) / 130;
+        var e2 = easeInOutCubic(p2);
+        var sy2 = 0.94 + (1.045 - 0.94) * e2;
+        var sxz2 = 1.032 + (0.978 - 1.032) * e2;
+        turntable.scale.set(sxz2, sy2, sxz2);
+        turntable.position.y = 0.045 * e2;
+        var sh2 = 1 - turntable.position.y * 2.4;
+        floorShadow.scale.set(sh2, sh2, 1);
+      } else if (elapsed < 450) {
+        var p3 = (elapsed - 220) / 230;
+        var e3 = easeInOutCubic(p3);
+        var sy3 = 1.045 + (1.0 - 1.045) * e3;
+        var sxz3 = 0.978 + (1.0 - 0.978) * e3;
+        turntable.scale.set(sxz3, sy3, sxz3);
+        turntable.position.y = 0.045 * (1 - e3);
+        var sh3 = 1 - turntable.position.y * 2.4;
+        floorShadow.scale.set(sh3, sh3, 1);
+      } else {
+        turntable.scale.set(1, 1, 1);
+        turntable.position.y = 0;
+        floorShadow.scale.set(1, 1, 1);
+        bounceAnim = null;
+      }
     }
 
     turntable.rotation.y = yaw;
@@ -1345,7 +1701,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
           id: ctrl.id,
           x: Math.round(sx * 1000) / 1000,
           y: Math.round(sy * 1000) / 1000,
-          visible: vis
+          visible: !!vis
         });
       }
       var payload = JSON.stringify(list);
@@ -2042,28 +2398,55 @@ fun zoneForCompartment(compartment: CompartmentUi): StorageZone =
   zoneForCompartment(compartment.id, compartment.name, compartment.kind)
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/MainActivity.kt` (187 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/MainActivity.kt` (385 lines)
 
 ```kotlin
 package com.truong.fridgezero
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
+import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.truong.fridgezero.data.AppConfig
@@ -2079,10 +2462,34 @@ import com.truong.fridgezero.ui.fridge3d.LocalFridge3DStageController
 import com.truong.fridgezero.ui.fridge3d.SharedFridge3DWebView
 import com.truong.fridgezero.ui.fridge3d.rememberFridge3DStageController
 import com.truong.fridgezero.ui.home.HomeScreen
+import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.CoralUrgent
+import com.truong.fridgezero.ui.theme.DisplayFont
 import com.truong.fridgezero.ui.theme.FridgeZeroTheme
+import com.truong.fridgezero.ui.theme.InkBlack
+import com.truong.fridgezero.ui.theme.LemonWarn
+import com.truong.fridgezero.ui.theme.LimeFresh
+import com.truong.fridgezero.ui.theme.MonoFont
+import com.truong.fridgezero.ui.theme.NeoBrutalistButton
+import com.truong.fridgezero.ui.theme.NeoBrutalistCard
+import com.truong.fridgezero.ui.theme.StickerBadge
 import com.truong.fridgezero.ui.theme.dotGridBackground
 import com.truong.fridgezero.vm.FridgeViewModel
 import kotlinx.coroutines.launch
+
+private const val CRASH_TRACE_FILE = "crash_trace.txt"
+
+private class FridgeCrashHandler(
+  private val crashFile: File,
+  private val previous: Thread.UncaughtExceptionHandler?
+) : Thread.UncaughtExceptionHandler {
+  override fun uncaughtException(thread: Thread, throwable: Throwable) {
+    runCatching {
+      crashFile.writeText(Log.getStackTraceString(throwable))
+    }
+    previous?.uncaughtException(thread, throwable)
+  }
+}
 
 private sealed interface RootRoute {
   data object Home : RootRoute
@@ -2094,139 +2501,286 @@ private sealed interface RootRoute {
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+
+    val crashFile = File(applicationContext.filesDir, CRASH_TRACE_FILE)
+    if (Thread.getDefaultUncaughtExceptionHandler() !is FridgeCrashHandler) {
+      val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+      Thread.setDefaultUncaughtExceptionHandler(FridgeCrashHandler(crashFile, previousHandler))
+    }
+
     enableEdgeToEdge(
       statusBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
       navigationBarStyle = SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
     )
     setContent {
       FridgeZeroTheme {
-        val stageController = rememberFridge3DStageController()
-        val appConfig = remember { AppConfig(applicationContext) }
-        val scope = rememberCoroutineScope()
-        val onboardingDone by appConfig.hasCompletedOnboarding
-          .collectAsStateWithLifecycle(initialValue = null)
-        val vm: FridgeViewModel = viewModel(factory = FridgeViewModel.factory(applicationContext))
-        val uiState by vm.uiState.collectAsStateWithLifecycle()
-        val reminderController = rememberReminderPromptController(appConfig)
-        var route by remember { mutableStateOf<RootRoute>(RootRoute.Home) }
-        var justClosedCompartmentId by remember { mutableStateOf<String?>(null) }
+        var savedCrashTrace by remember {
+          mutableStateOf(
+            runCatching {
+              if (crashFile.exists()) crashFile.readText().takeIf { it.isNotBlank() } else null
+            }.getOrNull()
+          )
+        }
 
-        CompositionLocalProvider(LocalFridge3DStageController provides stageController) {
-          Box(
-            modifier = Modifier
-              .fillMaxSize()
-              .dotGridBackground()
-              .onGloballyPositioned { stageController.rootCoordinates = it }
-          ) {
-            // Optional framed card backdrop behind WebView (used by FridgeDesignerScreen)
-            Fridge3DStageBackdrop(controller = stageController)
+        if (savedCrashTrace != null) {
+          CrashReportScreen(
+            trace = savedCrashTrace.orEmpty(),
+            onClearAndContinue = {
+              runCatching { if (crashFile.exists()) crashFile.delete() }
+              savedCrashTrace = null
+            }
+          )
+        } else {
+          val stageController = rememberFridge3DStageController()
+          val appConfig = remember { AppConfig(applicationContext) }
+          val scope = rememberCoroutineScope()
+          val onboardingDone by appConfig.hasCompletedOnboarding
+            .collectAsStateWithLifecycle(initialValue = null)
+          val vm: FridgeViewModel = viewModel(factory = FridgeViewModel.factory(applicationContext))
+          val uiState by vm.uiState.collectAsStateWithLifecycle()
+          val reminderController = rememberReminderPromptController(appConfig)
+          var route by remember { mutableStateOf<RootRoute>(RootRoute.Home) }
+          var justClosedCompartmentId by remember { mutableStateOf<String?>(null) }
 
-            // Single shared WebView hosted at root for the entire Activity lifetime
-            SharedFridge3DWebView(controller = stageController)
+          CompositionLocalProvider(LocalFridge3DStageController provides stageController) {
+            Box(
+              modifier = Modifier
+                .fillMaxSize()
+                .dotGridBackground()
+                .onGloballyPositioned { stageController.rootCoordinates = it }
+            ) {
+              // Optional framed card backdrop behind WebView (used by FridgeDesignerScreen)
+              Fridge3DStageBackdrop(
+                controller = stageController,
+                modifier = Modifier.zIndex(0.5f)
+              )
 
-            // Foreground screen UI, DoorStickersOverlay, and Floating "+ Thêm nhanh" button
-            Box(modifier = Modifier.fillMaxSize()) {
-              when {
-                onboardingDone == null -> Unit
-                onboardingDone == false || route is RootRoute.Designer -> {
-                  val isEditingExisting = onboardingDone == true
-                  val fridge = uiState.activeFridge ?: Seed.defaultFridge
-                  val current = if (isEditingExisting) {
-                    uiState.compartments.mapIndexed { idx, c ->
-                      CompartmentEntity(
-                        id = c.id, fridgeId = fridge.id, name = c.name,
-                        x = c.rect.x, y = c.rect.y, w = c.rect.w, h = c.rect.h,
-                        kind = c.kind, shelves = c.shelves, sort = idx
-                      )
+              // Single shared WebView hosted at root above dotGridBackground and below foreground UI
+              SharedFridge3DWebView(
+                controller = stageController,
+                modifier = Modifier.zIndex(1f)
+              )
+
+              // Foreground screen UI, DoorStickersOverlay, HomeDashboardHeader, HomeTaskBar, and FAB
+              Box(modifier = Modifier.fillMaxSize().zIndex(2f)) {
+                when {
+                  onboardingDone == null -> Unit
+                  onboardingDone == false || route is RootRoute.Designer -> {
+                    val isEditingExisting = onboardingDone == true
+                    val fridge = uiState.activeFridge ?: Seed.defaultFridge
+                    val current = if (isEditingExisting) {
+                      uiState.compartments.mapIndexed { idx, c ->
+                        CompartmentEntity(
+                          id = c.id, fridgeId = fridge.id, name = c.name,
+                          x = c.rect.x, y = c.rect.y, w = c.rect.w, h = c.rect.h,
+                          kind = c.kind, shelves = c.shelves, sort = idx
+                        )
+                      }
+                    } else {
+                      Seed.compartmentsForTemplate(Seed.defaultFridge.template, Seed.defaultFridge.id)
                     }
-                  } else {
-                    Seed.compartmentsForTemplate(Seed.defaultFridge.template, Seed.defaultFridge.id)
+                    if (isEditingExisting) {
+                      BackHandler { route = RootRoute.Home }
+                    }
+                    FridgeDesignerScreen(
+                      initialFridge = if (isEditingExisting) fridge else Seed.defaultFridge,
+                      initialCompartments = current,
+                      onConfirm = { f, comps ->
+                        vm.saveCustomFridge(
+                          fridge = f,
+                          compartments = comps,
+                          includeSampleItems = true,
+                          triggerWelcomeSpin = true
+                        )
+                        scope.launch { appConfig.setOnboardingCompleted(true) }
+                        route = RootRoute.Home
+                      }
+                    )
                   }
-                  if (isEditingExisting) {
+                  route is RootRoute.AiScan -> {
                     BackHandler { route = RootRoute.Home }
+                    AiScanPlaceholderScreen(onBack = { route = RootRoute.Home })
                   }
-                  FridgeDesignerScreen(
-                    initialFridge = if (isEditingExisting) fridge else Seed.defaultFridge,
-                    initialCompartments = current,
-                    onConfirm = { f, comps ->
-                      vm.saveCustomFridge(
-                        fridge = f,
-                        compartments = comps,
-                        includeSampleItems = true,
-                        triggerWelcomeSpin = true
+                  route is RootRoute.Bento -> {
+                    val bentoRoute = route as RootRoute.Bento
+                    val comp = uiState.compartments.firstOrNull { it.id == bentoRoute.compartmentId }
+                      ?: uiState.compartments.firstOrNull()
+                    if (comp == null) {
+                      route = RootRoute.Home
+                    } else {
+                      val exitToHome = {
+                        justClosedCompartmentId = comp.id
+                        route = RootRoute.Home
+                      }
+                      BackHandler(onBack = exitToHome)
+                      CompartmentBentoScreen(
+                        compartment = comp,
+                        allCompartments = uiState.compartments,
+                        recentKeys = uiState.recentItemKeys,
+                        initialFilter = if (bentoRoute.filterUrgent) BentoFilter.URGENT else BentoFilter.ALL,
+                        onSelectCompartment = { nextId ->
+                          route = RootRoute.Bento(nextId, filterUrgent = false)
+                        },
+                        onBack = exitToHome,
+                        onAddItem = { compId, name, iconKey, qty, daysLeft, unit ->
+                          vm.addItem(compId, name, iconKey, qty, daysLeft, unit)
+                          reminderController.onItemSavedWithExpiry(daysLeft)
+                        },
+                        onUpdateItem = { id, name, iconKey, qty, daysLeft, unit ->
+                          vm.updateItem(id, name, iconKey, qty, daysLeft, unit)
+                          reminderController.onItemSavedWithExpiry(daysLeft)
+                        },
+                        onAdjustQuantity = vm::adjustQuantity,
+                        onToggleOpened = vm::toggleItemOpened,
+                        onMoveCompartment = { ids, targetId, newDays ->
+                          vm.moveItemToCompartment(ids, targetId, newDays)
+                        },
+                        onMarkStatus = { ids, status ->
+                          vm.markItemStatus(ids, status)
+                        }
                       )
-                      scope.launch { appConfig.setOnboardingCompleted(true) }
-                      route = RootRoute.Home
                     }
-                  )
-                }
-                route is RootRoute.AiScan -> {
-                  BackHandler { route = RootRoute.Home }
-                  AiScanPlaceholderScreen(onBack = { route = RootRoute.Home })
-                }
-                route is RootRoute.Bento -> {
-                  val bentoRoute = route as RootRoute.Bento
-                  val comp = uiState.compartments.firstOrNull { it.id == bentoRoute.compartmentId }
-                    ?: uiState.compartments.firstOrNull()
-                  if (comp == null) {
-                    route = RootRoute.Home
-                  } else {
-                    val exitToHome = {
-                      justClosedCompartmentId = comp.id
-                      route = RootRoute.Home
-                    }
-                    BackHandler(onBack = exitToHome)
-                    CompartmentBentoScreen(
-                      compartment = comp,
-                      allCompartments = uiState.compartments,
-                      recentKeys = uiState.recentItemKeys,
-                      initialFilter = if (bentoRoute.filterUrgent) BentoFilter.URGENT else BentoFilter.ALL,
-                      onSelectCompartment = { nextId ->
-                        route = RootRoute.Bento(nextId, filterUrgent = false)
+                  }
+                  else -> {
+                    HomeScreen(
+                      uiState = uiState,
+                      remindersEnabled = reminderController.remindersEnabled,
+                      justClosedCompartmentId = justClosedCompartmentId,
+                      onJustClosedConsumed = { justClosedCompartmentId = null },
+                      onToggleReminders = reminderController.onToggleReminders,
+                      onWelcomeSpinConsumed = vm::consumeWelcomeSpin,
+                      onOpenCompartment = { compId, filterUrgent ->
+                        route = RootRoute.Bento(compId, filterUrgent)
                       },
-                      onBack = exitToHome,
                       onAddItem = { compId, name, iconKey, qty, daysLeft, unit ->
                         vm.addItem(compId, name, iconKey, qty, daysLeft, unit)
                         reminderController.onItemSavedWithExpiry(daysLeft)
                       },
-                      onUpdateItem = { id, name, iconKey, qty, daysLeft, unit ->
-                        vm.updateItem(id, name, iconKey, qty, daysLeft, unit)
-                        reminderController.onItemSavedWithExpiry(daysLeft)
-                      },
-                      onAdjustQuantity = vm::adjustQuantity,
-                      onToggleOpened = vm::toggleItemOpened,
-                      onMoveCompartment = { ids, targetId, newDays ->
-                        vm.moveItemToCompartment(ids, targetId, newDays)
-                      },
-                      onMarkStatus = { ids, status ->
-                        vm.markItemStatus(ids, status)
-                      }
+                      onOpenAiScan = { route = RootRoute.AiScan },
+                      onOpenDesigner = { route = RootRoute.Designer }
                     )
                   }
-                }
-                else -> {
-                  HomeScreen(
-                    uiState = uiState,
-                    remindersEnabled = reminderController.remindersEnabled,
-                    justClosedCompartmentId = justClosedCompartmentId,
-                    onJustClosedConsumed = { justClosedCompartmentId = null },
-                    onToggleReminders = reminderController.onToggleReminders,
-                    onWelcomeSpinConsumed = vm::consumeWelcomeSpin,
-                    onOpenCompartment = { compId, filterUrgent ->
-                      route = RootRoute.Bento(compId, filterUrgent)
-                    },
-                    onAddItem = { compId, name, iconKey, qty, daysLeft, unit ->
-                      vm.addItem(compId, name, iconKey, qty, daysLeft, unit)
-                      reminderController.onItemSavedWithExpiry(daysLeft)
-                    },
-                    onOpenAiScan = { route = RootRoute.AiScan },
-                    onOpenDesigner = { route = RootRoute.Designer }
-                  )
                 }
               }
             }
           }
         }
+      }
+    }
+  }
+}
+
+@Composable
+private fun CrashReportScreen(
+  trace: String,
+  onClearAndContinue: () -> Unit
+) {
+  val context = LocalContext.current
+  val summary = remember(trace) {
+    trace.lineSequence().firstOrNull { it.isNotBlank() } ?: "UncaughtException"
+  }
+
+  Column(
+    modifier = Modifier
+      .fillMaxSize()
+      .dotGridBackground()
+      .statusBarsPadding()
+      .navigationBarsPadding()
+      .padding(16.dp),
+    verticalArrangement = Arrangement.spacedBy(12.dp)
+  ) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = "NHẬT KÝ LỖI THIẾT BỊ",
+          fontFamily = DisplayFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 20.sp,
+          color = InkBlack
+        )
+        Text(
+          text = summary,
+          fontFamily = BodyFont,
+          fontWeight = FontWeight.Bold,
+          fontSize = 13.sp,
+          color = InkBlack.copy(alpha = 0.8f),
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis
+        )
+      }
+      StickerBadge(
+        text = "CRASH LOG",
+        containerColor = CoralUrgent,
+        mono = true
+      )
+    }
+
+    NeoBrutalistCard(
+      modifier = Modifier
+        .weight(1f)
+        .fillMaxWidth()
+    ) {
+      Box(
+        modifier = Modifier
+          .fillMaxSize()
+          .verticalScroll(rememberScrollState())
+          .padding(12.dp)
+      ) {
+        Text(
+          text = trace,
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.Medium,
+          fontSize = 11.sp,
+          lineHeight = 16.sp,
+          color = InkBlack
+        )
+      }
+    }
+
+    Spacer(Modifier.height(2.dp))
+
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+      NeoBrutalistButton(
+        onClick = {
+          val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+          cm?.setPrimaryClip(ClipData.newPlainText("FridgeZero Crash", trace))
+          Toast.makeText(context, "Đã sao chép lỗi", Toast.LENGTH_SHORT).show()
+        },
+        modifier = Modifier.weight(1f),
+        containerColor = LemonWarn,
+        contentPadding = PaddingValues(vertical = 12.dp, horizontal = 12.dp)
+      ) {
+        Text(
+          text = "Sao chép lỗi",
+          fontFamily = BodyFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 14.sp,
+          color = InkBlack,
+          maxLines = 1
+        )
+      }
+
+      NeoBrutalistButton(
+        onClick = onClearAndContinue,
+        modifier = Modifier.weight(1f),
+        containerColor = LimeFresh,
+        contentPadding = PaddingValues(vertical = 12.dp, horizontal = 12.dp)
+      ) {
+        Text(
+          text = "Xóa lỗi & Vào app",
+          fontFamily = BodyFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 14.sp,
+          color = InkBlack,
+          maxLines = 1
+        )
       }
     }
   }
@@ -4288,7 +4842,7 @@ private fun BrutalInputBox(
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/designer/FridgeDesignerScreen.kt` (441 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/designer/FridgeDesignerScreen.kt` (442 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.designer
@@ -4470,6 +5024,7 @@ fun FridgeDesignerScreen(
           compartments = compartments,
           template = template,
           openCompartmentId = openId,
+          surfaceBg = "#FFFFFF",
           cornerRadius = 16.dp,
           backdropColor = SurfaceWhite,
           onDoorClick = { id -> openId = if (openId == id) null else id },
@@ -4781,7 +5336,7 @@ fun normalizeCompartmentLayout(
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/fridge3d/Fridge3DView.kt` (549 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/fridge3d/Fridge3DView.kt` (636 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.fridge3d
@@ -4839,13 +5394,16 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.truong.fridgezero.data.CompartmentEntity
+import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val TAG = "Fridge3D"
 private const val PROJECTION_EPS = 0.005f
+private const val DEFAULT_SURFACE_BG = "#FAF8F5"
 
 data class DoorProjection(
   val xFrac: Float,
@@ -4882,11 +5440,15 @@ class Fridge3DStageController {
     private set
   var showStickers by mutableStateOf(false)
     private set
+  var surfaceBg by mutableStateOf(DEFAULT_SURFACE_BG)
+    private set
   var cornerRadius by mutableStateOf(0.dp)
     private set
   var backdropColor by mutableStateOf<Color?>(null)
     private set
   var resetNonce by mutableIntStateOf(0)
+    private set
+  var itemAddedPulseNonce by mutableIntStateOf(0)
     private set
 
   internal var onWelcomeSpinConsumed: () -> Unit = {}
@@ -4904,6 +5466,7 @@ class Fridge3DStageController {
     openCompartmentId: String?,
     playWelcomeSpin: Boolean,
     showStickers: Boolean,
+    surfaceBg: String,
     cornerRadius: Dp,
     backdropColor: Color?,
     onWelcomeSpinConsumed: () -> Unit,
@@ -4917,6 +5480,7 @@ class Fridge3DStageController {
     this.openCompartmentId = openCompartmentId
     this.playWelcomeSpin = playWelcomeSpin
     this.showStickers = showStickers
+    this.surfaceBg = surfaceBg
     this.cornerRadius = cornerRadius
     this.backdropColor = backdropColor
     this.onWelcomeSpinConsumed = onWelcomeSpinConsumed
@@ -4925,13 +5489,17 @@ class Fridge3DStageController {
   }
 
   fun updateBounds(token: Any, bounds: StageBoundsPx) {
-    if (activeToken === token && boundsPx != bounds) {
+    if (activeToken === token && bounds.isValid && boundsPx != bounds) {
       boundsPx = bounds
     }
   }
 
   fun requestResetOrbit() {
     resetNonce += 1
+  }
+
+  fun requestItemAddedBounce() {
+    itemAddedPulseNonce += 1
   }
 
   fun releaseSlot(token: Any) {
@@ -4969,14 +5537,17 @@ internal class FridgeJsBridge(
 
 /** Optional framed backdrop (e.g. `SurfaceWhite` card face in Designer) drawn strictly behind the WebView. */
 @Composable
-fun Fridge3DStageBackdrop(controller: Fridge3DStageController) {
+fun Fridge3DStageBackdrop(
+  controller: Fridge3DStageController,
+  modifier: Modifier = Modifier
+) {
   val backdrop = controller.backdropColor ?: return
   if (!controller.isVisible || !controller.boundsPx.isValid) return
   val b = controller.boundsPx
   val density = LocalDensity.current
   val shape = if (controller.cornerRadius > 0.dp) RoundedCornerShape(controller.cornerRadius) else RectangleShape
   Box(
-    modifier = Modifier
+    modifier = modifier
       .offset { IntOffset(b.left, b.top) }
       .size(with(density) { b.width.toDp() }, with(density) { b.height.toDp() })
       .background(backdrop, shape)
@@ -4989,7 +5560,10 @@ fun Fridge3DStageBackdrop(controller: Fridge3DStageController) {
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun SharedFridge3DWebView(controller: Fridge3DStageController) {
+fun SharedFridge3DWebView(
+  controller: Fridge3DStageController,
+  modifier: Modifier = Modifier
+) {
   val context = LocalContext.current
   val haptic = LocalHapticFeedback.current
   val density = LocalDensity.current
@@ -4999,9 +5573,16 @@ fun SharedFridge3DWebView(controller: Fridge3DStageController) {
   val projectionCache = remember { HashMap<String, DoorProjection>() }
   var pageReady by remember { mutableStateOf(false) }
   var recoveryKey by remember { mutableIntStateOf(0) }
+  var lastValidBounds by remember { mutableStateOf(StageBoundsPx()) }
 
   LaunchedEffect(controller.activeToken, recoveryKey) {
     projectionCache.clear()
+  }
+
+  LaunchedEffect(controller.boundsPx) {
+    if (controller.boundsPx.isValid) {
+      lastValidBounds = controller.boundsPx
+    }
   }
 
   val configJson = remember(
@@ -5009,16 +5590,20 @@ fun SharedFridge3DWebView(controller: Fridge3DStageController) {
     controller.colorKey,
     controller.compartments,
     controller.openCompartmentId,
-    controller.showStickers
+    controller.showStickers,
+    controller.surfaceBg
   ) {
     buildConfigJson(
       template = controller.template,
       colorKey = ShellColors.normalizeKey(controller.colorKey),
       compartments = controller.compartments,
       openCompartmentId = controller.openCompartmentId,
-      showStickers = controller.showStickers
+      showStickers = controller.showStickers,
+      surfaceBg = controller.surfaceBg
     )
   }
+
+  val webViewDestroyed = remember(recoveryKey) { AtomicBoolean(false) }
 
   val webView = remember(context, recoveryKey) {
     WebView.setWebContentsDebuggingEnabled(true)
@@ -5062,14 +5647,21 @@ fun SharedFridge3DWebView(controller: Fridge3DStageController) {
       },
       onWelcomeSpinFinishedCallback = {
         mainHandler.post {
-          latestHaptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+          if (!webViewDestroyed.get()) {
+            runCatching {
+              latestHaptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            }
+          }
         }
       }
     )
 
     WebView(context).apply {
-      setBackgroundColor(AndroidColor.TRANSPARENT)
-      setLayerType(View.LAYER_TYPE_HARDWARE, null)
+      layoutParams = ViewGroup.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.MATCH_PARENT
+      )
+      setBackgroundColor(parseSurfaceColorInt(DEFAULT_SURFACE_BG))
       isVerticalScrollBarEnabled = false
       isHorizontalScrollBarEnabled = false
       overScrollMode = View.OVER_SCROLL_NEVER
@@ -5119,8 +5711,9 @@ fun SharedFridge3DWebView(controller: Fridge3DStageController) {
     }
   }
 
-  DisposableEffect(webView) {
+  DisposableEffect(webView, webViewDestroyed) {
     onDispose {
+      webViewDestroyed.set(true)
       mainHandler.removeCallbacksAndMessages(null)
       (webView.parent as? ViewGroup)?.removeView(webView)
       webView.removeJavascriptInterface("AndroidBridge")
@@ -5135,20 +5728,33 @@ fun SharedFridge3DWebView(controller: Fridge3DStageController) {
 
   LaunchedEffect(pageReady, isActive, configJson) {
     if (pageReady && isActive) {
-      webView.evaluateJavascript("window.updateFridge(${JSONObject.quote(configJson)});", null)
+      safeEvaluateJs(
+        webView = webView,
+        destroyed = webViewDestroyed,
+        script = "window.updateFridge(${JSONObject.quote(configJson)});"
+      )
     }
   }
 
   LaunchedEffect(controller.resetNonce) {
     if (pageReady && show && controller.resetNonce > 0) {
-      webView.evaluateJavascript("window.resetView();", null)
+      safeEvaluateJs(webView, webViewDestroyed, "window.resetView();")
+    }
+  }
+
+  LaunchedEffect(controller.itemAddedPulseNonce) {
+    if (pageReady && show && controller.itemAddedPulseNonce > 0) {
+      safeEvaluateJs(webView, webViewDestroyed, "window.playItemAddedBounce();")
     }
   }
 
   LaunchedEffect(pageReady, show, controller.playWelcomeSpin) {
     if (pageReady && show && controller.playWelcomeSpin) {
-      webView.evaluateJavascript("window.playWelcomeSpin();", null)
-      controller.onWelcomeSpinConsumed()
+      delay(250L)
+      if (pageReady && controller.isVisible && !webViewDestroyed.get()) {
+        safeEvaluateJs(webView, webViewDestroyed, "window.playWelcomeSpin();")
+      }
+      runCatching { controller.onWelcomeSpinConsumed() }
     }
   }
 
@@ -5156,32 +5762,40 @@ fun SharedFridge3DWebView(controller: Fridge3DStageController) {
     if (pageReady && show && bounds.isValid) {
       webView.post {
         if (pageReady && controller.isVisible) {
-          webView.evaluateJavascript("window.dispatchEvent(new Event('resize'));", null)
+          safeEvaluateJs(webView, webViewDestroyed, "window.dispatchEvent(new Event('resize'));")
         }
       }
     }
   }
 
   key(recoveryKey) {
-    val wDp = if (show) with(density) { bounds.width.toDp() } else 0.dp
-    val hDp = if (show) with(density) { bounds.height.toDp() } else 0.dp
-    val xOff = if (show) bounds.left else 0
-    val yOff = if (show) bounds.top else 0
+    val activeBounds = if (bounds.isValid) bounds else lastValidBounds
+    val hasValidBounds = activeBounds.isValid
+    val wDp = if (hasValidBounds) with(density) { activeBounds.width.toDp() } else 0.dp
+    val hDp = if (hasValidBounds) with(density) { activeBounds.height.toDp() } else 0.dp
+    val xOff = if (hasValidBounds) activeBounds.left else 0
+    val yOff = if (hasValidBounds) activeBounds.top else 0
     val cornerRadius = controller.cornerRadius
     val cornerPx = with(density) { cornerRadius.toPx() }
     val cornerShape = if (cornerRadius > 0.dp) RoundedCornerShape(cornerRadius) else RectangleShape
     var appliedCornerPx by remember { mutableFloatStateOf(-1f) }
+    var appliedSurfaceBg by remember { mutableStateOf("") }
+    val surfaceBg = controller.surfaceBg
 
     AndroidView(
       factory = { webView },
-      modifier = Modifier
+      modifier = modifier
         .offset { IntOffset(xOff, yOff) }
         .size(wDp, hDp)
         .then(if (cornerRadius > 0.dp && show) Modifier.clip(cornerShape) else Modifier),
       update = { view ->
-        val targetVisibility = if (show) View.VISIBLE else View.GONE
+        val targetVisibility = if (show && bounds.isValid) View.VISIBLE else View.GONE
         if (view.visibility != targetVisibility) {
           view.visibility = targetVisibility
+        }
+        if (appliedSurfaceBg != surfaceBg) {
+          appliedSurfaceBg = surfaceBg
+          view.setBackgroundColor(parseSurfaceColorInt(surfaceBg))
         }
         if (appliedCornerPx != cornerPx) {
           appliedCornerPx = cornerPx
@@ -5197,7 +5811,7 @@ fun SharedFridge3DWebView(controller: Fridge3DStageController) {
             view.outlineProvider = ViewOutlineProvider.BACKGROUND
           }
         }
-        if (show) {
+        if (show && bounds.isValid) {
           view.requestLayout()
         }
       }
@@ -5217,9 +5831,11 @@ fun Fridge3DStageSlot(
   template: String = "top_freezer",
   openCompartmentId: String? = null,
   resetOrbitKey: Int = 0,
+  itemAddedPulseKey: Int = 0,
   playWelcomeSpin: Boolean = false,
   onWelcomeSpinConsumed: () -> Unit = {},
   showStickers: Boolean = false,
+  surfaceBg: String = DEFAULT_SURFACE_BG,
   cornerRadius: Dp = 0.dp,
   backdropColor: Color? = null,
   onDoorClick: ((compartmentId: String) -> Unit)? = null,
@@ -5241,6 +5857,7 @@ fun Fridge3DStageSlot(
       openCompartmentId = openCompartmentId,
       playWelcomeSpin = playWelcomeSpin,
       showStickers = showStickers,
+      surfaceBg = surfaceBg,
       cornerRadius = cornerRadius,
       backdropColor = backdropColor,
       onWelcomeSpinConsumed = { latestOnWelcomeConsumed() },
@@ -5255,6 +5872,12 @@ fun Fridge3DStageSlot(
     }
   }
 
+  LaunchedEffect(itemAddedPulseKey) {
+    if (itemAddedPulseKey > 0) {
+      controller.requestItemAddedBounce()
+    }
+  }
+
   DisposableEffect(controller, slotToken) {
     onDispose {
       controller.releaseSlot(slotToken)
@@ -5263,7 +5886,9 @@ fun Fridge3DStageSlot(
 
   Box(
     modifier = modifier.onGloballyPositioned { coords ->
-      if (!coords.isAttached) return@onGloballyPositioned
+      if (!coords.isAttached || coords.size.width <= 0 || coords.size.height <= 0) {
+        return@onGloballyPositioned
+      }
       val root = controller.rootCoordinates
       val topLeft = if (root != null && root.isAttached) {
         root.localPositionOf(coords, Offset.Zero)
@@ -5283,12 +5908,25 @@ fun Fridge3DStageSlot(
   )
 }
 
+private fun safeEvaluateJs(
+  webView: WebView,
+  destroyed: AtomicBoolean,
+  script: String
+) {
+  if (destroyed.get() || !webView.isAttachedToWindow) return
+  webView.evaluateJavascript(script, null)
+}
+
+private fun parseSurfaceColorInt(hex: String): Int =
+  runCatching { AndroidColor.parseColor(hex) }.getOrDefault(0xFFFAF8F5.toInt())
+
 private fun buildConfigJson(
   template: String,
   colorKey: String,
   compartments: List<CompartmentEntity>,
   openCompartmentId: String?,
-  showStickers: Boolean
+  showStickers: Boolean,
+  surfaceBg: String
 ): String {
   val compsArray = JSONArray()
   compartments.forEach { c ->
@@ -5305,11 +5943,15 @@ private fun buildConfigJson(
       }
     )
   }
+  val showDotGrid = showStickers || !surfaceBg.equals("#FFFFFF", ignoreCase = true)
   return JSONObject().apply {
     put("template", template)
     put("colorKey", colorKey)
     put("openCompartmentId", openCompartmentId ?: JSONObject.NULL)
     put("showStickers", showStickers)
+    put("springReturn", showStickers)
+    put("surfaceBg", surfaceBg)
+    put("showDotGrid", showDotGrid)
     put("compartments", compsArray)
   }.toString()
 }
@@ -5830,7 +6472,7 @@ private fun UrgentItemRow(
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/home/HomeScreen.kt` (490 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/home/HomeScreen.kt` (503 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.home
@@ -5862,6 +6504,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -5952,6 +6595,7 @@ fun HomeScreen(
   }
 
   var resetOrbitKey by remember { mutableIntStateOf(0) }
+  var itemAddedPulseKey by remember { mutableIntStateOf(0) }
   var openingId by remember { mutableStateOf<String?>(justClosedCompartmentId) }
   var isNavigatingOut by remember { mutableStateOf(false) }
   var showQuickAddSheet by remember { mutableStateOf(false) }
@@ -6020,9 +6664,11 @@ fun HomeScreen(
           template = fridge?.template ?: "top_freezer",
           openCompartmentId = openingId,
           resetOrbitKey = resetOrbitKey,
+          itemAddedPulseKey = itemAddedPulseKey,
           playWelcomeSpin = uiState.playWelcomeSpin,
           onWelcomeSpinConsumed = onWelcomeSpinConsumed,
           showStickers = true,
+          surfaceBg = "#FAF8F5",
           onDoorClick = { compId -> triggerDoorOpen(compId) },
           onProjectionsUpdated = { projections = it },
           modifier = Modifier.fillMaxSize()
@@ -6084,7 +6730,14 @@ fun HomeScreen(
       compartments = compartments,
       initialCompartmentId = null,
       recentKeys = uiState.recentItemKeys,
-      onSaveItem = onAddItem,
+      onSaveItem = { compId, name, iconKey, qty, daysLeft, unit ->
+        onAddItem(compId, name, iconKey, qty, daysLeft, unit)
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        scope.launch {
+          delay(140L)
+          itemAddedPulseKey++
+        }
+      },
       onDismiss = { showQuickAddSheet = false }
     )
   }
@@ -6103,32 +6756,34 @@ private fun DoorStickersOverlay(
     val padPx = with(density) { 8.dp.toPx() }
 
     compartments.forEachIndexed { index, comp ->
-      val proj = projections[comp.id] ?: return@forEachIndexed
-      val stickerAlpha by animateFloatAsState(
-        targetValue = if (proj.visible) 1f else 0f,
-        animationSpec = tween(durationMillis = 140),
-        label = "stickerAlpha_${comp.id}"
-      )
-      if (stickerAlpha <= 0.02f) return@forEachIndexed
+      key(comp.id) {
+        val proj = projections[comp.id]
+        val isVisible = proj?.visible == true
+        val stickerAlpha by animateFloatAsState(
+          targetValue = if (isVisible) 1f else 0f,
+          animationSpec = tween(durationMillis = 140),
+          label = "stickerAlpha_${comp.id}"
+        )
+        var stickerSize by remember { mutableStateOf(IntSize.Zero) }
+        if (proj != null && stickerAlpha > 0.02f) {
+          val tilt = if (index % 2 == 0) -1.5f else 1.5f
+          val rawX = proj.xFrac * maxWPx - stickerSize.width / 2f
+          val rawY = proj.yFrac * maxHPx - stickerSize.height / 2f
+          val clampedX = rawX.coerceIn(padPx, (maxWPx - stickerSize.width - padPx).coerceAtLeast(padPx))
+          val clampedY = rawY.coerceIn(padPx, (maxHPx - stickerSize.height - padPx).coerceAtLeast(padPx))
 
-      var stickerSize by remember(comp.id) { mutableStateOf(IntSize.Zero) }
-      val tilt = if (index % 2 == 0) -1.5f else 1.5f
-
-      val rawX = proj.xFrac * maxWPx - stickerSize.width / 2f
-      val rawY = proj.yFrac * maxHPx - stickerSize.height / 2f
-      val clampedX = rawX.coerceIn(padPx, (maxWPx - stickerSize.width - padPx).coerceAtLeast(padPx))
-      val clampedY = rawY.coerceIn(padPx, (maxHPx - stickerSize.height - padPx).coerceAtLeast(padPx))
-
-      DoorStickerBadge(
-        compartment = comp,
-        tiltDegrees = tilt,
-        enabled = proj.visible,
-        onClick = { onStickerClick(comp.id) },
-        modifier = Modifier
-          .onSizeChanged { stickerSize = it }
-          .offset { IntOffset(clampedX.roundToInt(), clampedY.roundToInt()) }
-          .alpha(stickerAlpha)
-      )
+          DoorStickerBadge(
+            compartment = comp,
+            tiltDegrees = tilt,
+            enabled = isVisible,
+            onClick = { onStickerClick(comp.id) },
+            modifier = Modifier
+              .onSizeChanged { stickerSize = it }
+              .offset { IntOffset(clampedX.roundToInt(), clampedY.roundToInt()) }
+              .alpha(stickerAlpha)
+          )
+        }
+      }
     }
   }
 }
@@ -6420,7 +7075,7 @@ object EmojiIconRepository : IconRepository {
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/theme/BrutalistComponents.kt` (230 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/theme/BrutalistComponents.kt` (240 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.theme
@@ -6481,7 +7136,13 @@ fun Modifier.dotGridBackground(
   step: Dp = 18.dp,
   dotRadius: Dp = 0.625.dp
 ): Modifier = this.drawWithCache {
-  val tilePx = step.toPx().toInt().coerceAtLeast(2)
+  if (size.width <= 0f || size.height <= 0f) {
+    return@drawWithCache onDrawBehind {}
+  }
+  val tilePx = step.toPx().toInt().coerceIn(2, 256)
+  if (tilePx <= 0) {
+    return@drawWithCache onDrawBehind {}
+  }
   val tileBitmap = ImageBitmap(tilePx, tilePx)
   val tileCanvas = Canvas(tileBitmap)
   val bgPaint = Paint().apply { color = paper }
@@ -6491,7 +7152,8 @@ fun Modifier.dotGridBackground(
     isAntiAlias = true
   }
   val center = tilePx / 2f
-  tileCanvas.drawCircle(Offset(center, center), dotRadius.toPx(), dotPaint)
+  val radiusPx = dotRadius.toPx().coerceAtLeast(0.5f)
+  tileCanvas.drawCircle(Offset(center, center), radiusPx, dotPaint)
   val tiledBrush = ShaderBrush(ImageShader(tileBitmap, TileMode.Repeated, TileMode.Repeated))
   onDrawBehind {
     drawRect(tiledBrush)
@@ -6532,6 +7194,9 @@ fun NeoBrutalistCard(
     val faceModifier = if (transparentInterior) {
       Modifier
         .drawWithCache {
+          if (size.width <= 0f || size.height <= 0f) {
+            return@drawWithCache onDrawBehind {}
+          }
           val d = shadowOffset.toPx()
           val r = cornerRadius.toPx()
           val cr = CornerRadius(r, r)
