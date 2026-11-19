@@ -1,10 +1,13 @@
 package com.truong.fridgezero.ui.fridge3d
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
+import android.content.Context
 import android.graphics.Color as AndroidColor
 import android.graphics.Outline
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -13,12 +16,14 @@ import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.annotation.Keep
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +38,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -52,17 +58,94 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.truong.fridgezero.data.AppConfig
 import com.truong.fridgezero.data.CompartmentEntity
+import com.truong.fridgezero.ui.theme.DotGridSpec
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val TAG = "Fridge3D"
 private const val PROJECTION_EPS = 0.005f
-private const val DEFAULT_SURFACE_BG = "#FAF8F5"
+private const val DEFAULT_SURFACE_BG = DotGridSpec.PAPER_HEX
+private const val ALLOWED_ASSET_PREFIX = "file:///android_asset/fridge3d/"
+private const val ALLOWED_ABOUT_BLANK = "about:blank"
+internal const val LOW_MEM_THRESHOLD_BYTES = 4L * 1024 * 1024 * 1024
+
+internal fun isAllowedFridge3dUrl(url: String?): Boolean {
+  if (url.isNullOrEmpty()) return false
+  if (url == ALLOWED_ABOUT_BLANK) return true
+  return url.startsWith(ALLOWED_ASSET_PREFIX) && !url.contains("..")
+}
+
+internal fun resolveWebGlQuality(
+  isLowRamDevice: Boolean,
+  totalMemBytes: Long,
+  forceLiteMode: Boolean
+): String {
+  val lowMem = isLowRamDevice || (totalMemBytes in 1L..LOW_MEM_THRESHOLD_BYTES)
+  return if (forceLiteMode || lowMem) "lite" else "high"
+}
+
+private fun isLowRamOrLowMemDevice(context: Context): Boolean {
+  val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+  if (am.isLowRamDevice) return true
+  val memInfo = ActivityManager.MemoryInfo()
+  am.getMemoryInfo(memInfo)
+  return memInfo.totalMem in 1L..LOW_MEM_THRESHOLD_BYTES
+}
+
+internal enum class WebGlRecoveryAction {
+  REBUILD_IN_LITE_AND_PERSIST,
+  REBUILD_IN_LITE,
+  FALLBACK_TO_2D
+}
+
+/**
+ * Sliding-window recovery budget: up to [maxRecoveries] WebView rebuilds within [windowMs]
+ * before degrading cleanly to the Compose Neo-Brutalist 2D fallback.
+ */
+internal class BoundedWebGlCrashTracker(
+  private val windowMs: Long = 60_000L,
+  private val maxRecoveries: Int = 2
+) {
+  private val timestamps = ArrayDeque<Long>()
+
+  fun recordCrash(nowMs: Long): WebGlRecoveryAction {
+    pruneOld(nowMs)
+    timestamps.addLast(nowMs)
+    val count = timestamps.size
+    return when {
+      count == 1 -> WebGlRecoveryAction.REBUILD_IN_LITE_AND_PERSIST
+      count <= maxRecoveries -> WebGlRecoveryAction.REBUILD_IN_LITE
+      else -> WebGlRecoveryAction.FALLBACK_TO_2D
+    }
+  }
+
+  fun recentCrashCount(nowMs: Long): Int {
+    pruneOld(nowMs)
+    return timestamps.size
+  }
+
+  fun reset() {
+    timestamps.clear()
+  }
+
+  private fun pruneOld(nowMs: Long) {
+    while (timestamps.isNotEmpty() && (nowMs - timestamps.first()) > windowMs) {
+      timestamps.removeFirst()
+    }
+  }
+}
 
 data class DoorProjection(
   val xFrac: Float,
@@ -109,13 +192,23 @@ class Fridge3DStageController {
     private set
   var itemAddedPulseNonce by mutableIntStateOf(0)
     private set
+  var use2DFallback by mutableStateOf(false)
+    private set
+  var fallbackResetNonce by mutableIntStateOf(0)
+    private set
 
   internal var onWelcomeSpinConsumed: () -> Unit = {}
   internal var onDoorClick: ((String) -> Unit)? = null
   internal var onProjectionsUpdated: ((Map<String, DoorProjection>) -> Unit)? = null
 
   val isVisible: Boolean
-    get() = activeToken != null && boundsPx.isValid
+    get() = activeToken != null && boundsPx.isValid && !use2DFallback
+
+  fun set2DFallback(active: Boolean) {
+    if (use2DFallback != active) {
+      use2DFallback = active
+    }
+  }
 
   fun updateSlot(
     token: Any,
@@ -132,7 +225,12 @@ class Fridge3DStageController {
     onDoorClick: ((String) -> Unit)?,
     onProjectionsUpdated: ((Map<String, DoorProjection>) -> Unit)?
   ) {
+    val slotSwitched = activeToken !== token
     activeToken = token
+    if (slotSwitched && use2DFallback) {
+      use2DFallback = false
+      fallbackResetNonce += 1
+    }
     this.colorKey = colorKey
     this.compartments = compartments
     this.template = template
@@ -167,6 +265,10 @@ class Fridge3DStageController {
       boundsPx = StageBoundsPx()
       onDoorClick = null
       onProjectionsUpdated = null
+      if (use2DFallback) {
+        use2DFallback = false
+        fallbackResetNonce += 1
+      }
     }
   }
 }
@@ -182,7 +284,8 @@ val LocalFridge3DStageController = staticCompositionLocalOf<Fridge3DStageControl
 internal class FridgeJsBridge(
   private val onDoorTappedCallback: (String) -> Unit,
   private val onStickersProjectedCallback: (String) -> Unit,
-  private val onWelcomeSpinFinishedCallback: () -> Unit
+  private val onWelcomeSpinFinishedCallback: () -> Unit,
+  private val onWebGlContextLostCallback: () -> Unit
 ) {
   @JavascriptInterface
   fun onDoorTapped(compartmentId: String) = onDoorTappedCallback(compartmentId)
@@ -192,6 +295,9 @@ internal class FridgeJsBridge(
 
   @JavascriptInterface
   fun onWelcomeSpinFinished() = onWelcomeSpinFinishedCallback()
+
+  @JavascriptInterface
+  fun onWebGlContextLost() = onWebGlContextLostCallback()
 }
 
 /** Optional framed backdrop (e.g. `SurfaceWhite` card face in Designer) drawn strictly behind the WebView. */
@@ -215,17 +321,56 @@ fun Fridge3DStageBackdrop(
 
 /**
  * Single shared WebView host mounted once at [com.truong.fridgezero.MainActivity] root.
- * Only destroyed when the Activity leaves composition or recovers from renderer crash.
+ * Resolves `lite` vs `high` quality before creating the WebView and degrades to [Fridge2DFallback]
+ * after >2 WebGL/renderer crashes in 60 seconds.
  */
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun SharedFridge3DWebView(
   controller: Fridge3DStageController,
+  appConfig: AppConfig,
+  modifier: Modifier = Modifier
+) {
+  val context = LocalContext.current
+  val persistedForceLite by appConfig.forceLiteMode.collectAsStateWithLifecycle(initialValue = null)
+  val resolvedPersistedLite = persistedForceLite ?: return
+  val hardwareRequiresLite = remember(context) { isLowRamOrLowMemDevice(context) }
+  var runtimeForceLite by remember { mutableStateOf(false) }
+  val crashTracker = remember { BoundedWebGlCrashTracker() }
+
+  LaunchedEffect(controller.fallbackResetNonce) {
+    crashTracker.reset()
+  }
+
+  if (controller.use2DFallback) return
+
+  SharedFridge3DWebViewHost(
+    controller = controller,
+    appConfig = appConfig,
+    hardwareRequiresLite = hardwareRequiresLite,
+    persistedForceLite = resolvedPersistedLite,
+    runtimeForceLite = runtimeForceLite,
+    onRequireRuntimeLite = { runtimeForceLite = true },
+    crashTracker = crashTracker,
+    modifier = modifier
+  )
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun SharedFridge3DWebViewHost(
+  controller: Fridge3DStageController,
+  appConfig: AppConfig,
+  hardwareRequiresLite: Boolean,
+  persistedForceLite: Boolean,
+  runtimeForceLite: Boolean,
+  onRequireRuntimeLite: () -> Unit,
+  crashTracker: BoundedWebGlCrashTracker,
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
   val haptic = LocalHapticFeedback.current
   val density = LocalDensity.current
+  val scope = rememberCoroutineScope()
   val mainHandler = remember { Handler(Looper.getMainLooper()) }
   val latestHaptic by rememberUpdatedState(haptic)
 
@@ -244,13 +389,18 @@ fun SharedFridge3DWebView(
     }
   }
 
+  val offsetXDp = if (controller.boundsPx.isValid) controller.boundsPx.left / density.density else 0f
+  val offsetYDp = if (controller.boundsPx.isValid) controller.boundsPx.top / density.density else 0f
+
   val configJson = remember(
     controller.template,
     controller.colorKey,
     controller.compartments,
     controller.openCompartmentId,
     controller.showStickers,
-    controller.surfaceBg
+    controller.surfaceBg,
+    offsetXDp,
+    offsetYDp
   ) {
     buildConfigJson(
       template = controller.template,
@@ -258,14 +408,49 @@ fun SharedFridge3DWebView(
       compartments = controller.compartments,
       openCompartmentId = controller.openCompartmentId,
       showStickers = controller.showStickers,
-      surfaceBg = controller.surfaceBg
+      surfaceBg = controller.surfaceBg,
+      dotGridOffsetXDp = offsetXDp,
+      dotGridOffsetYDp = offsetYDp
     )
   }
 
   val webViewDestroyed = remember(recoveryKey) { AtomicBoolean(false) }
 
+  // Deliberately keyed on (context, recoveryKey) only so persisting forceLiteMode mid-session
+  // does not trigger a duplicate WebView creation beyond the single bounded recovery.
   val webView = remember(context, recoveryKey) {
-    WebView.setWebContentsDebuggingEnabled(true)
+    val instanceCrashHandled = AtomicBoolean(false)
+    val initialQuality = if (hardwareRequiresLite || persistedForceLite || runtimeForceLite) {
+      "lite"
+    } else {
+      "high"
+    }
+    Log.d(TAG, "Initializing WebView (recoveryKey=$recoveryKey, quality=$initialQuality)")
+
+    fun handleWebGlFailure(source: String) {
+      if (!instanceCrashHandled.compareAndSet(false, true)) return
+      mainHandler.post {
+        if (webViewDestroyed.get() || controller.use2DFallback) return@post
+        val action = crashTracker.recordCrash(SystemClock.elapsedRealtime())
+        Log.e(TAG, "WebGL failure via $source -> action=$action")
+        pageReady = false
+        when (action) {
+          WebGlRecoveryAction.REBUILD_IN_LITE_AND_PERSIST -> {
+            onRequireRuntimeLite()
+            scope.launch { appConfig.setForceLiteMode(true) }
+            recoveryKey += 1
+          }
+          WebGlRecoveryAction.REBUILD_IN_LITE -> {
+            onRequireRuntimeLite()
+            recoveryKey += 1
+          }
+          WebGlRecoveryAction.FALLBACK_TO_2D -> {
+            controller.set2DFallback(true)
+          }
+        }
+      }
+    }
+
     val jsBridge = FridgeJsBridge(
       onDoorTappedCallback = { compartmentId ->
         mainHandler.post {
@@ -312,6 +497,9 @@ fun SharedFridge3DWebView(
             }
           }
         }
+      },
+      onWebGlContextLostCallback = {
+        handleWebGlFailure("webglcontextlost")
       }
     )
 
@@ -329,8 +517,12 @@ fun SharedFridge3DWebView(
       settings.apply {
         javaScriptEnabled = true
         domStorageEnabled = false
+        allowFileAccess = false
+        allowContentAccess = false
         @Suppress("DEPRECATION")
-        allowFileAccess = true
+        allowFileAccessFromFileURLs = false
+        @Suppress("DEPRECATION")
+        allowUniversalAccessFromFileURLs = false
         builtInZoomControls = false
         displayZoomControls = false
         setSupportZoom(false)
@@ -354,19 +546,48 @@ fun SharedFridge3DWebView(
       }
 
       webViewClient = object : WebViewClient() {
+        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+          val url = request?.url?.toString()
+          val allowed = isAllowedFridge3dUrl(url)
+          if (!allowed) {
+            Log.w(TAG, "Blocked external navigation: $url")
+          }
+          return !allowed
+        }
+
         override fun onPageFinished(view: WebView?, url: String?) {
           pageReady = true
         }
 
         override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-          Log.e(TAG, "renderer gone, didCrash=${detail?.didCrash()}")
-          pageReady = false
-          recoveryKey += 1
+          handleWebGlFailure("onRenderProcessGone(didCrash=${detail?.didCrash()})")
           return true
         }
       }
 
-      loadUrl("file:///android_asset/fridge3d/index.html")
+      loadUrl("file:///android_asset/fridge3d/index.html?q=$initialQuality")
+    }
+  }
+
+  val lifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(lifecycleOwner, webView, webViewDestroyed) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (webViewDestroyed.get()) return@LifecycleEventObserver
+      when (event) {
+        Lifecycle.Event.ON_STOP -> {
+          Log.d(TAG, "ON_STOP -> webView.onPause()")
+          webView.onPause()
+        }
+        Lifecycle.Event.ON_START -> {
+          Log.d(TAG, "ON_START -> webView.onResume()")
+          webView.onResume()
+        }
+        else -> Unit
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose {
+      lifecycleOwner.lifecycle.removeObserver(observer)
     }
   }
 
@@ -494,6 +715,7 @@ fun Fridge3DStageSlot(
   playWelcomeSpin: Boolean = false,
   onWelcomeSpinConsumed: () -> Unit = {},
   showStickers: Boolean = false,
+  compartmentStats: Map<String, FallbackCompartmentStat> = emptyMap(),
   surfaceBg: String = DEFAULT_SURFACE_BG,
   cornerRadius: Dp = 0.dp,
   backdropColor: Color? = null,
@@ -564,7 +786,20 @@ fun Fridge3DStageSlot(
         )
       )
     }
-  )
+  ) {
+    if (controller.use2DFallback) {
+      Fridge2DFallback(
+        colorKey = colorKey,
+        compartments = compartments,
+        openCompartmentId = openCompartmentId,
+        compartmentStats = compartmentStats,
+        showItemCounts = showStickers,
+        surfaceBg = backdropColor,
+        onDoorClick = latestOnDoorClick,
+        modifier = Modifier.fillMaxSize()
+      )
+    }
+  }
 }
 
 private fun safeEvaluateJs(
@@ -577,7 +812,8 @@ private fun safeEvaluateJs(
 }
 
 private fun parseSurfaceColorInt(hex: String): Int =
-  runCatching { AndroidColor.parseColor(hex) }.getOrDefault(0xFFFAF8F5.toInt())
+  runCatching { AndroidColor.parseColor(hex) }
+    .getOrElse { AndroidColor.parseColor(DotGridSpec.PAPER_HEX) }
 
 private fun buildConfigJson(
   template: String,
@@ -585,7 +821,9 @@ private fun buildConfigJson(
   compartments: List<CompartmentEntity>,
   openCompartmentId: String?,
   showStickers: Boolean,
-  surfaceBg: String
+  surfaceBg: String,
+  dotGridOffsetXDp: Float = 0f,
+  dotGridOffsetYDp: Float = 0f
 ): String {
   val compsArray = JSONArray()
   compartments.forEach { c ->
@@ -603,6 +841,14 @@ private fun buildConfigJson(
     )
   }
   val showDotGrid = showStickers || !surfaceBg.equals("#FFFFFF", ignoreCase = true)
+  val dotGridObj = JSONObject().apply {
+    put("paperHex", DotGridSpec.PAPER_HEX)
+    put("dotHex", DotGridSpec.DOT_HEX)
+    put("stepDp", DotGridSpec.STEP_DP.toDouble())
+    put("dotRadiusDp", DotGridSpec.DOT_RADIUS_DP.toDouble())
+    put("offsetXDp", dotGridOffsetXDp.toDouble())
+    put("offsetYDp", dotGridOffsetYDp.toDouble())
+  }
   return JSONObject().apply {
     put("template", template)
     put("colorKey", colorKey)
@@ -611,6 +857,7 @@ private fun buildConfigJson(
     put("springReturn", showStickers)
     put("surfaceBg", surfaceBg)
     put("showDotGrid", showDotGrid)
+    put("dotGrid", dotGridObj)
     put("compartments", compsArray)
   }.toString()
 }

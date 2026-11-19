@@ -2,14 +2,15 @@ package com.truong.fridgezero.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -32,17 +33,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.truong.fridgezero.R
+import com.truong.fridgezero.data.ItemStatus
 import com.truong.fridgezero.domain.CompartmentUi
 import com.truong.fridgezero.domain.DisplayItem
 import com.truong.fridgezero.domain.Freshness
+import com.truong.fridgezero.domain.RecipeRecommendation
 import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodIcon
 import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.ButterPale
+import com.truong.fridgezero.ui.theme.ButterSoft
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
 import com.truong.fridgezero.ui.theme.InkBlack
@@ -52,7 +60,6 @@ import com.truong.fridgezero.ui.theme.MonoFont
 import com.truong.fridgezero.ui.theme.NeoBrutalistButton
 import com.truong.fridgezero.ui.theme.NeoBrutalistCard
 import com.truong.fridgezero.ui.theme.PaperCream
-import com.truong.fridgezero.ui.theme.SkyPale
 import com.truong.fridgezero.ui.theme.StickerBadge
 import com.truong.fridgezero.ui.theme.SurfaceWhite
 import kotlinx.coroutines.delay
@@ -81,16 +88,19 @@ private fun DayOfWeek.toViShort(): String = when (this) {
 }
 
 /**
- * Top Home Dashboard (spec §3.2):
- * Row 1: FRIDGEZERO + dynamic greeting | live HH:mm:ss + day/date pill
- * Row 2: Weather badge (☀️ 28°C · Đà Nẵng) | Interactive expiring-items alert badge
+ * Top Home Dashboard:
+ * Row 1: Compact brand+weather caption + dynamic greeting | live HH:mm:ss + day/date pill
+ * Row 2: Prominent centered expiring-items assistant banner directly above the 3D fridge
  */
 @Composable
 fun HomeDashboardHeader(
   compartments: List<CompartmentUi>,
+  topRecommendation: RecipeRecommendation?,
   remindersEnabled: Boolean,
   onToggleReminders: () -> Unit,
   onOpenCompartment: (compartmentId: String, filterUrgent: Boolean) -> Unit,
+  onOpenRecipes: (recipeId: String?) -> Unit,
+  onMarkStatus: (ids: List<Long>, status: ItemStatus) -> Unit,
   modifier: Modifier = Modifier
 ) {
   var now by remember { mutableStateOf(LocalDateTime.now()) }
@@ -104,7 +114,7 @@ fun HomeDashboardHeader(
   val urgentEntries = remember(compartments) {
     compartments.flatMap { comp ->
       comp.items
-        .filter { it.freshness == Freshness.WARN || it.freshness == Freshness.BAD }
+        .filter { it.freshness == Freshness.SOON || it.freshness == Freshness.BAD }
         .map { UrgentEntry(comp.id, comp.name, it) }
     }.sortedBy { it.item.minDaysLeft }
   }
@@ -121,10 +131,10 @@ fun HomeDashboardHeader(
   Column(
     modifier = modifier
       .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 8.dp),
+      .padding(horizontal = 16.dp, vertical = 6.dp),
     verticalArrangement = Arrangement.spacedBy(8.dp)
   ) {
-    // Row 1: Brand + Greeting | Live digital clock
+    // Row 1: Merged brand + weather caption above Greeting | Live digital clock
     Row(
       modifier = Modifier.fillMaxWidth(),
       verticalAlignment = Alignment.CenterVertically,
@@ -132,12 +142,14 @@ fun HomeDashboardHeader(
     ) {
       Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
         Text(
-          text = stringResource(R.string.home_brand),
+          text = stringResource(R.string.home_brand_weather),
           fontFamily = MonoFont,
           fontWeight = FontWeight.ExtraBold,
           fontSize = 10.sp,
-          letterSpacing = 1.4.sp,
-          color = InkBlack.copy(alpha = 0.65f)
+          letterSpacing = 1.0.sp,
+          color = InkBlack.copy(alpha = 0.65f),
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
         )
         Text(
           text = stringResource(greetingRes),
@@ -152,41 +164,165 @@ fun HomeDashboardHeader(
       DigitalClockPill(now = now)
     }
 
-    // Row 2: Weather badge | Urgent expiring alert badge
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-      WeatherBadge()
-
-      val alertBg = when {
-        hasBad -> CoralUrgent
-        urgentEntries.isNotEmpty() -> LemonWarn
-        else -> LimeFresh
-      }
-      val alertLabel = if (urgentEntries.isEmpty()) {
-        stringResource(R.string.home_all_fresh_badge)
-      } else {
-        stringResource(R.string.home_urgent_badge_fmt, urgentEntries.size)
-      }
-
-      NeoBrutalistButton(
-        onClick = { showUrgentSheet = true },
-        containerColor = alertBg,
-        cornerRadius = 10.dp,
-        borderWidth = 2.dp,
-        shadowOffset = 3.dp,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+    // Row 2: Alert banner + live recipe recommendation strip
+    if (urgentEntries.isNotEmpty()) {
+      NeoBrutalistCard(
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = if (hasBad) CoralUrgent else LemonWarn,
+        cornerRadius = 14.dp,
+        borderWidth = 2.5.dp,
+        shadowOffset = 4.dp
       ) {
-        Text(
-          text = alertLabel,
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 12.sp,
-          color = InkBlack,
-          maxLines = 1
-        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .clickable(role = Role.Button) { showUrgentSheet = true }
+              .padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+            Text(
+              text = stringResource(R.string.home_urgent_banner_title_fmt, urgentEntries.size),
+              modifier = Modifier.weight(1f),
+              fontFamily = DisplayFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 14.sp,
+              color = InkBlack,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
+            )
+            Box(
+              modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceWhite)
+                .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+              Text(
+                text = stringResource(R.string.home_urgent_view_list),
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 10.sp,
+                color = InkBlack,
+                softWrap = false,
+                maxLines = 1
+              )
+            }
+          }
+
+          if (topRecommendation != null) {
+            Box(
+              modifier = Modifier
+                .fillMaxWidth()
+                .height(1.5.dp)
+                .background(InkBlack)
+            )
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .background(ButterSoft)
+                .clickable(role = Role.Button) { onOpenRecipes(topRecommendation.recipe.id) }
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+              Text(
+                text = stringResource(
+                  R.string.home_banner_recipe_fmt,
+                  topRecommendation.recipe.title,
+                  topRecommendation.recipe.cookMinutes
+                ),
+                modifier = Modifier.weight(1f),
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 12.sp,
+                color = InkBlack,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+              )
+              Box(
+                modifier = Modifier
+                  .clip(RoundedCornerShape(6.dp))
+                  .background(if (topRecommendation.isReadyToCook) LimeFresh else LemonWarn)
+                  .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+                  .padding(horizontal = 6.dp, vertical = 2.dp)
+              ) {
+                Text(
+                  text = stringResource(
+                    R.string.recipe_match_ratio_fmt,
+                    topRecommendation.matchedCount,
+                    topRecommendation.totalFridgeIngredients
+                  ),
+                  fontFamily = MonoFont,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 10.sp,
+                  color = InkBlack,
+                  softWrap = false,
+                  maxLines = 1
+                )
+              }
+            }
+          }
+        }
+      }
+    } else {
+      val remindersCd = stringResource(R.string.home_reminders_cd)
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        NeoBrutalistButton(
+          onClick = { onOpenRecipes(topRecommendation?.recipe?.id) },
+          modifier = Modifier.weight(1f),
+          containerColor = LimeFresh,
+          cornerRadius = 12.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 3.dp,
+          contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp)
+        ) {
+          Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+              text = stringResource(R.string.home_all_fresh_title),
+              fontFamily = MonoFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 10.sp,
+              color = InkBlack.copy(alpha = 0.85f),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
+            )
+            if (topRecommendation != null) {
+              Text(
+                text = stringResource(
+                  R.string.home_banner_recipe_fmt,
+                  topRecommendation.recipe.title,
+                  topRecommendation.recipe.cookMinutes
+                ),
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 12.sp,
+                color = InkBlack,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+              )
+            }
+          }
+        }
+
+        NeoBrutalistButton(
+          onClick = { showUrgentSheet = true },
+          modifier = Modifier
+            .size(46.dp)
+            .semantics { contentDescription = remindersCd },
+          containerColor = if (remindersEnabled) ButterPale else SurfaceWhite,
+          cornerRadius = 12.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 3.dp,
+          contentPadding = PaddingValues(0.dp)
+        ) {
+          Text(text = "🔔", fontSize = 16.sp)
+        }
       }
     }
   }
@@ -194,8 +330,14 @@ fun HomeDashboardHeader(
   if (showUrgentSheet) {
     UrgentItemsBottomSheet(
       entries = urgentEntries,
+      topRecommendation = topRecommendation,
       remindersEnabled = remindersEnabled,
       onToggleReminders = onToggleReminders,
+      onMarkStatus = onMarkStatus,
+      onOpenRecipe = { recipeId ->
+        showUrgentSheet = false
+        onOpenRecipes(recipeId)
+      },
       onDismiss = { showUrgentSheet = false },
       onOpenCompartment = { compId ->
         showUrgentSheet = false
@@ -245,40 +387,15 @@ private fun DigitalClockPill(now: LocalDateTime) {
   }
 }
 
-@Composable
-private fun WeatherBadge() {
-  val shape = RoundedCornerShape(10.dp)
-  Box(modifier = Modifier.padding(end = 2.dp, bottom = 2.dp)) {
-    Box(
-      modifier = Modifier
-        .matchParentSize()
-        .offset(2.dp, 2.dp)
-        .background(InkBlack, shape)
-    )
-    Box(
-      modifier = Modifier
-        .background(SkyPale, shape)
-        .border(2.dp, InkBlack, shape)
-        .padding(horizontal = 10.dp, vertical = 6.dp)
-    ) {
-      Text(
-        text = stringResource(R.string.home_weather_badge),
-        fontFamily = BodyFont,
-        fontWeight = FontWeight.Bold,
-        fontSize = 12.sp,
-        color = InkBlack,
-        maxLines = 1
-      )
-    }
-  }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UrgentItemsBottomSheet(
   entries: List<UrgentEntry>,
+  topRecommendation: RecipeRecommendation?,
   remindersEnabled: Boolean,
   onToggleReminders: () -> Unit,
+  onMarkStatus: (ids: List<Long>, status: ItemStatus) -> Unit,
+  onOpenRecipe: (String) -> Unit,
   onDismiss: () -> Unit,
   onOpenCompartment: (String) -> Unit
 ) {
@@ -338,14 +455,79 @@ private fun UrgentItemsBottomSheet(
           )
         }
       } else {
+        // Highlighted clickable recipe suggestion card linked directly to CulinaryGuideScreen
+        if (topRecommendation != null) {
+          val recipe = topRecommendation.recipe
+          NeoBrutalistCard(
+            modifier = Modifier
+              .fillMaxWidth()
+              .clickable(role = Role.Button) { onOpenRecipe(recipe.id) },
+            containerColor = ButterSoft,
+            cornerRadius = 14.dp,
+            borderWidth = 2.5.dp,
+            shadowOffset = 3.dp
+          ) {
+            Column(
+              modifier = Modifier.fillMaxWidth().padding(12.dp),
+              verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+              ) {
+                Text(
+                  text = stringResource(R.string.urgent_meal_title),
+                  fontFamily = DisplayFont,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 13.sp,
+                  color = InkBlack
+                )
+                StickerBadge(
+                  text = stringResource(
+                    R.string.recipe_match_ratio_fmt,
+                    topRecommendation.matchedCount,
+                    topRecommendation.totalFridgeIngredients
+                  ),
+                  containerColor = if (topRecommendation.isReadyToCook) LimeFresh else LemonWarn,
+                  tiltDegrees = 0f,
+                  mono = true
+                )
+              }
+              Text(
+                text = stringResource(
+                  R.string.urgent_meal_recipe_fmt,
+                  recipe.emoji,
+                  recipe.title,
+                  recipe.cookMinutes
+                ),
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 13.sp,
+                color = InkBlack,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+              )
+              Text(
+                text = stringResource(R.string.urgent_meal_cta),
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 11.sp,
+                color = InkBlack
+              )
+            }
+          }
+        }
+
         LazyColumn(
-          modifier = Modifier.fillMaxWidth().height(310.dp),
+          modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
           verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
           items(entries, key = { "${it.compartmentId}_${it.item.primaryId}" }) { entry ->
             UrgentItemRow(
               entry = entry,
-              onClick = { onOpenCompartment(entry.compartmentId) }
+              onMarkUsedUp = { onMarkStatus(entry.item.itemIds, ItemStatus.USED_UP) },
+              onOpenCompartment = { onOpenCompartment(entry.compartmentId) }
             )
           }
         }
@@ -375,7 +557,8 @@ private fun UrgentItemsBottomSheet(
 @Composable
 private fun UrgentItemRow(
   entry: UrgentEntry,
-  onClick: () -> Unit
+  onMarkUsedUp: () -> Unit,
+  onOpenCompartment: () -> Unit
 ) {
   val item = entry.item
   val icon = EmojiIconRepository.iconFor(item.iconKey)
@@ -388,63 +571,94 @@ private fun UrgentItemRow(
   val badgeColor = if (item.freshness == Freshness.BAD) CoralUrgent else LemonWarn
 
   NeoBrutalistCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 14.dp, shadowOffset = 3.dp) {
-    Row(
+    Column(
       modifier = Modifier.fillMaxWidth().padding(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(10.dp)
+      verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-      Box(
-        modifier = Modifier
-          .size(44.dp)
-          .clip(RoundedCornerShape(10.dp))
-          .background(PaperCream)
-          .border(2.dp, InkBlack, RoundedCornerShape(10.dp)),
-        contentAlignment = Alignment.Center
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
       ) {
-        Text(text = emoji, fontSize = 24.sp)
-      }
-      Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(
-          text = item.name,
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 15.sp,
-          color = InkBlack,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis
-        )
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(6.dp)
+        Box(
+          modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(PaperCream)
+            .border(2.dp, InkBlack, RoundedCornerShape(10.dp)),
+          contentAlignment = Alignment.Center
         ) {
-          StickerBadge(
-            text = entry.compartmentName,
-            containerColor = SurfaceWhite,
-            tiltDegrees = 0f
+          Text(text = emoji, fontSize = 24.sp)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+          Text(
+            text = item.name,
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 15.sp,
+            color = InkBlack,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
           )
-          StickerBadge(
-            text = daysText,
-            containerColor = badgeColor,
-            tiltDegrees = -1.5f,
-            mono = true
-          )
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
+            StickerBadge(
+              text = entry.compartmentName,
+              containerColor = SurfaceWhite,
+              tiltDegrees = 0f
+            )
+            StickerBadge(
+              text = daysText,
+              containerColor = badgeColor,
+              tiltDegrees = -1.5f,
+              mono = true
+            )
+          }
         }
       }
-      NeoBrutalistButton(
-        onClick = onClick,
-        containerColor = LimeFresh,
-        cornerRadius = 10.dp,
-        borderWidth = 2.dp,
-        shadowOffset = 2.dp,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp)
+
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
       ) {
-        Text(
-          text = stringResource(R.string.urgent_sheet_open_compartment),
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 12.sp,
-          color = InkBlack
-        )
+        NeoBrutalistButton(
+          onClick = onMarkUsedUp,
+          modifier = Modifier.weight(1f),
+          containerColor = LimeFresh,
+          cornerRadius = 10.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 2.dp,
+          contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+          Text(
+            text = stringResource(R.string.urgent_sheet_mark_used_up),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 12.sp,
+            color = InkBlack,
+            maxLines = 1
+          )
+        }
+        NeoBrutalistButton(
+          onClick = onOpenCompartment,
+          modifier = Modifier.weight(1f),
+          containerColor = SurfaceWhite,
+          cornerRadius = 10.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 2.dp,
+          contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+          Text(
+            text = stringResource(R.string.urgent_sheet_open_compartment),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 12.sp,
+            color = InkBlack,
+            maxLines = 1
+          )
+        }
       }
     }
   }

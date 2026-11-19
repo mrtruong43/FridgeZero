@@ -3,8 +3,21 @@ package com.truong.fridgezero.domain
 import com.truong.fridgezero.data.CompartmentEntity
 import com.truong.fridgezero.data.CompartmentKind
 import com.truong.fridgezero.data.FoodItemEntity
+import com.truong.fridgezero.data.ItemStatus
 import com.truong.fridgezero.data.Seed
+import com.truong.fridgezero.ui.fridge3d.BoundedWebGlCrashTracker
+import com.truong.fridgezero.ui.fridge3d.LOW_MEM_THRESHOLD_BYTES
+import com.truong.fridgezero.ui.fridge3d.WebGlRecoveryAction
+import com.truong.fridgezero.ui.fridge3d.isAllowedFridge3dUrl
+import com.truong.fridgezero.ui.fridge3d.resolveWebGlQuality
+import com.truong.fridgezero.ui.icons.EmojiIconRepository
+import com.truong.fridgezero.ui.icons.FoodGroup
+import com.truong.fridgezero.ui.theme.DotGridInk
+import com.truong.fridgezero.ui.theme.DotGridSpec
+import com.truong.fridgezero.ui.theme.PaperCream
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -12,10 +25,11 @@ class LodAndFreshnessTest {
 
   @Test
   fun freshnessThresholdsMatchSpec() {
+    assertEquals(Freshness.BAD, freshnessOf(-1))
     assertEquals(Freshness.BAD, freshnessOf(0))
-    assertEquals(Freshness.BAD, freshnessOf(1))
-    assertEquals(Freshness.WARN, freshnessOf(2))
-    assertEquals(Freshness.WARN, freshnessOf(3))
+    assertEquals(Freshness.SOON, freshnessOf(1))
+    assertEquals(Freshness.OK, freshnessOf(2))
+    assertEquals(Freshness.OK, freshnessOf(3))
     assertEquals(Freshness.OK, freshnessOf(4))
   }
 
@@ -101,5 +115,375 @@ class LodAndFreshnessTest {
     assertTrue(comps[0].y == 0.02f && comps[1].y == 0.02f)
     assertEquals(CompartmentKind.DRAWER, comps[2].kind)
     assertEquals(CompartmentKind.DRAWER, comps[3].kind)
+  }
+
+  @Test
+  fun shelfLifeItemRuleOverridesGroupFallback() {
+    assertEquals(7, ConfigurableShelfLifeRepository.suggestDays("milk", FoodGroup.SUA_TRUNG, StorageZone.CHILLED))
+    assertEquals(21, ConfigurableShelfLifeRepository.suggestDays("egg", FoodGroup.SUA_TRUNG, StorageZone.CHILLED))
+    EmojiIconRepository.entries.forEach { entry ->
+      assertNotNull(
+        "Missing chilled shelf-life rule for ${entry.key}",
+        ConfigurableShelfLifeRepository.suggestDays(entry.key, entry.group, StorageZone.CHILLED)
+      )
+    }
+  }
+
+  @Test
+  fun shelfLifeZoneSwitchingUsesChilledFreezerAndDrawerRules() {
+    assertEquals(2, ConfigurableShelfLifeRepository.suggestDays("chicken", FoodGroup.THIT, StorageZone.CHILLED))
+    assertEquals(270, ConfigurableShelfLifeRepository.suggestDays("chicken", FoodGroup.THIT, StorageZone.FREEZER))
+    assertEquals(14, ConfigurableShelfLifeRepository.suggestDays("carrot", FoodGroup.RAU, StorageZone.CHILLED))
+    assertEquals(21, ConfigurableShelfLifeRepository.suggestDays("carrot", FoodGroup.RAU, StorageZone.DRAWER))
+  }
+
+  @Test
+  fun shelfLifeFallsBackToGroupForUnknownItemKeys() {
+    assertEquals(3, ConfigurableShelfLifeRepository.suggestDays("custom_item", FoodGroup.THIT, StorageZone.CHILLED))
+    assertEquals(3, ConfigurableShelfLifeRepository.suggestDays("custom_item", FoodGroup.AN_SAN, StorageZone.CHILLED))
+  }
+
+  @Test
+  fun culinaryCatalogCoversAll32IconKeysAndMeetsRecipeMetadataSpec() {
+    val recipes = CulinaryGuideRepository.recipes
+    assertEquals(36, recipes.size)
+    assertEquals(36, recipes.map { it.id }.toSet().size)
+
+    val coveredKeys = recipes
+      .flatMap { it.fridgeIngredients }
+      .flatMap { it.iconKeys }
+      .toSet()
+    val allIconKeys = EmojiIconRepository.entries.map { it.key }.toSet()
+    assertTrue("Missing icon keys: ${allIconKeys - coveredKeys}", coveredKeys.containsAll(allIconKeys))
+
+    recipes.forEach { recipe ->
+      assertTrue("${recipe.id} must have 1..4 fridge ingredients", recipe.fridgeIngredients.size in 1..4)
+      assertTrue("${recipe.id} must declare pantry staples", recipe.pantryStaples.isNotEmpty())
+      assertTrue("${recipe.id} must have 4..5 steps", recipe.steps.size in 4..5)
+      assertTrue("${recipe.id} must cite sourceName", recipe.sourceName.isNotBlank())
+      assertTrue("${recipe.id} must cite https sourceUrl", recipe.sourceUrl.startsWith("https://"))
+      assertEquals(
+        "${recipe.id} QUICK_15 tag must align with cookMinutes <= 15",
+        recipe.cookMinutes <= 15,
+        CulinaryFilter.QUICK_15 in recipe.categories
+      )
+      assertEquals(
+        "${recipe.id} difficulty should default from cookMinutes",
+        if (recipe.cookMinutes <= 15) RecipeDifficulty.EASY else RecipeDifficulty.MEDIUM,
+        recipe.difficulty
+      )
+      recipe.fridgeIngredients.forEach { ing ->
+        assertTrue("${recipe.id}/${ing.name} amountText blank", ing.amountText.isNotBlank())
+        assertTrue("${recipe.id}/${ing.name} unitsToConsume < 1", ing.unitsToConsume >= 1)
+      }
+    }
+
+    val seedDisplay = Seed.foodItems(20_000L).toDisplay(20_000L)
+    val readyNow = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.READY_NOW)
+    assertTrue("Expected at least 10 seed-ready recipes, found ${readyNow.size}", readyNow.size >= 10)
+
+    val rescueUrgent = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.RESCUE_URGENT)
+    assertTrue(rescueUrgent.isNotEmpty())
+    assertTrue(rescueUrgent.all { it.hasUrgentMatch })
+
+    val topOverall = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ALL).first()
+    assertTrue(topOverall.isReadyToCook)
+    assertTrue(topOverall.hasUrgentMatch)
+    assertTrue(topOverall.matchedIngredients.all { it.tier == MatchTier.EXACT_ICON })
+  }
+
+  @Test
+  fun culinaryEngineThreeLayerMatchingPicksEarliestExpiryAndAvoidsDoubleAssignment() {
+    val recipe = CulinaryRecipe(
+      id = "test_3layer",
+      title = "Test 3-layer recipe",
+      emoji = "🍳",
+      summary = "Test",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15),
+      fridgeIngredients = listOf(
+        RecipeIngredient("Thịt gà", listOf("chicken"), listOf("thịt gà", "gà"), FoodGroup.THIT, "200g"),
+        RecipeIngredient("Ớt chuông", listOf("bell_pepper"), listOf("ớt chuông"), FoodGroup.RAU, "1 quả"),
+        RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "1 củ"),
+        RecipeIngredient("Bơ", listOf("butter"), listOf("bơ"), FoodGroup.SUA_TRUNG, "10g")
+      ),
+      pantryStaples = listOf("Muối"),
+      steps = listOf("B1", "B2", "B3", "B4"),
+      sourceName = "VnExpress Ẩm Thực",
+      sourceUrl = "https://vnexpress.net/doi-song/cooking"
+    )
+    val fridge = listOf(
+      DisplayItem(10L, listOf(10L), "fresh", "Ức gà tươi", "chicken", FoodGroup.THIT, 1, minDaysLeft = 5),
+      DisplayItem(11L, listOf(11L), "fresh", "Đùi gà", "chicken", FoodGroup.THIT, 1, minDaysLeft = 1),
+      DisplayItem(12L, listOf(12L), "fresh", "Thịt bò", "meat", FoodGroup.THIT, 1, minDaysLeft = 0),
+      DisplayItem(13L, listOf(13L), "crisper", "Ot chuong do", "custom_veg", FoodGroup.RAU, 1, minDaysLeft = 2),
+      DisplayItem(14L, listOf(14L), "crisper", "Nấm đùi gà", "mushroom", FoodGroup.RAU, 1, minDaysLeft = 3)
+    )
+
+    val eval = CulinaryGuideEngine.evaluate(recipe, fridge)
+    assertEquals(3, eval.matchedCount)
+    assertEquals(1, eval.missingIngredients.size)
+    assertEquals("Bơ", eval.missingIngredients.single().name)
+
+    val chickenMatch = eval.matchedIngredients.first { it.ingredient.name == "Thịt gà" }
+    assertEquals(MatchTier.EXACT_ICON, chickenMatch.tier)
+    assertEquals(11L, chickenMatch.item.primaryId)
+
+    val pepperMatch = eval.matchedIngredients.first { it.ingredient.name == "Ớt chuông" }
+    assertEquals(MatchTier.KEYWORD, pepperMatch.tier)
+    assertEquals(13L, pepperMatch.item.primaryId)
+
+    val carrotMatch = eval.matchedIngredients.first { it.ingredient.name == "Cà rốt" }
+    assertEquals(MatchTier.GROUP_FALLBACK, carrotMatch.tier)
+    assertEquals(14L, carrotMatch.item.primaryId)
+
+    // Layer 3 must not steal an exact Layer 1 item belonging to another ingredient in the same recipe.
+    val antiStealRecipe = CulinaryRecipe(
+      id = "anti_steal",
+      title = "Anti steal",
+      emoji = "🥗",
+      summary = "Test",
+      cookMinutes = 10,
+      categories = setOf(CulinaryFilter.QUICK_15),
+      fridgeIngredients = listOf(
+        RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "1 củ"),
+        RecipeIngredient("Xà lách", listOf("lettuce"), listOf("xà lách"), FoodGroup.RAU, "1 bó")
+      ),
+      pantryStaples = listOf("Muối"),
+      steps = listOf("B1", "B2", "B3", "B4"),
+      sourceName = "Cooky",
+      sourceUrl = "https://www.cooky.vn/cach-lam"
+    )
+    val antiStealEval = CulinaryGuideEngine.evaluate(
+      antiStealRecipe,
+      listOf(
+        DisplayItem(20L, listOf(20L), "crisper", "Xà lách", "lettuce", FoodGroup.RAU, 1, minDaysLeft = 2),
+        DisplayItem(21L, listOf(21L), "crisper", "Nấm rơm", "mushroom", FoodGroup.RAU, 1, minDaysLeft = 4)
+      )
+    )
+    assertTrue(antiStealEval.isReadyToCook)
+    val lettuceRes = antiStealEval.matchedIngredients.first { it.ingredient.name == "Xà lách" }
+    assertEquals(MatchTier.EXACT_ICON, lettuceRes.tier)
+    assertEquals(20L, lettuceRes.item.primaryId)
+    val carrotRes = antiStealEval.matchedIngredients.first { it.ingredient.name == "Cà rốt" }
+    assertEquals(MatchTier.GROUP_FALLBACK, carrotRes.tier)
+    assertEquals(21L, carrotRes.item.primaryId)
+
+    // Single RAU item must never be assigned to two ingredients in the same recipe.
+    val singleRauEval = CulinaryGuideEngine.evaluate(
+      antiStealRecipe,
+      listOf(DisplayItem(21L, listOf(21L), "crisper", "Nấm rơm", "mushroom", FoodGroup.RAU, 1, minDaysLeft = 4))
+    )
+    assertEquals(1, singleRauEval.matchedCount)
+    assertEquals(1, singleRauEval.missingIngredients.size)
+    assertFalse(singleRauEval.isReadyToCook)
+  }
+
+  @Test
+  fun culinaryEngineExpiryRescueScoringAndFilterRanking() {
+    fun makeRecipe(
+      id: String,
+      cookMinutes: Int,
+      categories: Set<CulinaryFilter>,
+      vararg keys: Pair<String, FoodGroup>
+    ) = CulinaryRecipe(
+      id = id,
+      title = id,
+      emoji = "🍽️",
+      summary = id,
+      cookMinutes = cookMinutes,
+      categories = categories,
+      fridgeIngredients = keys.map { (k, g) ->
+        RecipeIngredient(k, listOf(k), listOf(k), g, "1 phần")
+      },
+      pantryStaples = listOf("Muối"),
+      steps = listOf("B1", "B2", "B3", "B4"),
+      sourceName = "Savoury Days",
+      sourceUrl = "https://www.savourydays.com/"
+    )
+
+    val twoUrgentReady = makeRecipe(
+      "two_urgent_ready", 12, setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      "salmon" to FoodGroup.CA_HAI_SAN, "lettuce" to FoodGroup.RAU
+    ) // 15 + 15 + 8 = 38
+    val twoFreshReady = makeRecipe(
+      "two_fresh_ready", 25, setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      "milk" to FoodGroup.SUA_TRUNG, "carrot" to FoodGroup.RAU
+    ) // 6 + 6 + 8 = 20
+    val oneUrgentOneMissing = makeRecipe(
+      "one_urgent_missing", 15, setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      "chicken" to FoodGroup.THIT, "dumpling" to FoodGroup.AN_SAN
+    ) // 15 - 3 = 12
+    val twoMissing = makeRecipe(
+      "two_missing", 20, setOf(CulinaryFilter.VIET_HOME),
+      "mango" to FoodGroup.TRAI_CAY, "apple" to FoodGroup.TRAI_CAY
+    ) // -3 - 3 = -6
+
+    val fridge = listOf(
+      DisplayItem(1L, listOf(1L), "freezer", "Cá hồi", "salmon", FoodGroup.CA_HAI_SAN, 1, minDaysLeft = -1),
+      DisplayItem(2L, listOf(2L), "crisper", "Xà lách", "lettuce", FoodGroup.RAU, 1, minDaysLeft = 1),
+      DisplayItem(3L, listOf(3L), "fresh", "Thịt gà", "chicken", FoodGroup.THIT, 1, minDaysLeft = 1),
+      DisplayItem(4L, listOf(4L), "fresh", "Sữa", "milk", FoodGroup.SUA_TRUNG, 1, minDaysLeft = 2),
+      DisplayItem(5L, listOf(5L), "crisper", "Cà rốt", "carrot", FoodGroup.RAU, 1, minDaysLeft = 8)
+    )
+    val subset = listOf(twoMissing, twoFreshReady, oneUrgentOneMissing, twoUrgentReady)
+
+    val all = CulinaryGuideEngine.recommend(fridge, CulinaryFilter.ALL, subset)
+    assertEquals(listOf("two_urgent_ready", "two_fresh_ready", "one_urgent_missing", "two_missing"), all.map { it.recipe.id })
+    assertEquals(listOf(38, 20, 12, -6), all.map { it.score })
+
+    assertEquals(listOf("two_urgent_ready", "two_fresh_ready"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.READY_NOW, subset).map { it.recipe.id })
+    assertEquals(listOf("two_urgent_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.RESCUE_URGENT, subset).map { it.recipe.id })
+    assertEquals(listOf("two_urgent_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.QUICK_15, subset).map { it.recipe.id })
+    assertEquals(listOf("two_urgent_ready", "two_fresh_ready", "two_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.VIET_HOME, subset).map { it.recipe.id })
+    assertEquals(listOf("two_fresh_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.EAT_CLEAN, subset).map { it.recipe.id })
+  }
+
+  @Test
+  fun culinaryEnginePantryStaplesNeverBlockReadiness() {
+    val recipe = CulinaryRecipe(
+      id = "pantry_only_test",
+      title = "Trứng chiên nước mắm tỏi",
+      emoji = "🥚",
+      summary = "Gia vị cơ bản không bao giờ chặn trạng thái đủ đồ.",
+      cookMinutes = 10,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(
+        RecipeIngredient("Trứng gà", listOf("egg"), listOf("trứng"), FoodGroup.SUA_TRUNG, "2 quả")
+      ),
+      pantryStaples = listOf("Tỏi băm", "Nước mắm", "Dầu ăn", "Tiêu xay", "Muối", "Đường"),
+      steps = listOf("Đánh trứng.", "Phi thơm tỏi.", "Chiên trứng.", "Chan nước mắm đường và rắc tiêu."),
+      sourceName = "VnExpress Ẩm Thực",
+      sourceUrl = "https://vnexpress.net/doi-song/cooking"
+    )
+    val fridgeWithOnlyEgg = listOf(
+      DisplayItem(1L, listOf(1L), "fresh", "Trứng", "egg", FoodGroup.SUA_TRUNG, 2, minDaysLeft = 5)
+    )
+
+    val result = CulinaryGuideEngine.evaluate(recipe, fridgeWithOnlyEgg)
+    assertTrue(result.isReadyToCook)
+    assertTrue(result.missingIngredients.isEmpty())
+    assertEquals(1, result.matchedCount)
+    assertEquals(14, result.score)
+  }
+
+  @Test
+  fun culinaryEnginePlanDeductionsDecrementsAndMarksUsedUpEarliestFirst() {
+    val today = 20_000L
+    val milkEarly = FoodItemEntity(
+      id = 101L,
+      compartmentId = "fresh",
+      name = "Sữa tươi",
+      iconKey = "milk",
+      group = FoodGroup.SUA_TRUNG.name,
+      quantity = 1,
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 1,
+      status = ItemStatus.ACTIVE
+    )
+    val milkLater = FoodItemEntity(
+      id = 102L,
+      compartmentId = "fresh",
+      name = "Sữa tươi",
+      iconKey = "milk",
+      group = FoodGroup.SUA_TRUNG.name,
+      quantity = 3,
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 4,
+      status = ItemStatus.ACTIVE
+    )
+    val chickenSingle = FoodItemEntity(
+      id = 103L,
+      compartmentId = "fresh",
+      name = "Thịt gà",
+      iconKey = "chicken",
+      group = FoodGroup.THIT.name,
+      quantity = 1,
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 1,
+      status = ItemStatus.ACTIVE
+    )
+
+    val milkDisplay = listOf(milkLater, milkEarly).toDisplay(today).single()
+    val chickenDisplay = listOf(chickenSingle).toDisplay(today).single()
+
+    val matched = listOf(
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Sữa tươi", listOf("milk"), listOf("sữa"), FoodGroup.SUA_TRUNG, "2 hộp", unitsToConsume = 2),
+        item = milkDisplay,
+        tier = MatchTier.EXACT_ICON
+      ),
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Thịt gà", listOf("chicken"), listOf("gà"), FoodGroup.THIT, "300g", unitsToConsume = 1),
+        item = chickenDisplay,
+        tier = MatchTier.EXACT_ICON
+      )
+    )
+    val entitiesById = mapOf(
+      101L to milkEarly,
+      102L to milkLater,
+      103L to chickenSingle
+    )
+
+    val deductions = CulinaryGuideEngine.planDeductions(matched, entitiesById).associateBy { it.itemId }
+    assertEquals(3, deductions.size)
+    assertEquals(0, deductions[101L]?.remainingQuantity)
+    assertEquals(2, deductions[102L]?.remainingQuantity)
+    assertEquals(0, deductions[103L]?.remainingQuantity)
+  }
+
+  @Test
+  fun fridge3dUrlAllowlistAllowsOnlyLocalAssetsAndAboutBlank() {
+    assertTrue(isAllowedFridge3dUrl("file:///android_asset/fridge3d/index.html"))
+    assertTrue(isAllowedFridge3dUrl("file:///android_asset/fridge3d/index.html?q=lite"))
+    assertTrue(isAllowedFridge3dUrl("file:///android_asset/fridge3d/index.html?q=high"))
+    assertTrue(isAllowedFridge3dUrl("file:///android_asset/fridge3d/three.min.js"))
+    assertTrue(isAllowedFridge3dUrl("about:blank"))
+
+    assertFalse(isAllowedFridge3dUrl("https://example.com"))
+    assertFalse(isAllowedFridge3dUrl("http://localhost:8080/"))
+    assertFalse(isAllowedFridge3dUrl("file:///data/local/tmp/exploit.html"))
+    assertFalse(isAllowedFridge3dUrl("file:///android_asset/fridge3d/../secret.html"))
+    assertFalse(isAllowedFridge3dUrl(""))
+    assertFalse(isAllowedFridge3dUrl(null))
+  }
+
+  @Test
+  fun webGlQualityResolvesLiteForLowRamLowMemOrForcedFlag() {
+    assertEquals("high", resolveWebGlQuality(isLowRamDevice = false, totalMemBytes = 8L * 1024 * 1024 * 1024, forceLiteMode = false))
+    assertEquals("lite", resolveWebGlQuality(isLowRamDevice = true, totalMemBytes = 8L * 1024 * 1024 * 1024, forceLiteMode = false))
+    assertEquals("lite", resolveWebGlQuality(isLowRamDevice = false, totalMemBytes = LOW_MEM_THRESHOLD_BYTES, forceLiteMode = false))
+    assertEquals("lite", resolveWebGlQuality(isLowRamDevice = false, totalMemBytes = 8L * 1024 * 1024 * 1024, forceLiteMode = true))
+  }
+
+  @Test
+  fun boundedWebGlCrashTrackerEnforcesTwoRecoveriesIn60SecondsThenFallback() {
+    val tracker = BoundedWebGlCrashTracker(windowMs = 60_000L, maxRecoveries = 2)
+
+    assertEquals(WebGlRecoveryAction.REBUILD_IN_LITE_AND_PERSIST, tracker.recordCrash(1_000L))
+    assertEquals(1, tracker.recentCrashCount(1_000L))
+    assertEquals(WebGlRecoveryAction.REBUILD_IN_LITE, tracker.recordCrash(10_000L))
+    assertEquals(2, tracker.recentCrashCount(10_000L))
+    assertEquals(WebGlRecoveryAction.FALLBACK_TO_2D, tracker.recordCrash(59_000L))
+
+    // Leaving and re-entering screen resets recovery budget.
+    tracker.reset()
+    assertEquals(0, tracker.recentCrashCount(60_000L))
+    assertEquals(WebGlRecoveryAction.REBUILD_IN_LITE_AND_PERSIST, tracker.recordCrash(100_000L))
+    assertEquals(WebGlRecoveryAction.REBUILD_IN_LITE, tracker.recordCrash(120_000L))
+
+    // Old entries (> 60s earlier) expire from sliding window.
+    assertEquals(WebGlRecoveryAction.REBUILD_IN_LITE, tracker.recordCrash(165_000L))
+    assertEquals(2, tracker.recentCrashCount(165_000L))
+  }
+
+  @Test
+  fun dotGridSpecMatchesDesignTokens() {
+    assertEquals("#EAE2D3", DotGridSpec.PAPER_HEX)
+    assertEquals("#C4B8A3", DotGridSpec.DOT_HEX)
+    assertEquals(18f, DotGridSpec.STEP_DP, 0.0001f)
+    assertEquals(1.5f, DotGridSpec.DOT_RADIUS_DP, 0.0001f)
+    assertEquals(PaperCream, DotGridSpec.paperColor)
+    assertEquals(DotGridInk, DotGridSpec.dotColor)
   }
 }

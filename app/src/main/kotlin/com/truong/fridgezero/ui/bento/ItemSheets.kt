@@ -134,7 +134,13 @@ fun QuickAddItemSheet(
   var quantity by remember { mutableIntStateOf(1) }
   var selectedUnit by remember { mutableStateOf<String?>("hộp") }
   var daysLeftText by remember { mutableStateOf("") }
+  var expiryPinnedManually by remember { mutableStateOf(false) }
+  var autoSuggestedZoneLabel by remember { mutableStateOf<String?>(null) }
   var showDatePicker by remember { mutableStateOf(false) }
+
+  val zoneChilledLabel = stringResource(R.string.zone_label_chilled)
+  val zoneDrawerLabel = stringResource(R.string.zone_label_drawer)
+  val zoneFreezerLabel = stringResource(R.string.zone_label_freezer)
 
   val quickKeys = remember(recentKeys) {
     (recentKeys + DEFAULT_FAVORITE_KEYS).distinct().take(8)
@@ -143,6 +149,26 @@ fun QuickAddItemSheet(
     quickKeys.mapNotNull { key -> EmojiIconRepository.entries.firstOrNull { it.key == key } }
   }
   val filteredIcons = remember(iconQuery) { EmojiIconRepository.search(iconQuery) }
+
+  fun applySuggestedExpiry(iconKey: String, compId: String) {
+    val selectedComp = compartments.firstOrNull { it.id == compId }
+    val zone = selectedComp?.let(::zoneForCompartment) ?: zoneForCompartment(compId)
+    val suggested = ConfigurableShelfLifeRepository.suggestDays(
+      iconKey = iconKey,
+      group = EmojiIconRepository.groupFor(iconKey),
+      zone = zone
+    )
+    if (suggested != null) {
+      daysLeftText = suggested.toString()
+      autoSuggestedZoneLabel = when (zone) {
+        StorageZone.CHILLED -> zoneChilledLabel
+        StorageZone.DRAWER -> zoneDrawerLabel
+        StorageZone.FREEZER -> zoneFreezerLabel
+      }
+    } else {
+      autoSuggestedZoneLabel = null
+    }
+  }
 
   fun pickIcon(entry: IconEntry, fillName: Boolean) {
     selectedIconKey = entry.key
@@ -154,17 +180,8 @@ fun QuickAddItemSheet(
         selectedCompartmentId = it
       }
     }
-    val selectedComp = compartments.firstOrNull { it.id == selectedCompartmentId }
-    val zone = selectedComp?.let(::zoneForCompartment) ?: zoneForCompartment(selectedCompartmentId)
-    val suggestedDays = ConfigurableShelfLifeRepository.suggestDays(
-      iconKey = entry.key,
-      group = entry.group,
-      zone = zone,
-      isOpened = false
-    )
-    if (suggestedDays != null) {
-      daysLeftText = suggestedDays.toString()
-    }
+    expiryPinnedManually = false
+    applySuggestedExpiry(entry.key, selectedCompartmentId)
   }
 
   fun resetForNextEntry() {
@@ -172,6 +189,8 @@ fun QuickAddItemSheet(
     iconQuery = ""
     quantity = 1
     daysLeftText = ""
+    expiryPinnedManually = false
+    autoSuggestedZoneLabel = null
   }
 
   val parsedDays = daysLeftText.toIntOrNull()
@@ -290,6 +309,9 @@ fun QuickAddItemSheet(
             onClick = {
               selectedCompartmentId = comp.id
               compartmentPinnedManually = true
+              if (!expiryPinnedManually) {
+                applySuggestedExpiry(selectedIconKey, comp.id)
+              }
             },
             containerColor = if (selected) SkyInfo else SurfaceWhite,
             cornerRadius = 10.dp,
@@ -392,7 +414,11 @@ fun QuickAddItemSheet(
         items(QUICK_EXPIRY_CHIPS) { (days, labelRes) ->
           val active = parsedDays == days
           NeoBrutalistButton(
-            onClick = { daysLeftText = days.toString() },
+            onClick = {
+              daysLeftText = days.toString()
+              expiryPinnedManually = true
+              autoSuggestedZoneLabel = null
+            },
             containerColor = if (active) LimeFresh else SurfaceWhite,
             cornerRadius = 10.dp,
             borderWidth = 2.dp,
@@ -430,11 +456,24 @@ fun QuickAddItemSheet(
 
       BrutalInputBox(
         value = daysLeftText,
-        onValueChange = { raw -> daysLeftText = raw.filter { it.isDigit() || it == '-' }.take(4) },
+        onValueChange = { raw ->
+          daysLeftText = raw.filter { it.isDigit() || it == '-' }.take(4)
+          expiryPinnedManually = true
+          autoSuggestedZoneLabel = null
+        },
         placeholder = stringResource(R.string.quick_add_expiry_required_hint),
         keyboardType = KeyboardType.Number,
         modifier = Modifier.fillMaxWidth()
       )
+      autoSuggestedZoneLabel?.let { zoneLabel ->
+        Text(
+          text = stringResource(R.string.quick_add_usda_auto_hint, zoneLabel),
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.Bold,
+          fontSize = 11.sp,
+          color = InkBlack.copy(alpha = 0.72f)
+        )
+      }
 
       // Dual Save / Save & Continue buttons
       Row(
@@ -491,6 +530,8 @@ fun QuickAddItemSheet(
             val selectedDay = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
             val diff = (selectedDay - LocalDate.now().toEpochDay()).toInt()
             daysLeftText = diff.toString()
+            expiryPinnedManually = true
+            autoSuggestedZoneLabel = null
           }
           showDatePicker = false
         }) {
@@ -509,16 +550,14 @@ fun QuickAddItemSheet(
 }
 
 /**
- * Item Detail, Edit, "Đã mở nắp", Compartment Move & Mandatory Waste-Reason Delete Sheet.
+ * Item Detail, Edit, Compartment Move & 1-Tap Direct Delete Sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemDetailSheet(
   item: DisplayItem,
   compartments: List<CompartmentUi>,
-  startWithDeleteReason: Boolean = false,
   onUpdateItem: (id: Long, name: String, iconKey: String, quantity: Int, daysLeft: Int, unit: String?) -> Unit,
-  onToggleOpened: (id: Long) -> Unit,
   onMoveCompartment: (ids: List<Long>, targetCompartmentId: String, newDaysLeft: Int?) -> Unit,
   onMarkStatus: (ids: List<Long>, status: ItemStatus) -> Unit,
   onDismiss: () -> Unit
@@ -529,14 +568,11 @@ fun ItemDetailSheet(
   var unit by remember(item.primaryId, item.unit) { mutableStateOf(item.unit) }
   var daysText by remember(item.primaryId, item.minDaysLeft) { mutableStateOf(item.minDaysLeft.toString()) }
   var pendingMoveTargetId by remember { mutableStateOf<String?>(null) }
-  var showDeleteReasons by remember(item.primaryId, startWithDeleteReason) {
-    mutableStateOf(startWithDeleteReason)
-  }
 
   val emoji = (EmojiIconRepository.iconFor(item.iconKey) as? FoodIcon.Emoji)?.glyph ?: "🍽️"
   val badgeColor = when (item.freshness) {
     Freshness.BAD -> CoralUrgent
-    Freshness.WARN -> LemonWarn
+    Freshness.SOON -> LemonWarn
     Freshness.OK -> LimeFresh
   }
   val expiryBadgeText = when {
@@ -588,9 +624,6 @@ fun ItemDetailSheet(
           Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             StickerBadge(text = item.group.labelVi, containerColor = SurfaceWhite, tiltDegrees = 0f)
             StickerBadge(text = expiryBadgeText, containerColor = badgeColor, tiltDegrees = -1.5f, mono = true)
-            if (item.isOpened) {
-              StickerBadge(text = stringResource(R.string.opened_badge), containerColor = ButterSoft, tiltDegrees = 1.5f)
-            }
           }
         }
       }
@@ -658,24 +691,6 @@ fun ItemDetailSheet(
             color = InkBlack
           )
         }
-      }
-
-      // "Đã mở nắp" toggle
-      NeoBrutalistButton(
-        onClick = { onToggleOpened(item.primaryId) },
-        modifier = Modifier.fillMaxWidth(),
-        containerColor = if (item.isOpened) ButterSoft else SurfaceWhite,
-        cornerRadius = 12.dp,
-        shadowOffset = 3.dp
-      ) {
-        Text(
-          text = if (item.isOpened) "✓ ${stringResource(R.string.opened_toggle_label)} (${stringResource(R.string.opened_badge)})"
-          else "📦 ${stringResource(R.string.opened_toggle_label)}",
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 13.sp,
-          color = InkBlack
-        )
       }
 
       // Move compartment
@@ -767,57 +782,22 @@ fun ItemDetailSheet(
         }
       }
 
-      // Waste-tracking mandatory reason delete flow
-      if (!showDeleteReasons) {
-        NeoBrutalistButton(
-          onClick = { showDeleteReasons = true },
-          modifier = Modifier.fillMaxWidth(),
-          containerColor = CoralUrgent
-        ) {
-          Text(
-            text = "🗑️ ${stringResource(R.string.action_delete)}",
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 14.sp,
-            color = InkBlack
-          )
-        }
-      } else {
-        NeoBrutalistCard(modifier = Modifier.fillMaxWidth(), containerColor = SurfaceWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
-          Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-              text = stringResource(R.string.delete_reason_title),
-              fontFamily = DisplayFont,
-              fontWeight = FontWeight.ExtraBold,
-              fontSize = 14.sp,
-              color = InkBlack
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-              NeoBrutalistButton(
-                onClick = {
-                  onMarkStatus(item.itemIds, ItemStatus.USED_UP)
-                  onDismiss()
-                },
-                modifier = Modifier.weight(1f),
-                containerColor = LimeFresh,
-                shadowOffset = 3.dp
-              ) {
-                Text(stringResource(R.string.delete_reason_used_up), fontFamily = BodyFont, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = InkBlack)
-              }
-              NeoBrutalistButton(
-                onClick = {
-                  onMarkStatus(item.itemIds, ItemStatus.DISCARDED)
-                  onDismiss()
-                },
-                modifier = Modifier.weight(1f),
-                containerColor = CoralUrgent,
-                shadowOffset = 3.dp
-              ) {
-                Text(stringResource(R.string.delete_reason_discarded), fontFamily = BodyFont, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = InkBlack)
-              }
-            }
-          }
-        }
+      // 1-Tap Direct Deletion
+      NeoBrutalistButton(
+        onClick = {
+          onMarkStatus(item.itemIds, ItemStatus.USED_UP)
+          onDismiss()
+        },
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = CoralUrgent
+      ) {
+        Text(
+          text = "🗑️ ${stringResource(R.string.action_delete)}",
+          fontFamily = BodyFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 14.sp,
+          color = InkBlack
+        )
       }
     }
   }

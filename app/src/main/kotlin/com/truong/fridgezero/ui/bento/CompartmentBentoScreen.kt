@@ -53,7 +53,6 @@ import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodGroup
 import com.truong.fridgezero.ui.icons.FoodIcon
 import com.truong.fridgezero.ui.theme.BodyFont
-import com.truong.fridgezero.ui.theme.ButterSoft
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
 import com.truong.fridgezero.ui.theme.InkBlack
@@ -93,14 +92,13 @@ fun CompartmentBentoScreen(
   onAddItem: (compartmentId: String, name: String, iconKey: String, quantity: Int, daysLeft: Int, unit: String?) -> Unit,
   onUpdateItem: (id: Long, name: String, iconKey: String, quantity: Int, daysLeft: Int, unit: String?) -> Unit,
   onAdjustQuantity: (id: Long, delta: Int) -> Unit,
-  onToggleOpened: (id: Long) -> Unit,
   onMoveCompartment: (ids: List<Long>, targetCompartmentId: String, newDaysLeft: Int?) -> Unit,
   onMarkStatus: (ids: List<Long>, status: ItemStatus) -> Unit,
   modifier: Modifier = Modifier
 ) {
   var selectedFilter by remember(compartment.id, initialFilter) { mutableStateOf(initialFilter) }
   var showAddSheet by remember { mutableStateOf(false) }
-  var detailTarget by remember { mutableStateOf<Pair<DisplayItem, Boolean>?>(null) }
+  var detailTarget by remember { mutableStateOf<DisplayItem?>(null) }
 
   val isFreezerComp = zoneForCompartment(compartment) == StorageZone.FREEZER
   val filteredItems = remember(compartment.items, selectedFilter, isFreezerComp) {
@@ -279,10 +277,10 @@ fun CompartmentBentoScreen(
         items(filteredItems, key = { it.primaryId }) { item ->
           FoodBentoCard(
             item = item,
-            onCardClick = { detailTarget = item to false },
+            onCardClick = { detailTarget = item },
             onDecrement = {
               if (item.quantity <= 1) {
-                detailTarget = item to true
+                onMarkStatus(item.itemIds, ItemStatus.USED_UP)
               } else {
                 onAdjustQuantity(item.primaryId, -1)
               }
@@ -306,14 +304,12 @@ fun CompartmentBentoScreen(
 
   val activeDetail = detailTarget
   if (activeDetail != null) {
-    val latestItem = compartment.items.firstOrNull { it.primaryId == activeDetail.first.primaryId }
-      ?: activeDetail.first
+    val latestItem = compartment.items.firstOrNull { it.primaryId == activeDetail.primaryId }
+      ?: activeDetail
     ItemDetailSheet(
       item = latestItem,
       compartments = allCompartments,
-      startWithDeleteReason = activeDetail.second,
       onUpdateItem = onUpdateItem,
-      onToggleOpened = onToggleOpened,
       onMoveCompartment = onMoveCompartment,
       onMarkStatus = onMarkStatus,
       onDismiss = { detailTarget = null }
@@ -331,7 +327,7 @@ private fun FoodBentoCard(
   val emoji = (EmojiIconRepository.iconFor(item.iconKey) as? FoodIcon.Emoji)?.glyph ?: "🍽️"
   val freshnessBg = when (item.freshness) {
     Freshness.BAD -> CoralUrgent
-    Freshness.WARN -> LemonWarn
+    Freshness.SOON -> LemonWarn
     Freshness.OK -> LimeFresh
   }
   val expiryText = when {
@@ -383,7 +379,7 @@ private fun FoodBentoCard(
 
       Spacer(Modifier.height(8.dp))
 
-      // Middle: full 2-line Vietnamese item name + group / opened tags
+      // Middle: full 2-line Vietnamese item name + group tag
       Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(
           text = item.name,
@@ -395,44 +391,21 @@ private fun FoodBentoCard(
           maxLines = 2,
           overflow = TextOverflow.Ellipsis
         )
-        Row(
-          horizontalArrangement = Arrangement.spacedBy(4.dp),
-          verticalAlignment = Alignment.CenterVertically
+        Box(
+          modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(PaperCream)
+            .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+            .padding(horizontal = 5.dp, vertical = 2.dp)
         ) {
-          Box(
-            modifier = Modifier
-              .clip(RoundedCornerShape(6.dp))
-              .background(PaperCream)
-              .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
-              .padding(horizontal = 5.dp, vertical = 2.dp)
-          ) {
-            Text(
-              text = item.group.labelVi,
-              fontFamily = BodyFont,
-              fontWeight = FontWeight.Bold,
-              fontSize = 10.sp,
-              color = InkBlack,
-              maxLines = 1
-            )
-          }
-          if (item.isOpened) {
-            Box(
-              modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(ButterSoft)
-                .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
-                .padding(horizontal = 5.dp, vertical = 2.dp)
-            ) {
-              Text(
-                text = stringResource(R.string.opened_badge),
-                fontFamily = BodyFont,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 10.sp,
-                color = InkBlack,
-                maxLines = 1
-              )
-            }
-          }
+          Text(
+            text = item.group.labelVi,
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            color = InkBlack,
+            maxLines = 1
+          )
         }
       }
 

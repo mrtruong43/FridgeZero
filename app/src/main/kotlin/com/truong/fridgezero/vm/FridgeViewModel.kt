@@ -12,8 +12,10 @@ import com.truong.fridgezero.data.FridgeRepository
 import com.truong.fridgezero.data.ItemStatus
 import com.truong.fridgezero.domain.ConfigurableShelfLifeRepository
 import com.truong.fridgezero.domain.CompartmentUi
+import com.truong.fridgezero.domain.CulinaryGuideEngine
 import com.truong.fridgezero.domain.Freshness
 import com.truong.fridgezero.domain.FridgeUiState
+import com.truong.fridgezero.domain.MatchedIngredient
 import com.truong.fridgezero.domain.NRect
 import com.truong.fridgezero.domain.toDisplay
 import com.truong.fridgezero.domain.zoneForCompartment
@@ -191,6 +193,25 @@ class FridgeViewModel(
   }
 
   fun markItemStatus(id: Long, status: ItemStatus) = markItemStatus(listOf(id), status)
+
+  fun consumeRecipeIngredients(matched: List<MatchedIngredient>) {
+    if (matched.isEmpty()) return
+    viewModelScope.launch {
+      val uniqueIds = matched.flatMap { it.item.itemIds }.distinct()
+      val entitiesById = uniqueIds.mapNotNull { id ->
+        repository.getFoodItem(id)?.let { id to it }
+      }.toMap()
+      val deductions = CulinaryGuideEngine.planDeductions(matched, entitiesById)
+      deductions.forEach { deduction ->
+        val entity = entitiesById[deduction.itemId] ?: return@forEach
+        if (deduction.remainingQuantity <= 0) {
+          repository.updateItemStatus(deduction.itemId, ItemStatus.USED_UP)
+        } else {
+          repository.upsertFoodItem(entity.copy(quantity = deduction.remainingQuantity))
+        }
+      }
+    }
+  }
 
   fun moveItemToCompartment(
     ids: List<Long>,

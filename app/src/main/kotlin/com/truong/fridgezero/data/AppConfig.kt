@@ -29,6 +29,10 @@ class AppConfig(context: Context) {
     prefs[KEY_NOTIFICATION_PROMPTED] ?: false
   }
 
+  val forceLiteMode: Flow<Boolean> = dataStore.data.map { prefs ->
+    prefs[KEY_FORCE_LITE_MODE] ?: false
+  }
+
   suspend fun setOnboardingCompleted(completed: Boolean) {
     dataStore.edit { prefs ->
       prefs[KEY_ONBOARDING_DONE] = completed
@@ -47,9 +51,16 @@ class AppConfig(context: Context) {
     }
   }
 
+  suspend fun setForceLiteMode(enabled: Boolean) {
+    dataStore.edit { prefs ->
+      prefs[KEY_FORCE_LITE_MODE] = enabled
+    }
+  }
+
   companion object {
     private val KEY_ONBOARDING_DONE = booleanPreferencesKey("has_completed_onboarding")
     private val KEY_EXPIRY_REMINDERS = booleanPreferencesKey("expiry_reminders_enabled")
     private val KEY_NOTIFICATION_PROMPTED = booleanPreferencesKey("notification_prompt_shown")
+    private val KEY_FORCE_LITE_MODE = booleanPreferencesKey("force_lite_mode")
   }
 }

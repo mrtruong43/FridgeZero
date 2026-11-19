@@ -1,6 +1,6 @@
 # FridgeZero — Complete Source Code & Architecture Summary
 
-> **Generated:** 2026-11-18 23:06:03 +07:00
+> **Generated:** 2026-11-19 13:54:50 +07:00
 > **Architecture:** Jetpack Compose + Room + WorkManager + CameraX 1.4.2 + Offline Three.js r128 WebGL Stage (Single Shared WebView Host at MainActivity Root + v3 Neo-Brutalist)
 > **Excluded:** `local.properties` (machine-specific paths/sensitive config), binary files (`.apk`, `.jar`, `.ttf`, `.webp`), build outputs (`build/`, `.gradle/`), and third-party minified vendor bundle `app/src/main/assets/fridge3d/three.min.js` (603,451 bytes).
 
@@ -28,6 +28,7 @@ FridgeZero/
         │   │   └── data/Entities.kt
         │   │   └── data/Repository.kt
         │   │   └── data/Seed.kt
+        │   │   └── domain/CulinaryGuide.kt
         │   │   └── domain/Freshness.kt
         │   │   └── domain/Models.kt
         │   │   └── domain/ShelfLife.kt
@@ -39,11 +40,14 @@ FridgeZero/
         │   │   └── ui/bento/ItemSheets.kt
         │   │   └── ui/designer/FridgeDesignerScreen.kt
         │   │   └── ui/designer/FridgeLayoutEditor.kt
+        │   │   └── ui/fridge3d/Fridge2DFallback.kt
         │   │   └── ui/fridge3d/Fridge3DView.kt
         │   │   └── ui/fridge3d/ShellColorSpec.kt
         │   │   └── ui/home/HomeDashboardHeader.kt
         │   │   └── ui/home/HomeScreen.kt
         │   │   └── ui/icons/FoodIcon.kt
+        │   │   └── ui/recipes/CulinaryGuideScreen.kt
+        │   │   └── ui/recipes/RecipeDetailSheet.kt
         │   │   └── ui/theme/BrutalistComponents.kt
         │   │   └── ui/theme/Color.kt
         │   │   └── ui/theme/Theme.kt
@@ -58,7 +62,7 @@ FridgeZero/
 
 ## 2. File Contents
 
-### `docs/spec.md` (194 lines)
+### `docs/spec.md` (210 lines)
 
 ````markdown
 # FridgeZero — Đặc tả Kỹ thuật & UI/UX v3
@@ -74,11 +78,11 @@ FridgeZero/
    - **Màn hình chính (`FridgeHeroScreen`) = 3D Hero tương tác:** Chỉ hiển thị khối tủ lạnh 3D nguyên khối xoay 360° kèm các thẻ sticker trạng thái bám trên từng cánh cửa. Không nhồi danh sách thực phẩm vào bên trong lòng tủ 3D.
    - **Màn hình ngăn (`CompartmentBentoScreen`) = Lưới Bento 2 cột phẳng:** Khi chạm vào một cánh cửa 3D, cửa bật mở 3D (`420ms`) rồi chuyển sang màn hình phẳng 2D dùng `LazyVerticalGrid(GridCells.Fixed(2))` để quản lý thực phẩm rộng rãi, không bao giờ cắt chữ hay tràn khung.
 2. **Ngôn ngữ thị giác Gen-Z Neo-Brutalism:**
-   - Nền giấy kem ấm `#FAF8F5` phủ lưới chấm `Dot Grid`, bề mặt thẻ trắng tinh `#FFFFFF`, viền đen mực đậm `2.5.dp` (`#111111`), bóng đổ cứng lệch góc `4.dp × 4.dp` (`0.dp` blur), kết hợp bảng màu pastel độ tương phản cao (`#A3E635`, `#FACC15`, `#FB7185`, `#C084FC`, `#38BDF8`).
+   - Nền giấy kem ấm `#EAE2D3` phủ lưới chấm `Dot Grid`, bề mặt thẻ trắng tinh `#FFFFFF`, viền đen mực đậm `2.5.dp` (`#111111`), bóng đổ cứng lệch góc `4.dp × 4.dp` (`0.dp` blur), kết hợp bảng màu pastel độ tương phản cao (`#A3E635`, `#FACC15`, `#FB7185`, `#C084FC`, `#38BDF8`).
 3. **Kế thừa nguyên vẹn tầng dữ liệu từ `spec_v2`:**
    - Giữ nguyên 3 bảng Room Database (`FridgeEntity`, `CompartmentEntity`, `FoodItemEntity`), trạng thái lịch sử lãng phí (`ACTIVE`, `USED_UP`, `DISCARDED`), cấu trúc tra cứu `ShelfLife` và lịch nhắc hạn dùng `WorkManager`.
 4. **Quy tắc dữ liệu & tài nguyên:**
-   - Không tự bịa số liệu thời hạn bảo quản `ShelfLife` chưa kiểm chứng; để cấu trúc tra cứu mở để chủ dự án nạp dữ liệu chuẩn.
+   - Số liệu thời hạn bảo quản `ShelfLife` sử dụng cận dưới bảo thủ theo chuẩn USDA FoodKeeper / FDA (cho 9 `FoodGroup` và 32 món trong `EmojiIconRepository`) để tự điền thông minh theo vùng ngăn, kèm khuyến nghị người dùng kiểm tra thêm bao bì.
    - Toàn bộ chuỗi hiển thị tiếng Việt đặt tập trung trong `res/values/strings.xml`.
    - Xin quyền `POST_NOTIFICATIONS` (Android 13+) và `CAMERA` (Giai đoạn 2) đúng ngữ cảnh khi người dùng kích hoạt tính năng tương ứng.
 
@@ -89,13 +93,13 @@ FridgeZero/
 ### 1.1. Bảng màu Neo-Brutalist (`ui/theme/Color.kt`)
 | Token | Mã Hex | Vai trò & Ngữ cảnh sử dụng |
 | :--- | :--- | :--- |
-| `PaperCream` | `#FAF8F5` | Màu nền chính của toàn bộ ứng dụng và Bottom Sheet. |
-| `DotGridInk` | `#D6D3CD` | Màu chấm lưới nền (`1.25.dp` chấm, bước lưới `18.dp`). |
+| `PaperCream` | `#EAE2D3` | Màu nền chính của toàn bộ ứng dụng và Bottom Sheet. |
+| `DotGridInk` | `#C4B8A3` | Màu chấm lưới nền (bán kính `1.5.dp`, bước lưới `18.dp`). |
 | `SurfaceWhite` | `#FFFFFF` | Nền thẻ Bento, nút phụ, khung xem trước 3D và thanh Task Bar. |
 | `InkBlack` | `#111111` | Viền khối (`2.5.dp`), viền chip (`2.dp`), bóng đổ cứng và chữ chính. |
-| `LimeFresh` | `#A3E635` | Trạng thái tươi (`> 3` ngày), nút CTA chính (`CHỐT TỦ NÀY`), FAB `+ Thêm nhanh`. |
-| `LemonWarn` | `#FACC15` | Trạng thái sắp hết hạn (`2–3` ngày), badge bước thiết kế, nút nhắc hạn. |
-| `CoralUrgent` | `#FB7185` | Trạng thái gấp ($\le 1$ ngày / quá hạn), nút xóa ngăn/món, cảnh báo khẩn. |
+| `LimeFresh` | `#A3E635` | Trạng thái tươi (`≥ 2` ngày), nút CTA chính (`CHỐT TỦ NÀY`), FAB `+ Thêm nhanh`. |
+| `LemonWarn` | `#FACC15` | Trạng thái sắp hết hạn (`1` ngày — `Freshness.SOON`), badge bước thiết kế, nút nhắc hạn. |
+| `CoralUrgent` | `#FB7185` | Trạng thái gấp ($\le 0$ ngày — hết hạn hôm nay hoặc quá hạn), nút xóa ngăn/món, cảnh báo khẩn. |
 | `LilacAccent` | `#C084FC` | Badge ngăn đông, nút `📷 Quét AI (GĐ2)` trên thanh Task Bar. |
 | `SkyInfo` | `#38BDF8` | Huy hiệu thời tiết, badge ngăn kéo (`DRAWER`), chọn ngăn cất đồ. |
 | `CavitySlate` | `#1E293B` | Màu lòng khoang bên trong tủ 3D khi cửa mở. |
@@ -123,8 +127,12 @@ FridgeZero/
 ## §2. Kiến trúc Rendering 3D & Tương tác Không gian (`app/src/main/assets/fridge3d/` & `ui/fridge3d/`)
 
 ### 2.1. Công nghệ & Thư viện
-- Sử dụng **Offline Three.js WebGL Stage** đóng gói cục bộ trong `app/src/main/assets/fridge3d/` (`three.min.js` UMD + `index.html`), nhúng trong Jetpack Compose qua hardware-accelerated `WebView` (`AndroidView`), nền trong suốt (`alpha: true`, `Color.TRANSPARENT`) để hiển thị trực tiếp trên nền giấy kem lưới chấm `#FAF8F5`.
-- Mục tiêu hiệu năng: **60fps+** ổn định, nhẹ dung lượng APK và không phụ thuộc mạng hay native SceneView/Filament NDK.
+- Sử dụng **Offline Three.js WebGL Stage** đóng gói cục bộ trong `app/src/main/assets/fridge3d/` (`three.min.js` UMD + `index.html`), nhúng trong một `WebView` dùng chung duy nhất ở tầng root `MainActivity` (`SharedFridge3DWebView` + `Fridge3DStageSlot` với `AndroidView`).
+- **Đồng bộ nền không đường nối (`DotGridSpec` Single Source of Truth):** `WebGLRenderer` dùng màu xóa nền đặc (**opaque `alpha: false`**, `renderer.setClearColor(surfaceBg, 1)`) khớp màu `surfaceBg`; trên Màn 2 vẽ kết cấu lưới chấm `CanvasTexture` sinh từ đúng hằng số `DotGridSpec` (`#EAE2D3`, `#C4B8A3`, `18.dp`, `1.5.dp`) và đồng bộ lệch pha UV (`offsetXDp`, `offsetYDp`) theo tọa độ khung `Fridge3DStageSlot` để hòa liền mạch với `Modifier.dotGridBackground()` của Compose.
+- **Tối ưu hiệu năng, Bảo mật & Phục hồi sự cố:**
+  - **Render theo nhu cầu (`dirty`-flag):** Vòng `requestAnimationFrame` chỉ chạy `renderer.render(...)` và `onStickersProjected` khi có tương tác/hoạt ảnh đang chạy; vẽ đúng một frame nghỉ cuối cùng khi dừng rồi ngưng hẳn đến tương tác tiếp theo.
+  - **Chế độ `lite` vs `high` (`?q=lite` / `?q=high`):** Tự chọn `lite` khi `ActivityManager.isLowRamDevice`, RAM $\le 4\text{ GiB}$, hoặc `AppConfig.forceLiteMode == true` (tắt antialias, giới hạn DPR $\le 1.5$, dùng `MeshStandardMaterial` không clearcoat và vẫn giữ viền mực `EdgesGeometry`).
+  - **Bảo mật & Lifecycle:** Tạm dừng/khôi phục WebView ở `ON_STOP`/`ON_START`, tắt `allowFileAccess*`/`allowContentAccess`, chỉ cho phép điều hướng cục bộ `file:///android_asset/fridge3d/` hoặc `about:blank`, bật WebView debugging theo `FLAG_DEBUGGABLE`, và chặn rủi ro mất context/crash qua bộ đếm trượt tối đa **2 lần dựng lại trong 60 giây** (`onRenderProcessGone` + `onWebGlContextLost`) trước khi chuyển gọn sang giao diện dự phòng **`Fridge2DFallback`** Neo-Brutalist thuần Compose.
 
 ### 2.2. Dựng hình Tủ lạnh 3D Tham số (`assets/fridge3d/index.html`)
 Chiếc tủ 3D được lắp ráp động từ cấu hình `FridgeEntity` và danh sách `CompartmentEntity` (tọa độ chuẩn hóa `x, y, w, h` trong khoảng `0..1`):
@@ -154,7 +162,7 @@ Chiếc tủ 3D được lắp ráp động từ cấu hình `FridgeEntity` và 
 
 ---
 
-## §3. Luồng Trải nghiệm 3 Màn hình & Các Bottom Sheet
+## §3. Luồng Trải nghiệm 4 Màn hình & Các Bottom Sheet
 
 ### 3.1. Màn 1 — Thiết kế & Chốt tủ (`ui/setup/FridgeSetupScreen.kt`)
 Hiển thị khi người dùng mở app lần đầu (hoặc bấm nút `⚙️ Đổi dáng tủ` từ Màn 2):
@@ -170,23 +178,24 @@ Hiển thị khi người dùng mở app lần đầu (hoặc bấm nút `⚙️
      - Thuật toán `normalizeCompartmentLayout()` tự động tính lại tọa độ chuẩn hóa `x, y, w, h` không bao giờ chồng lấn mỗi khi thêm/bớt ngăn.
 - **Nút hành động đáy:** Nút toàn chiều rộng màu `#A3E635`: **`CHỐT TỦ NÀY →`** (lưu cấu hình vào Room và chuyển sang Màn 2).
 
-### 3.2. Màn 2 — Màn hình chính Tủ 3D Tương tác (`ui/hero/FridgeHeroScreen.kt`)
-- **Dashboard Đầu trang (2 hàng thông tin gọn gàng):**
-  - **Hàng 1:**
-    - Trái: Nhãn thương hiệu nhỏ `FRIDGEZERO` + **Lời chào thân thiện động theo khung giờ** (*"Chào buổi sáng / trưa / chiều / tối, [Tên]!"*).
+### 3.2. Màn 2 — Màn hình chính Tủ 3D Tương tác (`ui/home/HomeScreen.kt`, `ui/home/HomeDashboardHeader.kt`)
+- **Dashboard Đầu trang gọn gàng (`HomeDashboardHeader`):**
+  - **Hàng tiêu đề:**
+    - Trái: Nhãn thương hiệu nhỏ `FRIDGEZERO · 28°C ĐÀ NẴNG` + **Lời chào thân thiện động theo khung giờ** (*"Chào buổi sáng / trưa / chiều / tối, [Tên]!"*).
     - Phải: **Đồng hồ số thời gian thực** định dạng `HH:mm · Thứ, dd/MM` (`JetBrains Mono`, nền `#111111`, chữ trắng, bóng cứng `#A3E635`).
-  - **Hàng 2:**
-    - Trái: **Huy hiệu Thời tiết** (`☀️ 28°C · Đà Nẵng`, nền `#E0F2FE`, viền `2.dp` `#111111`).
-    - Phải: **Nút Thông báo Sắp hết hạn** (`🔔 N sắp hết hạn`, tự đổi màu `#FB7185` nếu có món $\le 1$ ngày, `#FACC15` nếu có món $2–3$ ngày, hoặc `#A3E635` *"✨ Tất cả đều tươi"* nếu không có món gấp). Bấm vào mở `UrgentItemsSheet`.
+  - **Banner Trợ lý & Gợi ý Món ăn Trung tâm:**
+    - Thẻ ngang nổi bật viền `2.5.dp` `#111111`: khi có đồ gấp ($\le 1$ ngày) hiển thị `🔔 N món sắp hết hạn` (`#FB7185` nếu có món hết hạn hôm nay/quá hạn $\le 0$ ngày, `#FACC15` nếu còn $1$ ngày) kèm pill `Danh sách` mở `UrgentItemsBottomSheet`, và dải gợi ý món điểm cao nhất (`🍳 Tên món · Xp →`) chạm vào đi thẳng tới `Recipes(topRecommendation.recipe.id)`.
+    - Khi tủ đồ đều tươi (`#A3E635`), banner dẫn trực tiếp sang món gợi ý nấu ngay kèm nút chuông nhắc hạn dùng nhỏ gọn bên cạnh.
 - **Sân khấu Trung tâm:**
-  - Hiển thị khối tủ 3D đã chốt cùng các Sticker bám cửa và pill hướng dẫn phía trên `↔ Vuốt xoay 360° · Chạm cửa để mở`.
+  - Hiển thị khối tủ 3D (camera `y=1.32, z=4.72` tạo khoảng thở thoáng đãng trên lưới chấm `#EAE2D3`) cùng các `DoorStickerBadge` cỡ lớn dễ đọc bám trên cửa tủ (`padding(top = 6.dp, bottom = 8.dp)`), lược bỏ pill hướng dẫn tĩnh phía trên để giải phóng không gian.
   - **Không đặt nút đổi màu vỏ tủ ở màn hình này** (đã cố định từ Màn 1).
 - **Nút nổi (`FAB`) `+ Thêm nhanh`:**
-  - Nổi bật ở góc dưới bên phải ngay phía trên thanh Task Bar (`bottom = 86.dp`, `end = 16.dp`), nền `#A3E635`, icon `+` trong ô vuông `#111111`, mở `QuickAddSheet`.
-- **Thanh Task Bar cố định dưới đáy (`height = 70.dp`, nền `#FFFFFF`, viền trên `2.5.dp` `#111111`):**
+  - Nổi bật ở góc dưới bên phải ngay phía trên thanh Task Bar (`bottom = 14.dp`, `end = 16.dp` trong khung sân khấu), nền `#A3E635`, icon `+` trong ô vuông `#111111`, mở `QuickAddSheet`.
+- **Thanh Task Bar cố định dưới đáy (`height = 74.dp`, 4 nút cân đối cho màn `360dp`, nền `#FFFFFF`, viền trên `2.5.dp` `#111111`):**
   1. **`🧊 Tủ lạnh` (nền `#FEF9C3`):** Căn lại góc nhìn chuẩn của tủ 3D.
-  2. **`📷 Quét AI` (nổi bật nền `#C084FC` + sticker nghiêng `GĐ2`):** Điểm vào luồng CameraX quét hóa đơn AI. Ở GĐ1 mở `CameraAiPreviewSheet` (đã khai báo sẵn quyền/giao diện khung ngắm để sẵn sàng nối API OCR ở GĐ2).
-  3. **`⚙️ Đổi dáng tủ` (nền `#FFFFFF`):** Quay lại Màn 1 (`FridgeSetupScreen`) để chỉnh sửa dáng tủ, màu vỏ hoặc số ngăn.
+  2. **`🍳 Cẩm nang` (nền `#FFFFFF` + sticker nghiêng `#A3E635` đếm số món sẵn sàng nấu):** Mở Màn 4 (`CulinaryGuideScreen`).
+  3. **`📷 Quét AI` (nổi bật nền `#C084FC` + sticker nghiêng `GĐ2`):** Điểm vào luồng CameraX quét hóa đơn AI. Ở GĐ1 mở `CameraAiPreviewSheet` (đã khai báo sẵn quyền/giao diện khung ngắm để sẵn sàng nối API OCR ở GĐ2).
+  4. **`⚙️ Đổi dáng` (nền `#FFFFFF`):** Quay lại Màn 1 (`FridgeDesignerScreen`) để chỉnh sửa dáng tủ, màu vỏ hoặc số ngăn.
 
 ### 3.3. Màn 3 — Khoang Thực phẩm Bento Grid 2 Cột (`ui/bento/CompartmentBentoScreen.kt`)
 - **Top Bar:**
@@ -198,23 +207,33 @@ Hiển thị khi người dùng mở app lần đầu (hoặc bấm nút `⚙️
 - **Lưới thẻ Bento 2 cột (`LazyVerticalGrid(GridCells.Fixed(2))`, khoảng cách `12.dp`):**
   - Sắp xếp ưu tiên món sắp hết hạn lên đầu (`expiryEpochDay ASC`).
   - **Cấu trúc từng thẻ Bento (`minHeight = 158.dp`):**
-    - *Hàng trên:* Khung icon `48.dp` bo góc chứa Emoji/Icon `32.dp` bên trái + Sticker hạn dùng nghiêng `-2°` bên phải (`Quá hạn Nd` / `Còn 1d` nền `#FB7185`, `Còn 2–3d` nền `#FACC15`, `> 3d` nền `#A3E635`).
-    - *Phần giữa:* Tên thực phẩm tối đa 2 dòng (`maxLines = 2`, không cắt chữ giữa từ) + tag nhóm thực phẩm và tag `Đã mở` (nền `#FEF08A`) nếu đã mở bao bì.
-    - *Hàng đáy:* Bộ đếm nhanh **`−` `[qty]` `+`** ngay trên mặt thẻ; bấm `−` khi số lượng đang là `1` sẽ tự động mở `ItemDetailSheet` ở bước hỏi lý do xóa.
+    - *Hàng trên:* Khung icon `48.dp` bo góc chứa Emoji/Icon `32.dp` bên trái + Sticker hạn dùng nghiêng `-2°` bên phải (`Quá hạn Nd` / `Hôm nay` nền `#FB7185`, `Còn 1d` nền `#FACC15`, `≥ 2d` nền `#A3E635`).
+    - *Phần giữa:* Tên thực phẩm tối đa 2 dòng (`maxLines = 2`, không cắt chữ giữa từ) + tag nhóm thực phẩm (`item.group.labelVi`).
+    - *Hàng đáy:* Bộ đếm nhanh **`−` `[qty]` `+`** ngay trên mặt thẻ; bấm `−` khi số lượng $\le 1$ sẽ xóa trực tiếp món khỏi ngăn chỉ với 1 chạm (gọi `onMarkStatus(itemIds, ItemStatus.USED_UP)`) mà không mở hộp thoại xác nhận.
 
 ### 3.4. Hệ thống 4 Bottom Sheet (`ui/sheets/`)
-1. **`ItemDetailSheet` (Chi tiết, Sửa, Chuyển ngăn & Xóa có lý do):**
+1. **`ItemDetailSheet` (Chi tiết, Sửa, Chuyển ngăn & Xóa nhanh 1 chạm):**
    - Hiển thị icon lớn, tên món, nhóm, badge hạn dùng.
-   - Bộ đếm số lượng `−` / `+` và nút bật/tắt **`Đã mở nắp`** (tự động rút ngắn 50% số ngày hạn còn lại và gắn nhãn `Đã mở`).
+   - Bộ đếm số lượng `−` / `+`, chỉnh sửa tên và số ngày hạn dùng.
    - **Chuyển ngăn bảo quản:** Danh sách chip các ngăn khác trong tủ; khi chuyển giữa ngăn mát và ngăn đông sẽ tự điều chỉnh hạn dùng phù hợp.
-   - **Xóa món bắt buộc chọn lý do:** Bấm `🗑️ Xóa món khỏi tủ` sẽ bung 2 lựa chọn: **`✓ Đã dùng hết`** (`ItemStatus.USED_UP`) hoặc **`✕ Bỏ đi`** (`ItemStatus.DISCARDED`).
+   - **Xóa món 1 chạm:** Bấm `🗑️ Xóa khỏi tủ` sẽ ghi nhận `ItemStatus.USED_UP` và đóng sheet ngay lập tức.
 2. **`QuickAddSheet` (Thêm nhanh thực phẩm):**
-   - Hàng chip gợi ý món quen chạm 1 lần điền sẵn icon, tên, nhóm và hạn dùng gợi ý.
+   - Hàng chip gợi ý món quen chạm 1 lần điền sẵn icon, tên, nhóm, chọn ngăn phù hợp và tự động điền số ngày hạn dùng theo chuẩn USDA/FDA (tự cập nhật khi đổi ngăn nếu người dùng chưa chọn mốc hạn thủ công, kèm chú thích `✓ Gợi ý theo chuẩn USDA/FDA (<vùng ngăn>)`).
    - Ô nhập tên thực phẩm + dải chip chọn ngăn cất + bộ đếm số lượng + 4 chip hạn dùng nhanh (`+3 ngày`, `+1 tuần`, `+2 tuần`, `+1 tháng`) kèm DatePicker tùy chọn.
-3. **`UrgentItemsSheet` (Trung tâm cảnh báo sắp hết hạn):**
-   - Mở khi chạm nút `🔔 N sắp hết hạn` trên Dashboard Màn 2; liệt kê các món còn $\le 3$ ngày kèm nút **`Mở ngăn →`** nhảy thẳng tới đúng ngăn đó ở Màn 3 với bộ lọc `Sắp hết hạn`.
+3. **`UrgentItemsBottomSheet` (Trung tâm cảnh báo sắp hết hạn & Gợi ý món):**
+   - Mở khi chạm Banner Trợ lý trên Dashboard Màn 2; hiển thị thẻ gợi ý **`🍳 TỐI NAY NẤU GÌ?`** nối thẳng với `topRecommendation` (chạm để mở thẳng `RecipeDetailSheet` tương ứng ở Màn 4), liệt kê các món sắp hết hạn kèm nút xóa nhanh **`✓ Dùng hết`** (1 chạm) và nút **`Mở ngăn →`** nhảy thẳng tới đúng ngăn đó ở Màn 3.
 4. **`CameraAiPreviewSheet` (Cổng CameraX Quét Hóa đơn — Giai đoạn 2):**
    - Mở khi chạm `📷 Quét AI` trên Task Bar; hiển thị khung ngắm CameraX với 4 góc định vị hóa đơn, tia quét laser xanh `#A3E635`, nút đèn Flash, nút chụp và chọn ảnh thư viện (sẵn sàng nối luồng AI OCR ở GĐ2).
+
+### 3.5. Màn 4 — Cẩm nang Ẩm thực & Giải cứu Hạn dùng (`ui/recipes/CulinaryGuideScreen.kt`, `RecipeDetailSheet.kt`)
+- **Top Bar:** Nút quay lại `←`, tiêu đề `CẨM NANG ẨM THỰC` và sticker `#A3E635` hiển thị số món đủ đồ nấu ngay.
+- **Lưới công thức Bento 2 cột (`LazyVerticalGrid`):**
+  - Thẻ Hero toàn chiều rộng **`🔥 MÓN CỨU TỦ HÔM NAY`** làm nổi bật công thức có điểm giải cứu cao nhất.
+  - Hàng chip lọc ngang (`Tất cả`, `Đủ đồ nấu ngay`, `Cứu đồ gấp`, `Nhanh ≤ 15p`, `Cơm nhà Việt`, `Eat-Clean`).
+  - Thẻ Bento 2 cột hiển thị emoji món, tỷ lệ khớp nguyên liệu (`#A3E635` khi đủ đồ, `#FACC15` khi còn thiếu), hàng emoji nguyên liệu tô màu theo hạn dùng, thời gian nấu và `sourceName`. Tự động mở `RecipeDetailSheet` khi điều hướng kèm `initialRecipeId`.
+- **`RecipeDetailSheet`:**
+  - Hiển thị tiêu đề, thời gian nấu, độ khó (`Dễ` / `Vừa`) và nhãn nguồn uy tín; phân tách rõ **`✓ Đã có trong tủ`** (tô màu `#FB7185` / `#FACC15` cho món sắp hết hạn), **`🛒 Cần chuẩn bị thêm`** và **`🧂 Gia vị bếp cơ bản`**.
+  - Liệt kê các bước nấu đánh số trong `NeoBrutalistCard` và 2 nút đáy: **`🔗 Xem bài gốc`** (`LocalUriHandler.openUri` bọc `runCatching`) và **`🎉 Đã nấu xong`** (gọi `FridgeViewModel.consumeRecipeIngredients` để trừ `unitsToConsume` / chuyển `USED_UP` trong Room, hiện Toast và đóng sheet).
 
 ---
 
@@ -227,34 +246,35 @@ Hiển thị khi người dùng mở app lần đầu (hoặc bấm nút `⚙️
 
 ### 4.2. Logic Nghiệp vụ & Thông báo
 - **Không tự xóa món quá hạn:** Món có `daysLeft < 0` vẫn hiển thị ở đầu lưới Bento với sticker màu `#FB7185` ghi rõ *"Quá hạn N ngày"* để người dùng tự xử lý và ghi nhận lý do.
-- **Bảng `ShelfLifeRepository`:** Giữ cấu trúc mở tra cứu theo `(foodKey, compartmentKind, isOpened)`, không hard-code số ngày chưa kiểm chứng.
+- **Bảng `ConfigurableShelfLifeRepository`:** Nạp sẵn quy tắc tra cứu bảo thủ theo chuẩn USDA FoodKeeper / FDA (9 `FoodGroup` và 32 `iconKey` trong `EmojiIconRepository`) theo vùng (`CHILLED`, `FREEZER`, `DRAWER`), hỗ trợ `isOpened: Boolean = false`.
 - **Nhắc hạn dùng (`ExpiryReminderWorker`):** Chạy kiểm tra định kỳ hằng ngày qua `WorkManager`; chỉ yêu cầu quyền `POST_NOTIFICATIONS` (Android 13+) khi người dùng lưu món có hạn ngắn hoặc bật nhắc nhở.
 
 ---
 
-## §5. Cấu trúc Package Kotlin & Lộ trình Chuyển đổi từ v2 sang v3
+## §5. Cấu trúc Package Kotlin & Kiến trúc 3D / Triển khai
 
 ```text
 app/src/main/
 ├── assets/fridge3d/    # three.min.js (r128 offline) + index.html (Three.js WebGL stage)
 └── kotlin/com/truong/fridgezero/
     ├── ui/
-    │   ├── theme/      # Color.kt, Type.kt, Theme.kt, BrutalistComponents.kt
-    │   ├── fridge3d/   # Fridge3DView.kt, ShellColorSpec.kt (WebView + AndroidBridge)
+    │   ├── theme/      # Color.kt (kèm DotGridSpec), Type.kt, Theme.kt, BrutalistComponents.kt
+    │   ├── fridge3d/   # Fridge3DView.kt, Fridge2DFallback.kt, ShellColorSpec.kt
     │   ├── designer/   # FridgeDesignerScreen.kt, FridgeLayoutEditor.kt (Màn 1)
     │   ├── home/       # HomeScreen.kt, HomeDashboardHeader.kt (Màn 2)
     │   ├── bento/      # CompartmentBentoScreen.kt, ItemSheets.kt (Màn 3)
+    │   ├── recipes/    # CulinaryGuideScreen.kt, RecipeDetailSheet.kt (Màn 4)
     │   └── aiscan/     # AiScanPlaceholderScreen.kt (Cổng CameraX GĐ2)
     ├── data/           # Entities.kt, Dao.kt, Db.kt, Repository.kt, Seed.kt, AppConfig.kt
-    ├── domain/         # Freshness.kt, ShelfLife.kt, Models.kt
+    ├── domain/         # Freshness.kt, ShelfLife.kt, Models.kt, CulinaryGuide.kt
     ├── notifications/  # ExpiryReminderWorker.kt, ContextualNotificationPrompt.kt
     └── vm/             # FridgeViewModel.kt
 ```
 
-### Lộ trình 3 Bước Chuyển đổi An toàn cho Antigravity
-1. **Bước 1 — Thiết lập Design System Neo-Brutalist & Màn 3 Bento Grid:** Cập nhật `Color.kt`, `Type.kt`, `BrutalistComponents.kt`, xây dựng `CompartmentBentoScreen` (lưới 2 cột) và 4 Bottom Sheet (`ItemDetailSheet`, `QuickAddSheet`, `UrgentItemsSheet`, `CameraAiPreviewSheet`) nối thẳng vào `FridgeViewModel` hiện có.
-2. **Bước 2 — Tích hợp SceneView 3D & Màn 1 Thiết kế Tủ (`FridgeSetupScreen`):** Thêm dependency `SceneView`, viết `Fridge3DBuilder` dựng tủ 3D có viền mực + bản lề cửa/ngăn kéo, và hoàn thiện màn hình chọn 6 mẫu tủ, 4 màu vỏ, thêm/bớt ngăn rồi chốt tủ.
-3. **Bước 3 — Hoàn thiện Màn 2 Chính (`FridgeHeroScreen`) & Kiểm thử:** Gắn Dashboard đầu trang (lời chào, đồng hồ số, thời tiết, thông báo sắp hết hạn), sân khấu tủ 3D xoay 360° kèm sticker chiếu 2D, FAB `+ Thêm nhanh` và thanh Task Bar có cổng `📷 Quét AI (GĐ2)`.
+### Tổng quan Kiến trúc Shared WebView + Fallback 2D
+1. **Shared Root WebView (`SharedFridge3DWebView` + `Fridge3DStageSlot`):** Một thực thể `WebView + Three.js` duy nhất gắn tại `MainActivity` đồng bộ bố cục theo khung đo của Màn 1 (`FridgeDesignerScreen`) và Màn 2 (`HomeScreen`), nối với Kotlin qua `FridgeJsBridge` (có giữ rule R8/ProGuard trong `proguard-rules.pro`).
+2. **Nền & Hạn mức Đồ họa thống nhất:** `DotGridSpec` cung cấp đồng thời tham số lưới chấm cho cả Compose (`dotGridBackground`) và Three.js (`configJson.dotGrid` kèm `surfaceBg`), hỗ trợ `dirty`-flag render theo nhu cầu và tự hạ xuống `?q=lite` trên máy cấu hình thấp hoặc sau sự cố WebGL đầu tiên (`AppConfig.forceLiteMode`).
+3. **Phục hồi có giới hạn & `Fridge2DFallback`:** Giới hạn tối đa **2 lần khởi tạo lại WebView trong 60 giây** khi gặp `onRenderProcessGone` hoặc `webglcontextlost`; lần thứ 3 trong cửa sổ 60s sẽ dừng WebView và hiển thị `Fridge2DFallback` Neo-Brutalist thuần Compose để toàn bộ thao tác mở ngăn/thiết kế tủ vẫn hoạt động bình thường.
 ````
 
 ### `settings.gradle.kts` (36 lines)
@@ -520,10 +540,10 @@ dependencies {
 </manifest>
 ```
 
-### `app/src/main/res/values/strings.xml` (135 lines)
+### `app/src/main/res/values/strings.xml` (196 lines)
 
 ```xml
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">FridgeZero</string>
     <string name="days_left_fmt">còn %1$d ngày</string>
@@ -534,7 +554,7 @@ dependencies {
     <string name="field_name">Tên món</string>
     <string name="field_quantity">Số lượng</string>
     <string name="field_days_left">Hạn dùng (số ngày)</string>
-    <string name="expiry_packaging_hint">Gợi ý, hãy kiểm tra bao bì</string>
+    <string name="expiry_packaging_hint">Chuẩn USDA/FDA · Kiểm tra thêm bao bì</string>
     <string name="opened_toggle_label">Đã mở nắp</string>
     <string name="opened_badge">Đã mở</string>
     <string name="pick_date_label">Chọn ngày</string>
@@ -543,7 +563,7 @@ dependencies {
     <string name="search_icon_hint">Tìm biểu tượng...</string>
     <string name="action_save">Lưu</string>
     <string name="action_save_and_next">Thêm tiếp</string>
-    <string name="action_delete">Xóa món</string>
+    <string name="action_delete">Xóa khỏi tủ</string>
     <string name="action_move_compartment">Chuyển ngăn</string>
     <string name="delete_reason_title">Lý do xóa món này?</string>
     <string name="delete_reason_used_up">✓ Đã dùng hết</string>
@@ -587,8 +607,10 @@ dependencies {
     <string name="designer_compartment_name_hint">Tên ngăn</string>
     <string name="designer_confirm">CHỐT TỦ NÀY →</string>
     <string name="designer_max_reached">Tối đa 6 ngăn</string>
+    <string name="fallback_2d_badge">Chế độ 2D</string>
 
     <string name="home_brand">FRIDGEZERO</string>
+    <string name="home_brand_weather">FRIDGEZERO · 28°C ĐÀ NẴNG</string>
     <string name="home_greeting_morning">Chào buổi sáng, Trường!</string>
     <string name="home_greeting_noon">Chào buổi trưa, Trường!</string>
     <string name="home_greeting_afternoon">Chào buổi chiều, Trường!</string>
@@ -596,17 +618,39 @@ dependencies {
     <string name="home_weather_badge">☀️ 28°C · Đà Nẵng</string>
     <string name="home_urgent_badge_fmt">🔔 %1$d sắp hết hạn</string>
     <string name="home_all_fresh_badge">✨ Tất cả đều tươi</string>
+    <string name="home_urgent_banner_title_fmt">🔔 %1$d món sắp hết hạn</string>
+    <string name="home_urgent_banner_hint_fmt">Gợi ý hôm nay: %1$s →</string>
+    <string name="home_all_fresh_banner">✨ Tất cả đều tươi · Kéo nghiêng 3D</string>
+    <string name="home_all_fresh_title">✨ Tất cả đều tươi · Gợi ý nấu ngay</string>
+    <string name="home_urgent_view_list">Danh sách</string>
+    <string name="home_banner_recipe_fmt">🍳 %1$s · %2$dp →</string>
+    <string name="home_reminders_cd">Cài đặt nhắc hạn dùng</string>
     <string name="home_stage_hint">↔ Kéo nghiêng xem tủ · Chạm cửa để mở</string>
     <string name="home_fab_quick_add">+ Thêm nhanh</string>
     <string name="home_tab_fridge">🧊 Tủ lạnh</string>
+    <string name="home_tab_fridge_short">Tủ lạnh</string>
+    <string name="home_tab_recipes_short">Cẩm nang</string>
+    <string name="home_tab_recipes_cd">Mở Cẩm nang ẩm thực</string>
     <string name="home_tab_scan_ai">📷 Quét AI</string>
+    <string name="home_tab_scan_ai_short">Quét AI</string>
     <string name="home_tab_scan_badge">GĐ2</string>
     <string name="home_tab_redesign">⚙️ Đổi dáng</string>
+    <string name="home_tab_redesign_short">Đổi dáng</string>
     <string name="sticker_urgent_cd">%1$s, %2$d món, %3$d món sắp hết hạn</string>
     <string name="urgent_sheet_title">CẦN XỬ LÝ SỚM</string>
-    <string name="urgent_sheet_subtitle">Các món còn ≤ 3 ngày hoặc đã quá hạn</string>
+    <string name="urgent_sheet_subtitle">Các món còn ≤ 1 ngày hoặc đã quá hạn</string>
     <string name="urgent_sheet_empty">Tất cả thực phẩm trong tủ đều đang tươi ngon!</string>
     <string name="urgent_sheet_open_compartment">Mở ngăn →</string>
+    <string name="urgent_sheet_mark_used_up">✓ Dùng hết</string>
+    <string name="urgent_meal_title">🍳 TỐI NAY NẤU GÌ?</string>
+    <string name="urgent_meal_cta">Xem công thức &amp; cách làm →</string>
+    <string name="urgent_meal_recipe_fmt">%1$s %2$s · %3$dp</string>
+    <string name="urgent_meal_chicken_pepper">Gà xào ớt chuông · 15 phút</string>
+    <string name="urgent_meal_salmon_salad">Salad cá hồi áp chảo · 15 phút</string>
+    <string name="urgent_meal_meat_veggie">Thịt xào rau củ · 15 phút</string>
+    <string name="urgent_meal_shrimp_veggie">Tôm xào rau củ · 12 phút</string>
+    <string name="urgent_meal_egg_tomato">Trứng chiên sốt cà · 10 phút</string>
+    <string name="urgent_meal_fallback_fmt">Ưu tiên chế biến: %1$s</string>
     <string name="urgent_badge_overdue_fmt">Quá hạn %1$dd</string>
     <string name="urgent_badge_today">Hôm nay</string>
     <string name="urgent_badge_days_fmt">Còn %1$dd</string>
@@ -648,14 +692,51 @@ dependencies {
     <string name="quick_add_14d">+2 tuần</string>
     <string name="quick_add_30d">+1 tháng</string>
     <string name="quick_add_days_input_fmt">Còn %1$d ngày</string>
+    <string name="quick_add_usda_auto_hint">✓ Gợi ý theo chuẩn USDA/FDA (%1$s)</string>
+    <string name="zone_label_chilled">Ngăn mát</string>
+    <string name="zone_label_drawer">Ngăn rau củ</string>
+    <string name="zone_label_freezer">Ngăn đông</string>
 
     <string name="reminder_toggle_label">🔔 Nhắc hạn mỗi ngày</string>
     <string name="reminder_toggle_on">Đang bật</string>
     <string name="reminder_toggle_off">Đang tắt</string>
     <string name="reminder_prompt_title">BẬT NHẮC HẠN DÙNG?</string>
-    <string name="reminder_prompt_body">FridgeZero sẽ kiểm tra mỗi ngày và nhắc nhẹ khi có món còn ≤ 3 ngày hoặc quá hạn. Không làm phiền khi đồ vẫn tươi.</string>
+    <string name="reminder_prompt_body">FridgeZero sẽ kiểm tra mỗi ngày và nhắc nhẹ khi có món còn ≤ 1 ngày hoặc quá hạn. Không làm phiền khi đồ vẫn tươi.</string>
     <string name="reminder_prompt_confirm">Bật nhắc nhở</string>
     <string name="reminder_prompt_later">Để sau</string>
+
+    <string name="recipe_screen_title">CẨM NANG ẨM THỰC</string>
+    <string name="recipe_back_cd">Quay lại tủ 3D</string>
+    <string name="recipe_ready_badge_fmt">%1$d SẴN SÀNG</string>
+    <string name="recipe_hero_badge">🔥 MÓN CỨU TỦ HÔM NAY</string>
+    <string name="recipe_hero_all_fresh_badge">🔥 GỢI Ý NẤU NGAY HÔM NAY</string>
+    <string name="recipe_hero_rescue_fmt">Cứu %1$d món gấp</string>
+    <string name="recipe_hero_cta">Xem công thức →</string>
+    <string name="recipe_filter_all">Tất cả</string>
+    <string name="recipe_filter_ready">Đủ đồ nấu ngay</string>
+    <string name="recipe_filter_rescue">Cứu đồ gấp</string>
+    <string name="recipe_filter_quick">Nhanh ≤ 15p</string>
+    <string name="recipe_filter_viet">Cơm nhà Việt</string>
+    <string name="recipe_filter_eat_clean">Eat-Clean</string>
+    <string name="recipe_empty_filter">Chưa có món nào khớp bộ lọc này. Thử chuyển sang "Tất cả" nhé!</string>
+    <string name="recipe_prep_time_short_fmt">⏱ %1$dp</string>
+    <string name="recipe_prep_time_long_fmt">⏱ %1$d phút</string>
+    <string name="recipe_difficulty_easy">⚡ Dễ</string>
+    <string name="recipe_difficulty_medium">⚡ Vừa</string>
+    <string name="recipe_match_ratio_fmt">%1$d/%2$d</string>
+    <string name="recipe_section_in_fridge">✓ Đã có trong tủ</string>
+    <string name="recipe_section_in_fridge_empty">Chưa có nguyên liệu chính nào của món này trong tủ.</string>
+    <string name="recipe_section_missing">🛒 Cần chuẩn bị thêm</string>
+    <string name="recipe_section_missing_none">✓ Đủ 100% nguyên liệu tủ lạnh — nấu ngay thôi!</string>
+    <string name="recipe_section_pantry">🧂 Gia vị bếp cơ bản</string>
+    <string name="recipe_section_pantry_hint">Gia vị sẵn trong bếp — không chặn trạng thái đủ đồ</string>
+    <string name="recipe_section_steps">👩‍🍳 Cách làm nhanh</string>
+    <string name="recipe_substitute_fmt">Thay bằng: %1$s</string>
+    <string name="recipe_action_source">🔗 Xem bài gốc</string>
+    <string name="recipe_action_cooked">🎉 Đã nấu xong</string>
+    <string name="recipe_cooked_toast_fmt">Đã nấu xong! Đã trừ %1$d nguyên liệu khỏi tủ lạnh.</string>
+    <string name="recipe_cooked_toast_empty">Chúc ngon miệng!</string>
+    <string name="recipe_open_source_error">Không mở được liên kết bài gốc trên thiết bị này.</string>
 </resources>
 ```
 
@@ -665,12 +746,12 @@ dependencies {
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.FridgeZero" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#FAF8F5</item>
+        <item name="android:windowBackground">#EAE2D3</item>
     </style>
 </resources>
 ```
 
-### `app/src/main/assets/fridge3d/index.html` (1047 lines)
+### `app/src/main/assets/fridge3d/index.html` (1217 lines)
 
 ```html
 <!DOCTYPE html>
@@ -685,7 +766,7 @@ dependencies {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #FAF8F5;
+    background: #EAE2D3;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
@@ -694,7 +775,7 @@ dependencies {
     display: block;
     width: 100%;
     height: 100%;
-    background: #FAF8F5;
+    background: #EAE2D3;
     touch-action: none;
   }
 </style>
@@ -708,6 +789,13 @@ window.addEventListener("error", function(e) {
 console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE) ? THREE.REVISION : "missing");
 (function () {
   "use strict";
+
+  var qualityParam = "";
+  try {
+    qualityParam = new URLSearchParams(window.location.search).get("q") || "";
+  } catch (_) {}
+  var isLiteMode = (qualityParam.toLowerCase() === "lite");
+  console.log("QUALITY_MODE", isLiteMode ? "lite" : "high");
 
   var CAB_W = 1.15;
   var CAB_H = 2.25;
@@ -776,40 +864,63 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
 
   var PROP_COLORS = [0xA3E635, 0xFACC15, 0xFB7185, 0xC084FC];
 
-  // Solid surface-matched WebGL renderer with crisp MSAA anti-aliasing.
+  // Surface-matched WebGL renderer tuned by resolved quality tier (?q=lite vs ?q=high).
   var dpr = window.devicePixelRatio || 1;
-  var currentSurfaceBg = "#FAF8F5";
+  var currentSurfaceBg = "#EAE2D3";
   var renderer = new THREE.WebGLRenderer({
     alpha: false,
-    antialias: true,
-    powerPreference: "high-performance"
+    antialias: !isLiteMode
   });
   renderer.setClearColor(currentSurfaceBg, 1);
-  renderer.setPixelRatio(Math.min(dpr, 2.0));
+  renderer.setPixelRatio(Math.min(dpr, isLiteMode ? 1.5 : 2.0));
   renderer.outputEncoding = THREE.sRGBEncoding;
   document.body.appendChild(renderer.domElement);
 
-  // Power-of-two 64x64 tiled dot-grid matching Compose dotGridBackground() (#FAF8F5 + #D6D3CD @ 18dp).
-  var DOT_STEP_PX = 18;
+  // Power-of-two 64x64 tiled dot-grid driven by Kotlin's single-source-of-truth DotGridSpec.
+  var dotGridConfig = {
+    paperHex: "#EAE2D3",
+    dotHex: "#C4B8A3",
+    stepDp: 18,
+    dotRadiusDp: 1.5,
+    offsetXDp: 0,
+    offsetYDp: 0
+  };
   var lastCssW = window.innerWidth || 360;
   var lastCssH = window.innerHeight || 480;
+
+  function syncDotGridUv(tex) {
+    if (!tex) return;
+    var step = Math.max(2, Number(dotGridConfig.stepDp) || 18);
+    var repX = lastCssW / step;
+    var repY = lastCssH / step;
+    var ox = Number(dotGridConfig.offsetXDp) || 0;
+    var oy = Number(dotGridConfig.offsetYDp) || 0;
+    tex.repeat.set(repX, repY);
+    tex.offset.set(
+      (((ox / step) % 1) + 1) % 1,
+      (((-(repY + oy / step)) % 1) + 1) % 1
+    );
+  }
+
   function createDotGridTexture() {
     var size = 64;
+    var step = Math.max(2, Number(dotGridConfig.stepDp) || 18);
+    var radius = Math.max(0.25, Number(dotGridConfig.dotRadiusDp) || 1.5);
     var canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
     var ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#FAF8F5";
+    ctx.fillStyle = dotGridConfig.paperHex || "#EAE2D3";
     ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = "#D6D3CD";
+    ctx.fillStyle = dotGridConfig.dotHex || "#C4B8A3";
     ctx.beginPath();
-    ctx.arc(size / 2, size / 2, (0.72 / DOT_STEP_PX) * size, 0, Math.PI * 2);
+    ctx.arc(size / 2, size / 2, (radius / step) * size, 0, Math.PI * 2);
     ctx.fill();
     var tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
     tex.encoding = THREE.sRGBEncoding;
-    tex.repeat.set(lastCssW / DOT_STEP_PX, lastCssH / DOT_STEP_PX);
+    syncDotGridUv(tex);
     return tex;
   }
 
@@ -878,8 +989,8 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   scene.environment = studioEnv;
 
   var camera = new THREE.PerspectiveCamera(38, 1, 0.1, 30);
-  camera.position.set(0, 1.30, 4.18);
-  camera.lookAt(0, 1.15, 0);
+  camera.position.set(0, 1.32, 4.72);
+  camera.lookAt(0, 1.16, 0);
 
   // Sculpted high-contrast 3-point studio lighting: upper-front-left key creates bold light/shadow planes.
   var hemiLight = new THREE.HemisphereLight(0xFFFFFF, 0x334155, 0.52);
@@ -940,22 +1051,36 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     transparent: true,
     opacity: 0.54
   });
-  var handleMat = new THREE.MeshPhysicalMaterial({
-    color: 0x1E293B,
-    metalness: 0.5,
-    roughness: 0.25,
-    clearcoat: 0.4,
-    clearcoatRoughness: 0.18,
-    envMapIntensity: 0.95
-  });
-  var shellMat = new THREE.MeshPhysicalMaterial({
-    color: SHELL_SPECS.inox.color,
-    metalness: SHELL_SPECS.inox.metalness,
-    roughness: SHELL_SPECS.inox.roughness,
-    clearcoat: SHELL_SPECS.inox.clearcoat,
-    clearcoatRoughness: SHELL_SPECS.inox.clearcoatRoughness,
-    envMapIntensity: SHELL_SPECS.inox.envMapIntensity
-  });
+  var handleMat = isLiteMode
+    ? new THREE.MeshStandardMaterial({
+        color: 0x1E293B,
+        metalness: 0.45,
+        roughness: 0.30,
+        envMapIntensity: 0.90
+      })
+    : new THREE.MeshPhysicalMaterial({
+        color: 0x1E293B,
+        metalness: 0.5,
+        roughness: 0.25,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.18,
+        envMapIntensity: 0.95
+      });
+  var shellMat = isLiteMode
+    ? new THREE.MeshStandardMaterial({
+        color: SHELL_SPECS.inox.color,
+        metalness: SHELL_SPECS.inox.metalness,
+        roughness: SHELL_SPECS.inox.roughness,
+        envMapIntensity: SHELL_SPECS.inox.envMapIntensity
+      })
+    : new THREE.MeshPhysicalMaterial({
+        color: SHELL_SPECS.inox.color,
+        metalness: SHELL_SPECS.inox.metalness,
+        roughness: SHELL_SPECS.inox.roughness,
+        clearcoat: SHELL_SPECS.inox.clearcoat,
+        clearcoatRoughness: SHELL_SPECS.inox.clearcoatRoughness,
+        envMapIntensity: SHELL_SPECS.inox.envMapIntensity
+      });
   var propMats = PROP_COLORS.map(function (c) {
     return new THREE.MeshStandardMaterial({ color: c, roughness: 0.46, metalness: 0.06 });
   });
@@ -1031,16 +1156,24 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   var doorControllers = []; // { id, kind, rightHinge, pivot, anchor, progress }
   var raycastTargets = [];
   var lastProjectedPayload = "";
+  var dirty = true;
+
+  function markDirty() {
+    dirty = true;
+  }
 
   function updateShellMaterial(colorKey) {
     var spec = SHELL_SPECS[colorKey] || SHELL_SPECS.inox;
     shellMat.color.setHex(spec.color);
     shellMat.metalness = spec.metalness;
     shellMat.roughness = spec.roughness;
-    shellMat.clearcoat = spec.clearcoat;
-    shellMat.clearcoatRoughness = spec.clearcoatRoughness;
+    if (!isLiteMode) {
+      shellMat.clearcoat = spec.clearcoat;
+      shellMat.clearcoatRoughness = spec.clearcoatRoughness;
+    }
     shellMat.envMapIntensity = spec.envMapIntensity;
     shellMat.needsUpdate = true;
+    markDirty();
   }
 
   function rebuildFridge() {
@@ -1048,6 +1181,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     doorControllers = [];
     raycastTargets = [];
     lastProjectedPayload = "";
+    markDirty();
 
     var halfW = CAB_W / 2;
     var midY = FOOT_H + CAB_H / 2;
@@ -1369,7 +1503,30 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
         }
       }
 
-      var nextBg = cfg.surfaceBg || (state.showDotGrid ? "#FAF8F5" : "#FFFFFF");
+      if (cfg.dotGrid) {
+        var dg = cfg.dotGrid;
+        var nextPaper = dg.paperHex || dotGridConfig.paperHex;
+        var nextDot = dg.dotHex || dotGridConfig.dotHex;
+        var nextStep = Number(dg.stepDp) || dotGridConfig.stepDp;
+        var nextRadius = Number(dg.dotRadiusDp) || dotGridConfig.dotRadiusDp;
+        var texDirty =
+          nextPaper !== dotGridConfig.paperHex ||
+          nextDot !== dotGridConfig.dotHex ||
+          nextStep !== dotGridConfig.stepDp ||
+          nextRadius !== dotGridConfig.dotRadiusDp;
+        dotGridConfig.paperHex = nextPaper;
+        dotGridConfig.dotHex = nextDot;
+        dotGridConfig.stepDp = nextStep;
+        dotGridConfig.dotRadiusDp = nextRadius;
+        dotGridConfig.offsetXDp = Number(dg.offsetXDp) || 0;
+        dotGridConfig.offsetYDp = Number(dg.offsetYDp) || 0;
+        if (texDirty) {
+          if (dotGridTex) dotGridTex.dispose();
+          dotGridTex = createDotGridTexture();
+        }
+      }
+
+      var nextBg = cfg.surfaceBg || (state.showDotGrid ? dotGridConfig.paperHex : "#FFFFFF");
       if (nextBg !== currentSurfaceBg) {
         currentSurfaceBg = nextBg;
         document.documentElement.style.backgroundColor = nextBg;
@@ -1379,7 +1536,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       renderer.setClearColor(nextBg, 1);
 
       if (state.showDotGrid) {
-        dotGridTex.repeat.set(lastCssW / DOT_STEP_PX, lastCssH / DOT_STEP_PX);
+        syncDotGridUv(dotGridTex);
         scene.background = dotGridTex;
       } else {
         solidBgColor.set(nextBg);
@@ -1395,6 +1552,10 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
         layoutSignature = nextSig;
         rebuildFridge();
       }
+      if (state.showStickers) {
+        lastProjectedPayload = "";
+      }
+      markDirty();
     } catch (err) {
       console.error("UPDATE_ERR", err);
     }
@@ -1411,6 +1572,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       startYaw: restYaw,
       targetYaw: restYaw
     };
+    markDirty();
   };
 
   window.resetView = function () {
@@ -1423,6 +1585,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       } else {
         yawVel = 0;
       }
+      markDirty();
       return;
     }
     yawVel = 0;
@@ -1432,6 +1595,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       targetYaw: nearestYaw(yaw, restYaw),
       startPitch: pitch
     };
+    markDirty();
   };
 
   window.playItemAddedBounce = function () {
@@ -1439,6 +1603,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       startTime: performance.now(),
       impulseApplied: false
     };
+    markDirty();
   };
 
   // Pointer & Raycaster handling
@@ -1470,6 +1635,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     if (dom.setPointerCapture) {
       try { dom.setPointerCapture(e.pointerId); } catch (_) {}
     }
+    markDirty();
   });
 
   dom.addEventListener("pointermove", function (e) {
@@ -1497,6 +1663,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       yawVel = dyaw * 0.75;
     }
     pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, pitch - dy * 0.0022));
+    markDirty();
   });
 
   function handlePointerEnd(e) {
@@ -1526,6 +1693,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
         }
       }
     }
+    markDirty();
   }
 
   dom.addEventListener("pointerup", handlePointerEnd);
@@ -1537,13 +1705,12 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     console.log("CANVAS_RESIZE", w, h);
     lastCssW = w;
     lastCssH = h;
-    if (dotGridTex) {
-      dotGridTex.repeat.set(w / DOT_STEP_PX, h / DOT_STEP_PX);
-    }
+    syncDotGridUv(dotGridTex);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
     lastProjectedPayload = "";
+    markDirty();
   }
   if (typeof ResizeObserver !== "undefined") {
     var ro = new ResizeObserver(function (entries) {
@@ -1558,6 +1725,9 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   window.addEventListener("resize", function () {
     applyResize(window.innerWidth || 0, window.innerHeight || 0);
   });
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) markDirty();
+  });
   applyResize(window.innerWidth || 0, window.innerHeight || 0);
 
   // Frame loop
@@ -1568,10 +1738,44 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
+  function hasDoorAnimation() {
+    for (var i = 0; i < doorControllers.length; i++) {
+      var dc = doorControllers[i];
+      var target = (dc.id === state.openCompartmentId) ? 1 : 0;
+      if (dc.progress !== target) return true;
+    }
+    return false;
+  }
+
+  function hasActiveMotion() {
+    if (Math.abs(DEFAULT_PITCH - pitch) >= 0.0005) return true;
+    if (state.springReturn) {
+      return Math.abs(yaw - HOME_REST_YAW) >= 0.0005 || Math.abs(yawVel) >= 0.002;
+    }
+    return Math.abs(yawVel) > 0.0002;
+  }
+
+  var contextLost = false;
+  var rafId = 0;
+
   function animate(now) {
-    requestAnimationFrame(animate);
+    if (contextLost) {
+      rafId = 0;
+      return;
+    }
+    rafId = requestAnimationFrame(animate);
     var dt = Math.min(0.05, Math.max(0.001, (now - lastFrameTime) / 1000));
     lastFrameTime = now;
+
+    var shouldStep =
+      dirty ||
+      isDragging ||
+      welcomeSpin !== null ||
+      resetAnim !== null ||
+      bounceAnim !== null ||
+      hasDoorAnimation() ||
+      hasActiveMotion();
+    if (!shouldStep) return;
 
     if (welcomeSpin) {
       var t = Math.min(1, (now - welcomeSpin.startTime) / 1000);
@@ -1619,8 +1823,12 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
           yawVel = 0;
         }
       }
-      // Spring pitch back to grounded -4.5 deg
-      pitch += (DEFAULT_PITCH - pitch) * Math.min(1, dt * 10);
+      // Spring pitch back to grounded -4.5 deg and snap cleanly when settled
+      if (Math.abs(DEFAULT_PITCH - pitch) < 0.0005) {
+        pitch = DEFAULT_PITCH;
+      } else {
+        pitch += (DEFAULT_PITCH - pitch) * Math.min(1, dt * 10);
+      }
     }
 
     if (bounceAnim) {
@@ -1712,16 +1920,59 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     }
 
     renderer.render(scene, camera);
+
+    dirty =
+      isDragging ||
+      welcomeSpin !== null ||
+      resetAnim !== null ||
+      bounceAnim !== null ||
+      hasDoorAnimation() ||
+      hasActiveMotion();
   }
 
-  requestAnimationFrame(animate);
+  dom.addEventListener("webglcontextlost", function (e) {
+    e.preventDefault();
+    contextLost = true;
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    console.error("WEBGL_CONTEXT_LOST");
+    if (window.AndroidBridge && window.AndroidBridge.onWebGlContextLost) {
+      window.AndroidBridge.onWebGlContextLost();
+    }
+  }, false);
+
+  dom.addEventListener("webglcontextrestored", function () {
+    console.log("WEBGL_CONTEXT_RESTORED");
+    contextLost = false;
+    if (dotGridTex) dotGridTex.dispose();
+    dotGridTex = createDotGridTexture();
+    if (studioEnv) studioEnv.dispose();
+    studioEnv = createStudioEnvMap();
+    scene.environment = studioEnv;
+    scene.background = state.showDotGrid ? dotGridTex : solidBgColor;
+    if (floorShadow.material.map) floorShadow.material.map.dispose();
+    floorShadow.material.map = createShadowTexture();
+    floorShadow.material.needsUpdate = true;
+    updateShellMaterial(state.colorKey);
+    rebuildFridge();
+    applyResize(lastCssW, lastCssH);
+    lastFrameTime = performance.now();
+    markDirty();
+    if (!rafId) {
+      rafId = requestAnimationFrame(animate);
+    }
+  }, false);
+
+  rafId = requestAnimationFrame(animate);
 })();
 </script>
 </body>
 </html>
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/data/AppConfig.kt` (56 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/data/AppConfig.kt` (67 lines)
 
 ```kotlin
 package com.truong.fridgezero.data
@@ -1755,6 +2006,10 @@ class AppConfig(context: Context) {
     prefs[KEY_NOTIFICATION_PROMPTED] ?: false
   }
 
+  val forceLiteMode: Flow<Boolean> = dataStore.data.map { prefs ->
+    prefs[KEY_FORCE_LITE_MODE] ?: false
+  }
+
   suspend fun setOnboardingCompleted(completed: Boolean) {
     dataStore.edit { prefs ->
       prefs[KEY_ONBOARDING_DONE] = completed
@@ -1773,10 +2028,17 @@ class AppConfig(context: Context) {
     }
   }
 
+  suspend fun setForceLiteMode(enabled: Boolean) {
+    dataStore.edit { prefs ->
+      prefs[KEY_FORCE_LITE_MODE] = enabled
+    }
+  }
+
   companion object {
     private val KEY_ONBOARDING_DONE = booleanPreferencesKey("has_completed_onboarding")
     private val KEY_EXPIRY_REMINDERS = booleanPreferencesKey("expiry_reminders_enabled")
     private val KEY_NOTIFICATION_PROMPTED = booleanPreferencesKey("notification_prompt_shown")
+    private val KEY_FORCE_LITE_MODE = booleanPreferencesKey("force_lite_mode")
   }
 }
 ```
@@ -2219,6 +2481,1235 @@ object Seed {
 }
 ```
 
+### `app/src/main/kotlin/com/truong/fridgezero/domain/CulinaryGuide.kt` (1225 lines)
+
+```kotlin
+package com.truong.fridgezero.domain
+
+import com.truong.fridgezero.data.FoodItemEntity
+import com.truong.fridgezero.data.ItemStatus
+import com.truong.fridgezero.ui.icons.FoodGroup
+import java.text.Normalizer
+import java.util.Locale
+
+enum class CulinaryFilter(val labelVi: String) {
+  ALL("Tất cả"),
+  READY_NOW("Đủ đồ nấu ngay"),
+  RESCUE_URGENT("Cứu đồ sắp hết hạn"),
+  QUICK_15("Nhanh ≤ 15p"),
+  VIET_HOME("Cơm nhà Việt"),
+  EAT_CLEAN("Eat-Clean")
+}
+
+typealias RecipeCategory = CulinaryFilter
+
+enum class RecipeDifficulty {
+  EASY,
+  MEDIUM
+}
+
+enum class MatchTier {
+  EXACT_ICON,
+  KEYWORD,
+  GROUP_FALLBACK
+}
+
+data class InventoryDeduction(
+  val itemId: Long,
+  val remainingQuantity: Int
+)
+
+data class RecipeIngredient(
+  val name: String,
+  val iconKeys: List<String>,
+  val keywords: List<String>,
+  val fallbackGroup: FoodGroup,
+  val amountText: String,
+  val unitsToConsume: Int = 1
+)
+
+data class CulinaryRecipe(
+  val id: String,
+  val title: String,
+  val emoji: String,
+  val summary: String,
+  val cookMinutes: Int,
+  val servings: Int = 2,
+  val categories: Set<CulinaryFilter>,
+  val fridgeIngredients: List<RecipeIngredient>,
+  val pantryStaples: List<String>,
+  val steps: List<String>,
+  val sourceName: String,
+  val sourceUrl: String,
+  val difficulty: RecipeDifficulty = if (cookMinutes <= 15) RecipeDifficulty.EASY else RecipeDifficulty.MEDIUM
+)
+
+data class MatchedIngredient(
+  val ingredient: RecipeIngredient,
+  val item: DisplayItem,
+  val tier: MatchTier
+) {
+  val isUrgent: Boolean get() = item.minDaysLeft <= CulinaryGuideEngine.URGENT_DAYS_THRESHOLD
+}
+
+data class RecipeRecommendation(
+  val recipe: CulinaryRecipe,
+  val matchedIngredients: List<MatchedIngredient>,
+  val missingIngredients: List<RecipeIngredient>,
+  val score: Int
+) {
+  val matchedCount: Int get() = matchedIngredients.size
+  val totalFridgeIngredients: Int get() = recipe.fridgeIngredients.size
+  val isReadyToCook: Boolean get() = recipe.fridgeIngredients.isNotEmpty() && missingIngredients.isEmpty()
+  val urgentMatchedCount: Int get() = matchedIngredients.count { it.isUrgent }
+  val freshMatchedCount: Int get() = matchedIngredients.count { !it.isUrgent }
+  val hasUrgentMatch: Boolean get() = urgentMatchedCount > 0
+  val minUrgentDaysLeft: Int? get() = matchedIngredients.minOfOrNull { it.item.minDaysLeft }
+}
+
+/**
+ * 3-layer ingredient matcher and expiry-rescue ranker:
+ * Layer 1: Exact `iconKey` -> Layer 2: Vietnamese name keyword -> Layer 3: `FoodGroup` fallback.
+ */
+object CulinaryGuideEngine {
+
+  const val URGENT_DAYS_THRESHOLD = 1
+  const val SCORE_URGENT_MATCH = 15
+  const val SCORE_FRESH_MATCH = 6
+  const val SCORE_MISSING_PENALTY = -3
+  const val SCORE_READY_BONUS = 8
+
+  private val VI_LOCALE = Locale.forLanguageTag("vi-VN")
+  private val NON_WORD_REGEX = Regex("[^\\p{L}\\p{Nd}]+")
+  private val DIACRITICS_REGEX = Regex("\\p{InCombiningDiacriticalMarks}+")
+
+  fun recommend(
+    fridgeItems: List<DisplayItem>,
+    filter: CulinaryFilter = CulinaryFilter.ALL,
+    recipes: List<CulinaryRecipe> = CulinaryGuideRepository.recipes
+  ): List<RecipeRecommendation> {
+    return recipes
+      .map { evaluate(it, fridgeItems) }
+      .filter { rec ->
+        when (filter) {
+          CulinaryFilter.ALL -> true
+          CulinaryFilter.READY_NOW -> rec.isReadyToCook
+          CulinaryFilter.RESCUE_URGENT -> rec.hasUrgentMatch
+          CulinaryFilter.QUICK_15 ->
+            rec.recipe.cookMinutes <= 15 || CulinaryFilter.QUICK_15 in rec.recipe.categories
+          CulinaryFilter.VIET_HOME -> CulinaryFilter.VIET_HOME in rec.recipe.categories
+          CulinaryFilter.EAT_CLEAN -> CulinaryFilter.EAT_CLEAN in rec.recipe.categories
+        }
+      }
+      .sortedWith(
+        compareByDescending<RecipeRecommendation> { it.score }
+          .thenByDescending { it.isReadyToCook }
+          .thenByDescending { it.urgentMatchedCount }
+          .thenByDescending { rec -> rec.matchedIngredients.count { it.tier == MatchTier.EXACT_ICON } }
+          .thenByDescending { rec ->
+            rec.matchedIngredients.count {
+              it.tier == MatchTier.EXACT_ICON || it.tier == MatchTier.KEYWORD
+            }
+          }
+          .thenBy { it.recipe.cookMinutes }
+          .thenBy { it.recipe.id }
+      )
+  }
+
+  fun evaluate(
+    recipe: CulinaryRecipe,
+    fridgeItems: List<DisplayItem>
+  ): RecipeRecommendation {
+    // Track consumed candidates by index rather than primaryId so in-memory items with id=0 stay distinct.
+    val candidates = fridgeItems
+      .filter { it.quantity > 0 }
+      .withIndex()
+      .sortedWith(compareBy<IndexedValue<DisplayItem>> { it.value.minDaysLeft }.thenBy { it.index })
+
+    val usedIndices = mutableSetOf<Int>()
+    val matchedByIngredient = arrayOfNulls<MatchedIngredient>(recipe.fridgeIngredients.size)
+
+    assignTier(
+      recipe = recipe,
+      candidates = candidates,
+      usedIndices = usedIndices,
+      matchedByIngredient = matchedByIngredient,
+      tier = MatchTier.EXACT_ICON
+    ) { ingredient, item ->
+      val itemKey = item.iconKey.trim().lowercase(Locale.ROOT)
+      ingredient.iconKeys.any { it.trim().lowercase(Locale.ROOT) == itemKey }
+    }
+
+    assignTier(
+      recipe = recipe,
+      candidates = candidates,
+      usedIndices = usedIndices,
+      matchedByIngredient = matchedByIngredient,
+      tier = MatchTier.KEYWORD
+    ) { ingredient, item ->
+      matchesKeyword(item.name, ingredient.keywords)
+    }
+
+    assignTier(
+      recipe = recipe,
+      candidates = candidates,
+      usedIndices = usedIndices,
+      matchedByIngredient = matchedByIngredient,
+      tier = MatchTier.GROUP_FALLBACK
+    ) { ingredient, item ->
+      item.group == ingredient.fallbackGroup
+    }
+
+    val matchedList = mutableListOf<MatchedIngredient>()
+    val missingList = mutableListOf<RecipeIngredient>()
+    recipe.fridgeIngredients.forEachIndexed { idx, ingredient ->
+      val matched = matchedByIngredient[idx]
+      if (matched != null) matchedList.add(matched) else missingList.add(ingredient)
+    }
+
+    val urgentCount = matchedList.count { it.isUrgent }
+    val freshCount = matchedList.size - urgentCount
+    val missingCount = missingList.size
+    val isReady = recipe.fridgeIngredients.isNotEmpty() && missingCount == 0
+    val score = (urgentCount * SCORE_URGENT_MATCH) +
+      (freshCount * SCORE_FRESH_MATCH) +
+      (missingCount * SCORE_MISSING_PENALTY) +
+      if (isReady) SCORE_READY_BONUS else 0
+
+    return RecipeRecommendation(
+      recipe = recipe,
+      matchedIngredients = matchedList,
+      missingIngredients = missingList,
+      score = score
+    )
+  }
+
+  /**
+   * Computes earliest-expiry quantity decrements across active Room rows backing matched items.
+   * Returned entries with `remainingQuantity <= 0` should be transitioned to [ItemStatus.USED_UP].
+   */
+  fun planDeductions(
+    matched: List<MatchedIngredient>,
+    entitiesById: Map<Long, FoodItemEntity>
+  ): List<InventoryDeduction> {
+    if (matched.isEmpty() || entitiesById.isEmpty()) return emptyList()
+    val originalQty = entitiesById
+      .filterValues { it.status == ItemStatus.ACTIVE && it.quantity > 0 }
+      .mapValues { it.value.quantity }
+    val remainingQty = originalQty.toMutableMap()
+
+    matched.forEach { entry ->
+      var need = entry.ingredient.unitsToConsume.coerceAtLeast(1)
+      val orderedIds = entry.item.itemIds
+        .distinct()
+        .filter { (remainingQty[it] ?: 0) > 0 }
+        .sortedWith(compareBy<Long> { entitiesById[it]?.expiresAtEpochDay ?: Long.MAX_VALUE }.thenBy { it })
+
+      for (id in orderedIds) {
+        if (need <= 0) break
+        val available = remainingQty[id] ?: 0
+        if (available <= 0) continue
+        val consumed = minOf(available, need)
+        remainingQty[id] = available - consumed
+        need -= consumed
+      }
+    }
+
+    return remainingQty.entries.mapNotNull { (id, remaining) ->
+      val initial = originalQty[id] ?: return@mapNotNull null
+      if (remaining < initial) InventoryDeduction(itemId = id, remainingQuantity = remaining) else null
+    }
+  }
+
+  private inline fun assignTier(
+    recipe: CulinaryRecipe,
+    candidates: List<IndexedValue<DisplayItem>>,
+    usedIndices: MutableSet<Int>,
+    matchedByIngredient: Array<MatchedIngredient?>,
+    tier: MatchTier,
+    predicate: (RecipeIngredient, DisplayItem) -> Boolean
+  ) {
+    recipe.fridgeIngredients.forEachIndexed { idx, ingredient ->
+      if (matchedByIngredient[idx] != null) return@forEachIndexed
+      val match = candidates.firstOrNull { candidate ->
+        candidate.index !in usedIndices && predicate(ingredient, candidate.value)
+      } ?: return@forEachIndexed
+      usedIndices.add(match.index)
+      matchedByIngredient[idx] = MatchedIngredient(ingredient, match.value, tier)
+    }
+  }
+
+  private fun matchesKeyword(itemName: String, keywords: List<String>): Boolean {
+    val normNameAccented = normalizeAccented(itemName)
+    if (normNameAccented.isEmpty()) return false
+    val normNameStripped = stripVietnameseAccents(itemName)
+
+    return keywords.any { rawKw ->
+      val normKwAccented = normalizeAccented(rawKw)
+      if (normKwAccented.isEmpty()) return@any false
+      if (normNameAccented.contains(normKwAccented)) return@any true
+
+      // Only fall back to unaccented matching for multi-word or >=4-char keywords
+      // so short Vietnamese pairs like "bơ" (butter) vs "bò" (beef) never collide.
+      val trimmedKw = normKwAccented.trim()
+      if (' ' in trimmedKw || trimmedKw.length >= 4) {
+        val normKwStripped = stripVietnameseAccents(rawKw)
+        normKwStripped.isNotEmpty() && normNameStripped.contains(normKwStripped)
+      } else {
+        false
+      }
+    }
+  }
+
+  private fun normalizeAccented(text: String): String {
+    val cleaned = text.lowercase(VI_LOCALE).replace(NON_WORD_REGEX, " ").trim()
+    return if (cleaned.isEmpty()) "" else " $cleaned "
+  }
+
+  private fun stripVietnameseAccents(text: String): String {
+    val nfd = Normalizer.normalize(text, Normalizer.Form.NFD)
+    val withoutMarks = DIACRITICS_REGEX.replace(nfd, "")
+      .replace('đ', 'd')
+      .replace('Đ', 'D')
+    return normalizeAccented(withoutMarks)
+  }
+}
+
+/**
+ * Curated catalog of 36 practical Vietnamese home-cooking & Eat-Clean recipes
+ * covering all 32 `EmojiIconRepository` icon keys.
+ */
+object CulinaryGuideRepository {
+
+  private const val SRC_SAVOURY_DAYS = "Savoury Days"
+  private const val URL_SAVOURY_DAYS = "https://www.savourydays.com/"
+  private const val SRC_COOKY = "Cooky"
+  private const val URL_COOKY = "https://www.cooky.vn/cach-lam"
+  private const val SRC_VNEXPRESS = "VnExpress Ẩm Thực"
+  private const val URL_VNEXPRESS = "https://vnexpress.net/doi-song/cooking"
+  private const val SRC_DMX = "Điện máy XANH Vào Bếp"
+  private const val URL_DMX = "https://www.dienmayxanh.com/vao-bep"
+  private const val SRC_SERIOUS_EATS = "Serious Eats"
+  private const val URL_SERIOUS_EATS = "https://www.seriouseats.com/"
+
+  private fun ingChicken(amount: String = "300g") = RecipeIngredient(
+    name = "Thịt gà / Ức gà",
+    iconKeys = listOf("chicken"),
+    keywords = listOf("thịt gà", "ức gà", "đùi gà", "cánh gà", "gà"),
+    fallbackGroup = FoodGroup.THIT,
+    amountText = amount
+  )
+
+  private fun ingMeat(amount: String = "250g", name: String = "Thịt bò / Thịt nạc") = RecipeIngredient(
+    name = name,
+    iconKeys = listOf("meat"),
+    keywords = listOf("thịt bò", "thịt heo", "thịt lợn", "nạc vai", "thăn bò", "thịt bằm", "bò", "heo"),
+    fallbackGroup = FoodGroup.THIT,
+    amountText = amount
+  )
+
+  private fun ingBacon(amount: String = "200g") = RecipeIngredient(
+    name = "Thịt ba chỉ",
+    iconKeys = listOf("bacon"),
+    keywords = listOf("ba chỉ", "ba rọi", "thịt ba chỉ", "bacon"),
+    fallbackGroup = FoodGroup.THIT,
+    amountText = amount
+  )
+
+  private fun ingSalmon(amount: String = "250g") = RecipeIngredient(
+    name = "Cá hồi",
+    iconKeys = listOf("salmon"),
+    keywords = listOf("cá hồi", "phi lê cá", "salmon"),
+    fallbackGroup = FoodGroup.CA_HAI_SAN,
+    amountText = amount
+  )
+
+  private fun ingShrimp(amount: String = "250g") = RecipeIngredient(
+    name = "Tôm tươi",
+    iconKeys = listOf("shrimp"),
+    keywords = listOf("tôm", "tôm sú", "tôm thẻ", "tôm tươi"),
+    fallbackGroup = FoodGroup.CA_HAI_SAN,
+    amountText = amount
+  )
+
+  private fun ingCrab(amount: String = "200g") = RecipeIngredient(
+    name = "Cua / Thịt cua",
+    iconKeys = listOf("crab"),
+    keywords = listOf("thịt cua", "cua", "cua biển", "ghẹ"),
+    fallbackGroup = FoodGroup.CA_HAI_SAN,
+    amountText = amount
+  )
+
+  private fun ingSquid(amount: String = "250g") = RecipeIngredient(
+    name = "Mực tươi",
+    iconKeys = listOf("squid"),
+    keywords = listOf("mực", "mực ống", "mực lá", "mực tươi"),
+    fallbackGroup = FoodGroup.CA_HAI_SAN,
+    amountText = amount
+  )
+
+  private fun ingLettuce(amount: String = "1 bó") = RecipeIngredient(
+    name = "Rau xà lách",
+    iconKeys = listOf("lettuce"),
+    keywords = listOf("xà lách", "rau xà lách", "rau cải", "rau xanh"),
+    fallbackGroup = FoodGroup.RAU,
+    amountText = amount
+  )
+
+  private fun ingCarrot(amount: String = "1 củ") = RecipeIngredient(
+    name = "Cà rốt",
+    iconKeys = listOf("carrot"),
+    keywords = listOf("cà rốt", "carrot"),
+    fallbackGroup = FoodGroup.RAU,
+    amountText = amount
+  )
+
+  private fun ingBellPepper(amount: String = "1 quả") = RecipeIngredient(
+    name = "Ớt chuông",
+    iconKeys = listOf("bell_pepper"),
+    keywords = listOf("ớt chuông", "ớt ngọt", "ớt chuông đỏ"),
+    fallbackGroup = FoodGroup.RAU,
+    amountText = amount
+  )
+
+  private fun ingBroccoli(amount: String = "1 bông") = RecipeIngredient(
+    name = "Bông cải xanh",
+    iconKeys = listOf("broccoli"),
+    keywords = listOf("bông cải", "súp lơ", "bông cải xanh"),
+    fallbackGroup = FoodGroup.RAU,
+    amountText = amount
+  )
+
+  private fun ingCorn(amount: String = "1 trái") = RecipeIngredient(
+    name = "Bắp ngọt",
+    iconKeys = listOf("corn"),
+    keywords = listOf("bắp ngọt", "ngô ngọt", "bắp mỹ", "ngô", "bắp"),
+    fallbackGroup = FoodGroup.RAU,
+    amountText = amount
+  )
+
+  private fun ingMushroom(amount: String = "150g") = RecipeIngredient(
+    name = "Nấm tươi",
+    iconKeys = listOf("mushroom"),
+    keywords = listOf("nấm", "nấm kim châm", "nấm đùi gà", "nấm hương", "nấm rơm"),
+    fallbackGroup = FoodGroup.RAU,
+    amountText = amount
+  )
+
+  private fun ingPickle(amount: String = "100g") = RecipeIngredient(
+    name = "Dưa muối / Dưa chuột",
+    iconKeys = listOf("pickle"),
+    keywords = listOf("dưa muối", "dưa cải", "dưa chua", "dưa leo", "dưa chuột"),
+    fallbackGroup = FoodGroup.RAU,
+    amountText = amount
+  )
+
+  private fun ingEgg(amount: String = "2 quả") = RecipeIngredient(
+    name = "Trứng gà",
+    iconKeys = listOf("egg"),
+    keywords = listOf("trứng", "trứng gà", "trứng vịt"),
+    fallbackGroup = FoodGroup.SUA_TRUNG,
+    amountText = amount
+  )
+
+  private fun ingMilk(amount: String = "150ml") = RecipeIngredient(
+    name = "Sữa tươi",
+    iconKeys = listOf("milk"),
+    keywords = listOf("sữa tươi", "sữa không đường", "sữa"),
+    fallbackGroup = FoodGroup.SUA_TRUNG,
+    amountText = amount
+  )
+
+  private fun ingCheese(amount: String = "2 lát") = RecipeIngredient(
+    name = "Phô mai",
+    iconKeys = listOf("cheese"),
+    keywords = listOf("phô mai", "cheddar", "mozzarella", "cheese"),
+    fallbackGroup = FoodGroup.SUA_TRUNG,
+    amountText = amount
+  )
+
+  private fun ingYogurt(amount: String = "1 hũ") = RecipeIngredient(
+    name = "Sữa chua",
+    iconKeys = listOf("yogurt"),
+    keywords = listOf("sữa chua", "sữa chua không đường", "yogurt"),
+    fallbackGroup = FoodGroup.SUA_TRUNG,
+    amountText = amount
+  )
+
+  private fun ingButter(amount: String = "15g") = RecipeIngredient(
+    name = "Bơ",
+    iconKeys = listOf("butter"),
+    keywords = listOf("bơ lạt", "bơ mặn", "bơ thực vật", "bơ"),
+    fallbackGroup = FoodGroup.SUA_TRUNG,
+    amountText = amount
+  )
+
+  private fun ingOrangeJuice(amount: String = "120ml") = RecipeIngredient(
+    name = "Nước cam",
+    iconKeys = listOf("orange_juice"),
+    keywords = listOf("nước cam", "cam ép", "nước ép cam"),
+    fallbackGroup = FoodGroup.DO_UONG,
+    amountText = amount
+  )
+
+  private fun ingWater(amount: String = "300ml") = RecipeIngredient(
+    name = "Nước suối",
+    iconKeys = listOf("water"),
+    keywords = listOf("nước suối", "nước lọc", "nước tinh khiết"),
+    fallbackGroup = FoodGroup.DO_UONG,
+    amountText = amount
+  )
+
+  private fun ingTomatoSauce(amount: String = "3 muỗng") = RecipeIngredient(
+    name = "Sốt cà",
+    iconKeys = listOf("tomato_sauce"),
+    keywords = listOf("sốt cà", "sốt cà chua", "tương cà", "cà chua cô đặc"),
+    fallbackGroup = FoodGroup.DO_KHO,
+    amountText = amount
+  )
+
+  private fun ingBread(amount: String = "2 ổ / lát") = RecipeIngredient(
+    name = "Bánh mì",
+    iconKeys = listOf("bread"),
+    keywords = listOf("bánh mì", "bánh mì gối", "sandwich", "baguette"),
+    fallbackGroup = FoodGroup.DO_KHO,
+    amountText = amount
+  )
+
+  private fun ingRice(amount: String = "2 chén") = RecipeIngredient(
+    name = "Cơm nguội / Gạo",
+    iconKeys = listOf("rice"),
+    keywords = listOf("cơm", "cơm nguội", "gạo", "gạo tẻ"),
+    fallbackGroup = FoodGroup.DO_KHO,
+    amountText = amount
+  )
+
+  private fun ingDumpling(amount: String = "3 cái") = RecipeIngredient(
+    name = "Bánh bao",
+    iconKeys = listOf("dumpling"),
+    keywords = listOf("bánh bao", "há cảo", "sủi cảo"),
+    fallbackGroup = FoodGroup.AN_SAN,
+    amountText = amount
+  )
+
+  private fun ingIceCream(amount: String = "2 viên") = RecipeIngredient(
+    name = "Kem lạnh",
+    iconKeys = listOf("ice_cream"),
+    keywords = listOf("kem", "kem vani", "kem tươi"),
+    fallbackGroup = FoodGroup.AN_SAN,
+    amountText = amount
+  )
+
+  private fun ingApple(amount: String = "1 quả") = RecipeIngredient(
+    name = "Táo",
+    iconKeys = listOf("apple"),
+    keywords = listOf("táo", "táo đỏ", "táo xanh"),
+    fallbackGroup = FoodGroup.TRAI_CAY,
+    amountText = amount
+  )
+
+  private fun ingBanana(amount: String = "1 quả") = RecipeIngredient(
+    name = "Chuối",
+    iconKeys = listOf("banana"),
+    keywords = listOf("chuối", "chuối chín", "chuối cau"),
+    fallbackGroup = FoodGroup.TRAI_CAY,
+    amountText = amount
+  )
+
+  private fun ingGrape(amount: String = "100g") = RecipeIngredient(
+    name = "Nho tươi",
+    iconKeys = listOf("grape"),
+    keywords = listOf("nho", "nho xanh", "nho đỏ", "nho đen"),
+    fallbackGroup = FoodGroup.TRAI_CAY,
+    amountText = amount
+  )
+
+  private fun ingStrawberry(amount: String = "100g") = RecipeIngredient(
+    name = "Dâu tây",
+    iconKeys = listOf("strawberry"),
+    keywords = listOf("dâu tây", "dâu", "strawberry"),
+    fallbackGroup = FoodGroup.TRAI_CAY,
+    amountText = amount
+  )
+
+  private fun ingWatermelon(amount: String = "300g") = RecipeIngredient(
+    name = "Dưa hấu",
+    iconKeys = listOf("watermelon"),
+    keywords = listOf("dưa hấu", "ruột dưa hấu"),
+    fallbackGroup = FoodGroup.TRAI_CAY,
+    amountText = amount
+  )
+
+  private fun ingMango(amount: String = "1 quả") = RecipeIngredient(
+    name = "Xoài",
+    iconKeys = listOf("mango"),
+    keywords = listOf("xoài", "xoài xanh", "xoài chín"),
+    fallbackGroup = FoodGroup.TRAI_CAY,
+    amountText = amount
+  )
+
+  val recipes: List<CulinaryRecipe> = listOf(
+    // 1–12: Ready out-of-the-box with Seed.kt and prioritize rescuing salmon (1d), chicken (1d), orange_juice (2d), lettuce (2d), ice_cream (3d).
+    CulinaryRecipe(
+      id = "ga_ap_chao_sot_cam_xa_lach",
+      title = "Gà áp chảo sốt cam mật ong & xà lách",
+      emoji = "🍗",
+      summary = "Ức gà áp chảo vàng cạnh quyện sốt cam chua ngọt dịu nhẹ, ăn cùng xà lách giòn mát.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingChicken(), ingOrangeJuice(), ingLettuce(), ingButter("10g")),
+      pantryStaples = listOf("Tỏi băm", "Mật ong", "Muối", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Thấm khô thịt gà, ướp với chút muối, tiêu và tỏi băm trong 5 phút.",
+        "Làm nóng chảo với dầu ăn, áp chảo gà mỗi mặt 4 phút cho chín vàng đều rồi gắp ra.",
+        "Hạ lửa nhỏ, cho bơ, nước cam và 1 muỗng mật ong vào chảo khuấy tới khi sốt hơi sánh.",
+        "Xếp xà lách rửa sạch ra đĩa, thái lát gà đặt lên trên và rưới sốt cam ấm nóng."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = URL_VNEXPRESS
+    ),
+    CulinaryRecipe(
+      id = "ca_hoi_sot_cam_bo_toi",
+      title = "Cá hồi áp chảo sốt cam bơ tỏi & xà lách",
+      emoji = "🐟",
+      summary = "Cá hồi da giòn thấm bơ tỏi kết hợp sốt cam thơm thanh, chuẩn bữa Eat-Clean nhanh gọn.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingSalmon(), ingOrangeJuice("100ml"), ingButter("15g"), ingLettuce()),
+      pantryStaples = listOf("Tỏi đập dập", "Muối", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Thấm thật ráo miếng cá hồi rồi rắc đều một lớp muối mỏng và tiêu lên hai mặt.",
+        "Áp chảo mặt da trước trên lửa vừa khoảng 3 phút cho giòn, lật mặt áp tiếp 2 phút.",
+        "Cho bơ và tỏi đập dập vào chảo rưới đều lên thân cá, sau đó gắp cá đặt lên đĩa xà lách.",
+        "Đổ nước cam vào phần bơ tỏi còn lại, đun sôi nhẹ 1 phút cho sánh rồi chan lên cá."
+      ),
+      sourceName = SRC_SERIOUS_EATS,
+      sourceUrl = URL_SERIOUS_EATS
+    ),
+    CulinaryRecipe(
+      id = "ca_hoi_ap_chao_bo_toi_salad",
+      title = "Cá hồi áp chảo bơ tỏi kèm salad cà rốt",
+      emoji = "🥗",
+      summary = "Phi lê cá hồi béo ngậy bơ tỏi ăn kèm xà lách và cà rốt bào sợi cân vị.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingSalmon(), ingButter("15g"), ingLettuce(), ingCarrot()),
+      pantryStaples = listOf("Tỏi băm", "Nước cốt chanh", "Muối", "Tiêu xay", "Dầu ô liu"),
+      steps = listOf(
+        "Ướp cá hồi với muối tiêu trong 5 phút; xà lách cắt vừa ăn, cà rốt bào sợi mảnh.",
+        "Áp chảo cá hồi với ít dầu cho vàng hai mặt rồi thả bơ và tỏi băm vào dậy mùi thơm.",
+        "Trộn xà lách và cà rốt với dầu ô liu, nước cốt chanh và chút muối tiêu làm salad nền.",
+        "Đặt cá hồi lên trên đĩa salad, rưới thêm bơ tỏi nóng và thưởng thức ngay."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = URL_DMX
+    ),
+    CulinaryRecipe(
+      id = "salad_ga_xe_sua_chua",
+      title = "Salad ức gà xé xà lách sốt sữa chua",
+      emoji = "🥗",
+      summary = "Xốt sữa chua chua dịu thay mayonnaise giúp đĩa salad gà thanh đạm mà vẫn đậm vị.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingChicken("250g"), ingLettuce(), ingYogurt(), ingCarrot()),
+      pantryStaples = listOf("Nước cốt chanh", "Mật ong", "Muối", "Tiêu xay", "Tỏi băm"),
+      steps = listOf(
+        "Luộc hoặc áp chảo chín ức gà với nhúm muối, để nguội bớt rồi xé thành sợi vừa ăn.",
+        "Rửa sạch xà lách để ráo, cà rốt thái sợi mỏng hoặc hạt lựu nhỏ.",
+        "Khuấy đều sữa chua với 1 muỗng mật ong, nước cốt chanh, muối và tiêu làm xốt trộn.",
+        "Cho gà xé, xà lách, cà rốt vào tô lớn, rưới xốt sữa chua và đảo nhẹ trước khi ăn."
+      ),
+      sourceName = SRC_SAVOURY_DAYS,
+      sourceUrl = URL_SAVOURY_DAYS
+    ),
+    CulinaryRecipe(
+      id = "ga_xao_ot_chuong_ca_rot",
+      title = "Ức gà xào ớt chuông cà rốt kiểu cơm nhà",
+      emoji = "🫑",
+      summary = "Món xào nhiều màu sắc giàu đạm, thịt gà mềm ngọt hòa cùng ớt chuông giòn tươi.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingChicken(), ingBellPepper(), ingCarrot()),
+      pantryStaples = listOf("Hành tỏi băm", "Dầu hào", "Nước mắm", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Thái gà miếng vừa ăn, ướp nhanh với tỏi băm, 1 muỗng dầu hào và nửa muỗng tiêu.",
+        "Thái vuông ớt chuông và tỉa lát mỏng cà rốt để khi xào chín đồng đều.",
+        "Xào nhanh thịt gà trên lửa lớn cho săn chín khoảng 80% rồi trút ra đĩa.",
+        "Phi thơm hành tỏi, xào cà rốt và ớt chuông 2 phút rồi trút gà vào đảo chung, nêm nước mắm vừa ăn."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = URL_DMX
+    ),
+    CulinaryRecipe(
+      id = "salad_ca_hoi_dua_muoi",
+      title = "Salad cá hồi áp chảo dưa muối thanh vị",
+      emoji = "🥬",
+      summary = "Chút chua giòn của dưa muối kết hợp cá hồi béo thơm giúp chống ngấy cực hiệu quả.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingSalmon(), ingLettuce(), ingPickle("80g"), ingCarrot()),
+      pantryStaples = listOf("Dầu ô liu", "Đường", "Muối", "Tiêu xay", "Hành tím"),
+      steps = listOf(
+        "Vắt nhẹ dưa muối cho ráo nước và thái nhỏ vừa ăn; cà rốt bào sợi, xà lách cắt khúc.",
+        "Áp chảo cá hồi với muối tiêu đến khi chín vàng hai mặt, tách miếng vừa gắp.",
+        "Pha nhanh dầu ô liu, chút đường và tiêu thành nước trộn salad cân vị.",
+        "Xếp xà lách, cà rốt, dưa muối ra tô, đặt cá hồi lên trên và rưới sốt trộn đều."
+      ),
+      sourceName = SRC_COOKY,
+      sourceUrl = URL_COOKY
+    ),
+    CulinaryRecipe(
+      id = "kem_sua_chua_cam_tuoi",
+      title = "Kem sữa chua sốt cam tươi mát lạnh",
+      emoji = "🍨",
+      summary = "Tráng miệng 5 phút giải cứu ngay hộp kem lạnh, nước cam và sữa chua trong tủ.",
+      cookMinutes = 5,
+      servings = 1,
+      categories = setOf(CulinaryFilter.QUICK_15),
+      fridgeIngredients = listOf(ingIceCream(), ingOrangeJuice("80ml"), ingYogurt()),
+      pantryStaples = listOf("Mật ong", "Lá bạc hà hoặc vỏ cam bào"),
+      steps = listOf(
+        "Đun ấm nước cam với nửa muỗng mật ong trong 2 phút cho thơm nhẹ rồi để nguội.",
+        "Múc sữa chua ra ly hoặc chén lạnh làm lớp nền mịn màng.",
+        "Thêm 2 viên kem lạnh lên trên phần sữa chua.",
+        "Rưới nước sốt cam nguội lên mặt kem, trang trí thêm vỏ cam bào và thưởng thức ngay."
+      ),
+      sourceName = SRC_SAVOURY_DAYS,
+      sourceUrl = URL_SAVOURY_DAYS
+    ),
+    CulinaryRecipe(
+      id = "trung_chien_pho_mai_sot_ca",
+      title = "Trứng chiên phô mai sốt cà chua đậm đà",
+      emoji = "🍳",
+      summary = "Trứng xốp thơm mùi bơ kẹp nhân phô mai tan chảy và sốt cà chua bắt cơm.",
+      cookMinutes = 12,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingEgg("3 quả"), ingCheese(), ingTomatoSauce(), ingButter("10g")),
+      pantryStaples = listOf("Hành lá", "Nước mắm", "Đường", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Đánh tan trứng với hành lá cắt nhỏ, nửa muỗng nước mắm và chút tiêu xay.",
+        "Đun chảy bơ trên chảo chống dính lửa nhỏ, đổ trứng vào tráng mỏng đều mặt chảo.",
+        "Đặt phô mai lên một nửa mặt trứng, rưới sốt cà pha chút đường rồi gập đôi miếng trứng.",
+        "Chiên thêm 1 phút cho phô mai chảy đều, rưới phần sốt cà còn lại lên mặt và rắc tiêu."
+      ),
+      sourceName = SRC_COOKY,
+      sourceUrl = URL_COOKY
+    ),
+    CulinaryRecipe(
+      id = "tom_rim_bo_toi_sot_ca",
+      title = "Tôm rim bơ tỏi sốt cà ăn kèm dưa muối",
+      emoji = "🦐",
+      summary = "Tôm rim săn chắc áo lớp sốt cà bơ tỏi bóng đẹp, ăn cùng cơm trắng và dưa muối cực đưa cơm.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingShrimp(), ingButter("15g"), ingTomatoSauce(), ingPickle()),
+      pantryStaples = listOf("Tỏi băm", "Nước mắm", "Đường", "Tiêu xay", "Hành lá"),
+      steps = listOf(
+        "Cắt bỏ râu tôm, rút chỉ lưng, rửa sạch để ráo và xóc nhẹ với chút tiêu.",
+        "Đun chảy bơ cùng tỏi băm cho dậy thơm rồi cho tôm vào đảo nhanh trên lửa lớn.",
+        "Khi tôm chuyển đỏ săn lại, thêm sốt cà, 1 muỗng nước mắm và 1 muỗng nhỏ đường vào rim.",
+        "Rim 3 phút đến khi sốt sệt bám đều vỏ tôm, rắc hành lá và dọn kèm đĩa dưa muối."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = URL_VNEXPRESS
+    ),
+    CulinaryRecipe(
+      id = "trung_bac_sua_tuoi_pho_mai",
+      title = "Trứng bác sữa tươi phô mai béo mịn",
+      emoji = "🥚",
+      summary = "Bữa sáng mềm mịn kiểu Tây nhờ đánh trứng với sữa tươi và nấu chậm cùng bơ phô mai.",
+      cookMinutes = 10,
+      servings = 1,
+      categories = setOf(CulinaryFilter.QUICK_15),
+      fridgeIngredients = listOf(ingEgg("3 quả"), ingMilk("60ml"), ingCheese(), ingButter("15g")),
+      pantryStaples = listOf("Muối", "Tiêu đen", "Hành lá hoặc ngò rí"),
+      steps = listOf(
+        "Đập trứng vào tô, thêm sữa tươi và nhúm muối rồi đánh đều cho tan quyện.",
+        "Làm tan chảy bơ ở lửa thật nhỏ trên chảo chống dính.",
+        "Đổ trứng vào, dùng phới đảo nhẹ liên tục từ ngoài vào trong để tạo các lớp trứng mềm mịn.",
+        "Khi trứng còn hơi ướt thì tắt bếp, thả phô mai xé nhỏ vào đảo tan và rắc tiêu đen."
+      ),
+      sourceName = SRC_SERIOUS_EATS,
+      sourceUrl = URL_SERIOUS_EATS
+    ),
+    CulinaryRecipe(
+      id = "banh_bao_chien_sot_ca_dua_muoi",
+      title = "Bánh bao chiên giòn chấm sốt cà & dưa muối",
+      emoji = "🥟",
+      summary = "Bánh bao vỏ giòn rụm nóng hổi chấm sốt cà pha đậm vị và kèm dưa muối chống ngấy.",
+      cookMinutes = 12,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingDumpling("4 cái"), ingTomatoSauce(), ingPickle("80g")),
+      pantryStaples = listOf("Dầu ăn", "Tỏi băm", "Đường", "Xì dầu", "Tương ớt"),
+      steps = listOf(
+        "Cho bánh bao vào chảo dầu nóng vừa (hoặc nồi chiên không dầu), chiên vàng giòn các mặt.",
+        "Trong lúc đó phi thơm tỏi băm, cho sốt cà, chút xì dầu và nửa muỗng đường vào đảo sánh.",
+        "Vớt bánh bao ra giấy thấm dầu và cắt đôi cho dễ thưởng thức.",
+        "Dọn bánh bao nóng kèm chén sốt cà ấm và dưa muối thái vừa ăn."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = URL_DMX
+    ),
+    CulinaryRecipe(
+      id = "tom_xao_ot_chuong_ca_rot",
+      title = "Tôm tươi xào ớt chuông cà rốt giòn ngọt",
+      emoji = "🦐",
+      summary = "Món xào cơm nhà ít dầu mỡ, giữ nguyên vị ngọt giòn tự nhiên của tôm và rau củ.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingShrimp(), ingBellPepper(), ingCarrot()),
+      pantryStaples = listOf("Tỏi băm", "Dầu hào", "Hành lá", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Tôm bóc vỏ chừa đuôi, rút chỉ lưng, ướp nhanh với chút tỏi băm và tiêu.",
+        "Cà rốt tỉa lát mỏng, ớt chuông bỏ hạt thái miếng vuông vừa đũa.",
+        "Xào tôm trên lửa lớn 2 phút đến khi vừa săn cong lại thì trút ra bát.",
+        "Xào cà rốt và ớt chuông 2 phút, trút tôm vào đảo cùng 1 muỗng dầu hào và rắc hành lá."
+      ),
+      sourceName = SRC_COOKY,
+      sourceUrl = URL_COOKY
+    ),
+
+    // 13–36: Practical Vietnamese home-cooking & Eat-Clean coverage for all remaining iconKeys.
+    CulinaryRecipe(
+      id = "ba_chi_rang_chay_canh_dua_muoi",
+      title = "Thịt ba chỉ rang cháy cạnh kèm dưa muối & cơm",
+      emoji = "🥓",
+      summary = "Ba chỉ xém vàng thơm lừng mắm hành, ăn cùng dưa cải muối chua và cơm nóng chuẩn vị.",
+      cookMinutes = 20,
+      categories = setOf(CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingBacon("300g"), ingPickle("150g"), ingRice()),
+      pantryStaples = listOf("Hành tím băm", "Nước mắm", "Đường", "Hành lá", "Tiêu xay"),
+      steps = listOf(
+        "Thịt ba chỉ thái miếng mỏng vừa ăn, chần sơ nước sôi 1 phút rồi để ráo.",
+        "Đặt chảo nóng, đảo thịt trên lửa vừa đến khi ra mỡ và các cạnh cháy xém vàng.",
+        "Chắt bớt mỡ thừa, phi thơm hành tím rồi nêm nước mắm, chút đường đảo thấm đều.",
+        "Rắc hành lá, tiêu và dọn ăn nóng cùng dưa muối và cơm trắng."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = URL_VNEXPRESS
+    ),
+    CulinaryRecipe(
+      id = "bo_xao_bong_cai_ca_rot",
+      title = "Thịt bò xào bông cải xanh cà rốt",
+      emoji = "🥦",
+      summary = "Thịt bò mềm mọng xào lửa lớn với bông cải xanh và cà rốt giòn giữ trọn vitamin.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingMeat("250g", "Thịt bò"), ingBroccoli(), ingCarrot()),
+      pantryStaples = listOf("Tỏi băm", "Dầu hào", "Xì dầu", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Thái mỏng thịt bò ngang thớ, ướp 1 muỗng dầu hào, chút xì dầu, tiêu và nửa phần tỏi băm.",
+        "Cắt nhỏ bông cải xanh và thái lát cà rốt, chần qua nước sôi 45 giây rồi vớt ngâm nước mát.",
+        "Làm nóng chảo thật già dầu, xào thịt bò thật nhanh tay trên lửa lớn 1 phút rồi trút ra.",
+        "Xào thơm phần tỏi còn lại với bông cải, cà rốt rồi đổ thịt bò vào đảo chung 30 giây."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = URL_DMX
+    ),
+    CulinaryRecipe(
+      id = "bo_xao_ot_chuong_nam",
+      title = "Thịt bò xào ớt chuông nấm hương",
+      emoji = "🥩",
+      summary = "Nấm ngọt nước quyện vị thịt bò mềm và ớt chuông thơm lừng cho bữa tối gọn lẹ.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingMeat("250g", "Thịt bò"), ingBellPepper(), ingMushroom()),
+      pantryStaples = listOf("Tỏi băm", "Dầu hào", "Xì dầu", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Thịt bò thái lát mỏng ướp nhanh với xì dầu, tỏi băm và tiêu trong 5 phút.",
+        "Nấm làm sạch cắt đôi; ớt chuông bỏ hạt thái miếng vuông vừa ăn.",
+        "Xào thịt bò trên lửa lớn cho chín tái rồi vớt ra đĩa riêng.",
+        "Xào nấm và ớt chuông với chút dầu hào 2 phút rồi trút bò vào đảo đều, rắc tiêu và tắt bếp."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = URL_VNEXPRESS
+    ),
+    CulinaryRecipe(
+      id = "muc_xao_ot_chuong_nam",
+      title = "Mực xào ớt chuông nấm & cà rốt giòn ngọt",
+      emoji = "🦑",
+      summary = "Mực khứa vảy rồng giòn sần sật xào nhanh cùng ớt chuông, nấm và cà rốt không ra nước.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingSquid(), ingBellPepper(), ingMushroom("100g"), ingCarrot()),
+      pantryStaples = listOf("Gừng thái lát", "Tỏi băm", "Dầu hào", "Nước mắm", "Hành lá"),
+      steps = listOf(
+        "Làm sạch mực, khứa caro nhẹ và cắt miếng vừa, chần nhanh qua nước sôi có vài lát gừng.",
+        "Cắt miếng vừa ăn ớt chuông, cà rốt và nấm tươi.",
+        "Phi thơm tỏi, xào mực trên lửa lớn 1 phút với nửa muỗng dầu hào rồi vớt ra.",
+        "Xào rau củ 2 phút cho chín tới, trút mực vào đảo lại cùng hành lá và chút nước mắm."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = URL_DMX
+    ),
+    CulinaryRecipe(
+      id = "muc_hap_gung_cuon_xa_lach",
+      title = "Mực hấp gừng sả cuốn xà lách",
+      emoji = "🦑",
+      summary = "Mực hấp giữ nguyên độ giòn ngọt tự nhiên, cuốn xà lách cà rốt nhẹ bụng ít calo.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingSquid("300g"), ingLettuce(), ingCarrot()),
+      pantryStaples = listOf("Gừng thái sợi", "Sả đập dập", "Nước mắm", "Chanh", "Tỏi ớt"),
+      steps = listOf(
+        "Rửa sạch mực với gừng giã để khử tanh, để nguyên con hoặc cắt khoanh dày.",
+        "Lót sả đập dập và gừng sợi dưới đĩa, xếp mực lên hấp cách thủy khoảng 6–7 phút.",
+        "Rửa sạch xà lách và thái cà rốt thành thanh dài để chuẩn bị đồ cuốn.",
+        "Pha nước mắm gừng chanh tỏi ớt; dọn mực hấp nóng ăn cuốn kèm xà lách và cà rốt."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = URL_VNEXPRESS
+    ),
+    CulinaryRecipe(
+      id = "sup_cua_bap_ngot_trung",
+      title = "Súp cua bắp ngọt trứng gà sánh mịn",
+      emoji = "🦀",
+      summary = "Chén súp nóng hổi sánh nhẹ với thịt cua ngọt, hạt bắp vàng giòn và vân trứng mây.",
+      cookMinutes = 25,
+      categories = setOf(CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingCrab(), ingCorn(), ingEgg(), ingCarrot("1/2 củ")),
+      pantryStaples = listOf("Bột năng hoặc bột bắp", "Hành tím băm", "Dầu mè", "Tiêu xay", "Ngò rí"),
+      steps = listOf(
+        "Tách hạt bắp ngọt, thái hạt lựu nhỏ cà rốt; xào thơm nhẹ thịt cua với hành tím băm.",
+        "Đun sôi 800ml nước với bắp và cà rốt trong 8 phút cho ra nước ngọt.",
+        "Cho thịt cua vào, nêm muối và hạt nêm rồi khuấy từ từ nước bột năng cho súp sánh nhẹ.",
+        "Đánh tan trứng rót thành dòng mảnh vào nồi khuấy theo một chiều, thêm dầu mè, tiêu và ngò."
+      ),
+      sourceName = SRC_SAVOURY_DAYS,
+      sourceUrl = URL_SAVOURY_DAYS
+    ),
+    CulinaryRecipe(
+      id = "com_chien_cua_bap_ngot",
+      title = "Cơm chiên thịt cua bắp ngọt trứng vàng",
+      emoji = "🦀",
+      summary = "Hạt cơm tơi săn áo trứng vàng ươm hòa với thịt cua và bắp ngọt thơm nức mũi.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingCrab("150g"), ingRice(), ingCorn("1/2 trái"), ingEgg()),
+      pantryStaples = listOf("Hành tím băm", "Nước mắm", "Hành lá", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Đánh 1 lòng đỏ trứng trộn sẵn vào cơm nguội để hạt cơm tơi và lên màu vàng đẹp.",
+        "Phi thơm hành tím, xào nhanh thịt cua và hạt bắp ngọt với chút tiêu rồi múc ra.",
+        "Đổ phần trứng còn lại vào chảo đảo tơi, trút cơm vào rang săn trên lửa vừa.",
+        "Cho thịt cua và bắp vào đảo chung 2 phút, nêm chút nước mắm và rắc hành lá trước khi tắt bếp."
+      ),
+      sourceName = SRC_COOKY,
+      sourceUrl = URL_COOKY
+    ),
+    CulinaryRecipe(
+      id = "com_chien_duong_chau_tom",
+      title = "Cơm chiên Dương Châu tôm trứng bắp ngọt",
+      emoji = "🍚",
+      summary = "Đĩa cơm chiên đủ sắc màu từ tôm, trứng và hạt bắp ngọt tận dụng hoàn hảo cơm nguội.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingRice(), ingShrimp("150g"), ingEgg(), ingCorn("1/2 trái")),
+      pantryStaples = listOf("Tỏi băm", "Xì dầu", "Dầu ăn", "Hành lá", "Tiêu xay"),
+      steps = listOf(
+        "Tôm bóc vỏ cắt hạt lựu; luộc sơ hạt bắp ngọt khoảng 2 phút cho chín mềm.",
+        "Làm nóng dầu, chiên tơi trứng gà rồi trút cơm nguội vào đảo đều cho hạt cơm ráo tơi.",
+        "Đẩy cơm sang một bên chảo, xào chín tôm và bắp với chút tỏi băm rồi trộn chung.",
+        "Nêm xì dầu vừa miệng, đảo thêm 1 phút trên lửa lớn và rắc hành lá, tiêu xay."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = URL_VNEXPRESS
+    ),
+    CulinaryRecipe(
+      id = "com_chien_ba_chi_dua_muoi",
+      title = "Cơm chiên thịt ba chỉ dưa cải muối",
+      emoji = "🍚",
+      summary = "Vị chua mặn của dưa cải muối giúp đĩa cơm rang thịt ba chỉ trứng gà tròn vị không ngán.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingRice(), ingBacon("150g"), ingPickle("100g"), ingEgg()),
+      pantryStaples = listOf("Tỏi băm", "Nước mắm", "Hành lá", "Tiêu xay", "Đường"),
+      steps = listOf(
+        "Thịt ba chỉ thái hạt lựu nhỏ, dưa muối vắt ráo thái vừa; đảo ba chỉ xém cạnh để lấy mỡ thơm.",
+        "Cho tỏi băm và dưa muối vào xào săn cùng chút đường rồi múc bớt ra.",
+        "Đập trứng vào chảo đảo nhanh tay cùng cơm nguội cho hạt cơm khô tơi.",
+        "Trút dưa muối và ba chỉ vào đảo chung 2 phút, nêm chút nước mắm, rắc hành lá và tiêu."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = URL_DMX
+    ),
+    CulinaryRecipe(
+      id = "canh_thit_bam_nam_bong_cai",
+      title = "Canh thịt bằm nấm bông cải cà rốt thanh ngọt",
+      emoji = "🍲",
+      summary = "Bát canh rau củ thanh mát, ngọt tự nhiên từ nấm, bông cải, cà rốt và thịt nạc bằm.",
+      cookMinutes = 20,
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingMeat("150g", "Thịt heo bằm"), ingMushroom(), ingBroccoli("1/2 bông"), ingCarrot()),
+      pantryStaples = listOf("Hành tím băm", "Nước mắm", "Muối", "Hành lá", "Tiêu xay"),
+      steps = listOf(
+        "Ướp thịt bằm với hành tím, chút nước mắm và tiêu; cắt vừa ăn nấm, bông cải và cà rốt.",
+        "Xào săn thịt bằm với nhúm hành tím trong nồi rồi chế khoảng 800ml nước đun sôi.",
+        "Hớt bọt, thả cà rốt vào nấu 3 phút rồi cho tiếp bông cải và nấm vào.",
+        "Nấu thêm 2–3 phút đến khi rau chín tới, nêm muối vừa ăn, rắc hành lá và tiêu."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = URL_VNEXPRESS
+    ),
+    CulinaryRecipe(
+      id = "ba_chi_cuon_nam_ap_chao",
+      title = "Thịt ba chỉ cuộn nấm áp chảo cuốn xà lách",
+      emoji = "🍄",
+      summary = "Nấm ngọt mọng gói gọn trong lát ba chỉ áp chảo cháy cạnh, ăn cuốn xà lách cực cuốn.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingBacon(), ingMushroom("200g"), ingLettuce()),
+      pantryStaples = listOf("Xì dầu", "Tỏi băm", "Mật ong", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Nấm cắt gốc rửa sạch để ráo; trải lát ba chỉ mỏng cuộn chặt quanh từng bó nấm nhỏ.",
+        "Pha xốt quét gồm 2 muỗng xì dầu, 1 muỗng mật ong, tỏi băm và ít tiêu.",
+        "Áp chảo các cuộn thịt nấm ở lửa vừa cho xém vàng đều các mặt không cần nhiều dầu.",
+        "Phết đều xốt lên cuộn thịt trong 1 phút cuối cho bóng đẹp, dọn cuốn với xà lách tươi."
+      ),
+      sourceName = SRC_COOKY,
+      sourceUrl = URL_COOKY
+    ),
+    CulinaryRecipe(
+      id = "ga_ham_nam_bap_ngot",
+      title = "Gà hầm nấm cà rốt bắp ngọt bổ dưỡng",
+      emoji = "🍄",
+      summary = "Nồi gà hầm thanh ngọt đậm vị nấm, cà rốt và bắp thích hợp cho bữa cơm gia đình ấm áp.",
+      cookMinutes = 30,
+      categories = setOf(CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingChicken("400g"), ingMushroom(), ingCarrot(), ingCorn()),
+      pantryStaples = listOf("Hành tím", "Gừng đập dập", "Nước mắm", "Muối", "Hành ngò"),
+      steps = listOf(
+        "Chặt gà miếng vừa ăn, ướp với chút muối, nước mắm và hành tím trong 10 phút.",
+        "Cắt khúc bắp ngọt, thái khoanh cà rốt và làm sạch nấm tươi.",
+        "Xào săn thịt gà với hành tím và gừng, đổ nước ngập mặt rồi hầm lửa vừa 12 phút.",
+        "Cho cà rốt, bắp ngọt và nấm vào hầm thêm 10 phút đến khi mềm ngọt, nêm vừa ăn và rắc hành ngò."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = URL_DMX
+    ),
+    CulinaryRecipe(
+      id = "tom_xao_bong_cai_toi",
+      title = "Tôm xào bông cải xanh tỏi thơm Eat-Clean",
+      emoji = "🥦",
+      summary = "Bữa tối ít béo chỉ 12 phút với tôm săn giòn cùng bông cải xanh và cà rốt.",
+      cookMinutes = 12,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingShrimp(), ingBroccoli(), ingCarrot("1/2 củ")),
+      pantryStaples = listOf("Tỏi băm", "Dầu hào", "Muối", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Bóc vỏ tôm chừa đuôi, xóc với chút muối tiêu; tách bông cải miếng nhỏ và thái lát cà rốt.",
+        "Chần nhanh bông cải và cà rốt trong nước sôi 45 giây rồi vớt ra giữ màu xanh.",
+        "Phi thơm tỏi băm với ít dầu, xào tôm trên lửa lớn 2 phút đến khi vừa chuyển đỏ.",
+        "Trút bông cải và cà rốt vào đảo đều 1 phút với nửa muỗng dầu hào và rắc tiêu."
+      ),
+      sourceName = SRC_COOKY,
+      sourceUrl = URL_COOKY
+    ),
+    CulinaryRecipe(
+      id = "banh_mi_chao_trung_sot_ca",
+      title = "Bánh mì chảo trứng ốp la sốt cà bơ thơm",
+      emoji = "🥖",
+      summary = "Bữa sáng kiểu tiệm nóng hổi ngay tại nhà với bánh mì giòn chấm sốt cà chua bơ béo.",
+      cookMinutes = 12,
+      servings = 1,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingBread("1 ổ"), ingEgg("2 quả"), ingTomatoSauce(), ingButter("15g")),
+      pantryStaples = listOf("Tỏi băm", "Đường", "Xì dầu", "Tiêu xay", "Ngò rí"),
+      steps = listOf(
+        "Đun chảy bơ với chút tỏi băm trên chảo nhỏ, cho sốt cà và nửa muỗng đường vào đun sánh.",
+        "Tạo hai khoảng trống trên chảo sốt rồi đập 2 quả trứng gà vào ốp la nhẹ tay.",
+        "Đậy nắp khoảng 2 phút trên lửa nhỏ để lòng trắng chín mượt còn lòng đỏ vẫn dẻo thơm.",
+        "Rắc tiêu, ngò rí lên mặt chảo, rưới chút xì dầu và chấm nóng với bánh mì nướng giòn."
+      ),
+      sourceName = SRC_SAVOURY_DAYS,
+      sourceUrl = URL_SAVOURY_DAYS
+    ),
+    CulinaryRecipe(
+      id = "banh_mi_kep_ba_chi_pho_mai",
+      title = "Bánh mì kẹp thịt ba chỉ phô mai xà lách",
+      emoji = "🥪",
+      summary = "Sandwich kẹp nhanh 10 phút với ba chỉ áp chảo giòn, phô mai tan nhẹ và xà lách tươi.",
+      cookMinutes = 10,
+      servings = 1,
+      categories = setOf(CulinaryFilter.QUICK_15),
+      fridgeIngredients = listOf(ingBread("2 lát"), ingBacon("120g"), ingCheese(), ingLettuce("3 lá")),
+      pantryStaples = listOf("Tiêu đen", "Tương cà hoặc tương ớt", "Dầu ăn"),
+      steps = listOf(
+        "Áp chảo thịt ba chỉ trên lửa vừa cho xém giòn hai mặt rồi thấm bớt dầu.",
+        "Áp nóng nhanh hai lát bánh mì trên chính chảo vừa chiên để bánh giòn thơm.",
+        "Xếp xà lách khô ráo lên lát bánh dưới, đặt ba chỉ nóng và lát phô mai lên trên cho chảy nhẹ.",
+        "Phết thêm chút tương cà hoặc tương ớt, rắc tiêu và kẹp lát bánh còn lại."
+      ),
+      sourceName = SRC_SERIOUS_EATS,
+      sourceUrl = URL_SERIOUS_EATS
+    ),
+    CulinaryRecipe(
+      id = "banh_mi_bo_toi_nam_pho_mai",
+      title = "Bánh mì nướng bơ tỏi nấm phô mai kéo sợi",
+      emoji = "🧀",
+      summary = "Lớp bơ tỏi thơm lừng phủ nấm xào đậm vị và phô mai nướng chảy vàng rụm.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15),
+      fridgeIngredients = listOf(ingBread("2 ổ nhỏ"), ingButter("25g"), ingMushroom("120g"), ingCheese("50g")),
+      pantryStaples = listOf("Tỏi băm", "Muối", "Tiêu xay", "Ngò rí hoặc lá oregano"),
+      steps = listOf(
+        "Trộn bơ mềm với tỏi băm, nhúm muối và ngò rí băm nhuyễn; xào nhanh nấm thái lát cho ráo nước.",
+        "Xẻ dọc bánh mì, phết đều hỗn hợp bơ tỏi lên mặt cắt.",
+        "Xếp phần nấm đã xào lên bánh rồi phủ phô mai bào sợi kín mặt.",
+        "Nướng ở 180°C trong 6–7 phút (hoặc áp chảo đậy nắp) đến khi phô mai tan vàng rụm."
+      ),
+      sourceName = SRC_SAVOURY_DAYS,
+      sourceUrl = URL_SAVOURY_DAYS
+    ),
+    CulinaryRecipe(
+      id = "banh_mi_nuong_phap_chuoi",
+      title = "Bánh mì nướng kiểu Pháp chuối sữa tươi",
+      emoji = "🍌",
+      summary = "Bánh mì nhúng hỗn hợp trứng sữa áp chảo thơm lừng kết hợp chuối chín ngọt tự nhiên.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingBread("3 lát"), ingBanana("2 quả"), ingMilk("100ml"), ingEgg()),
+      pantryStaples = listOf("Mật ong", "Bột quế (tùy chọn)", "Nhúm muối", "Dầu dừa hoặc dầu ăn"),
+      steps = listOf(
+        "Đánh đều trứng gà, sữa tươi và nhúm muối nhỏ trong tô rộng; cắt lát chuối chín.",
+        "Nhúng từng lát bánh mì vào hỗn hợp trứng sữa khoảng 15 giây cho thấm đều hai mặt.",
+        "Áp chảo bánh trên lửa vừa nhỏ mỗi mặt 2–3 phút đến khi vàng thơm.",
+        "Xếp bánh ra đĩa kèm chuối thái lát và rưới thêm chút mật ong trước khi thưởng thức."
+      ),
+      sourceName = SRC_SAVOURY_DAYS,
+      sourceUrl = URL_SAVOURY_DAYS
+    ),
+    CulinaryRecipe(
+      id = "sinh_to_chuoi_dau_sua_chua",
+      title = "Sinh tố chuối dâu tây sữa chua ít đường",
+      emoji = "🍓",
+      summary = "Ly sinh tố sánh mịn giàu chất xơ, ngọt dịu từ chuối chín và dâu tây tươi mát.",
+      cookMinutes = 5,
+      servings = 1,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingBanana(), ingStrawberry(), ingYogurt(), ingMilk("100ml")),
+      pantryStaples = listOf("Đá viên", "Hạt chia hoặc mật ong (tùy chọn)"),
+      steps = listOf(
+        "Rửa sạch dâu tây, bỏ cuống và cắt đôi; bóc vỏ chuối cắt khoanh vừa xay.",
+        "Cho chuối, dâu tây, sữa chua và sữa tươi vào máy xay sinh tố.",
+        "Thêm vài viên đá nhỏ nếu thích uống lạnh và xay nhuyễn khoảng 30 giây.",
+        "Rót ra ly, rắc thêm chút hạt chia nếu có và dùng ngay để giữ vitamin."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = URL_DMX
+    ),
+    CulinaryRecipe(
+      id = "sua_chua_to_tao_nho_dau",
+      title = "Sữa chua tô trái cây táo nho dâu tây",
+      emoji = "🍎",
+      summary = "Smoothie bowl mát giòn đầy màu sắc từ táo, nho, dâu tây và sữa chua không làm nóng bếp.",
+      cookMinutes = 5,
+      servings = 1,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingYogurt("2 hũ"), ingApple(), ingGrape(), ingStrawberry("80g")),
+      pantryStaples = listOf("Mật ong", "Yến mạch hoặc hạt điều rang (tùy chọn)"),
+      steps = listOf(
+        "Rửa sạch táo, nho và dâu tây với nước muối loãng rồi để ráo hoàn toàn.",
+        "Thái táo miếng nhỏ vừa ăn, cắt đôi quả nho và lát mỏng dâu tây.",
+        "Đổ sữa chua lạnh ra tô rộng làm phần nền sánh mịn.",
+        "Xếp gọn táo, nho và dâu tây lên mặt tô, rưới thêm 1 muỗng nhỏ mật ong nếu thích ngọt."
+      ),
+      sourceName = SRC_COOKY,
+      sourceUrl = URL_COOKY
+    ),
+    CulinaryRecipe(
+      id = "salad_ga_tao_nho_xa_lach",
+      title = "Salad ức gà táo nho xà lách giòn mát",
+      emoji = "🍏",
+      summary = "Vị ngọt giòn của táo và nho giúp món salad ức gà Eat-Clean tươi mới và dễ ăn hơn hẳn.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingChicken("250g"), ingApple(), ingGrape("100g"), ingLettuce()),
+      pantryStaples = listOf("Dầu ô liu", "Nước cốt chanh", "Mật ong", "Muối", "Tiêu xay"),
+      steps = listOf(
+        "Áp chảo hoặc luộc chín ức gà với nhúm muối, để nguội bớt rồi thái lát vừa ăn.",
+        "Cắt xà lách khúc ngắn; táo thái lát mỏng ngâm nhanh nước chanh loãng chống thâm; nho cắt đôi.",
+        "Khuấy đều 2 muỗng dầu ô liu, 1 muỗng nước cốt chanh, nửa muỗng mật ong, muối và tiêu.",
+        "Cho toàn bộ nguyên liệu vào tô, rưới sốt trộn nhẹ tay và thưởng thức."
+      ),
+      sourceName = SRC_SERIOUS_EATS,
+      sourceUrl = URL_SERIOUS_EATS
+    ),
+    CulinaryRecipe(
+      id = "goi_xoai_tom_ca_rot",
+      title = "Gỏi xoài tôm tươi cà rốt cuốn xà lách",
+      emoji = "🥭",
+      summary = "Đĩa gỏi xoài chua ngọt giòn sần sật cùng tôm luộc ngọt thịt và nước mắm chua cay.",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingMango(), ingShrimp("200g"), ingCarrot("1/2 củ"), ingLettuce()),
+      pantryStaples = listOf("Nước mắm", "Đường", "Nước cốt chanh", "Tỏi ớt băm", "Đậu phộng rang"),
+      steps = listOf(
+        "Luộc chín tôm với nhúm muối, bóc vỏ và chẻ đôi theo chiều dọc; xoài và cà rốt bào sợi.",
+        "Pha nước trộn gỏi theo tỷ lệ 2 muỗng nước mắm, 2 muỗng đường, 2 muỗng nước chanh và tỏi ớt.",
+        "Trộn xoài bào và cà rốt với một nửa nước trộn cho thấm dịu rồi gạn bớt nước.",
+        "Cho tôm và phần nước gỏi còn lại vào đảo đều, bày trên lá xà lách và rắc đậu phộng rang."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = URL_VNEXPRESS
+    ),
+    CulinaryRecipe(
+      id = "sinh_to_xoai_sua_tuoi_kem",
+      title = "Sinh tố xoài sữa tươi topping kem lạnh",
+      emoji = "🥭",
+      summary = "Món tráng miệng xoài chín thơm lừng, sánh mịn quyện sữa tươi và viên kem mát lạnh.",
+      cookMinutes = 8,
+      categories = setOf(CulinaryFilter.QUICK_15),
+      fridgeIngredients = listOf(ingMango(), ingMilk("150ml"), ingIceCream("1 viên")),
+      pantryStaples = listOf("Đá viên", "Đường hoặc mật ong (tùy chọn)"),
+      steps = listOf(
+        "Gọt vỏ xoài chín, lấy phần thịt cắt miếng vuông (giữ lại vài miếng nhỏ để trang trí).",
+        "Cho thịt xoài, sữa tươi và ít đá viên vào máy xay mịn trong 30 giây.",
+        "Rót sinh tố xoài ra ly cao, nhẹ nhàng đặt 1 viên kem lạnh lên trên mặt.",
+        "Trang trí thêm vài miếng xoài cắt hạt lựu rồi dùng ngay bằng muỗng và ống hút."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = URL_DMX
+    ),
+    CulinaryRecipe(
+      id = "detox_dua_hau_nuoc_cam",
+      title = "Nước ép detox dưa hấu nước cam giải nhiệt",
+      emoji = "🍉",
+      summary = "Thức uống giải nhiệt giàu vitamin C kết hợp dưa hấu thanh mát, nước cam và nước suối lạnh.",
+      cookMinutes = 5,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingWatermelon(), ingOrangeJuice(), ingWater("150ml")),
+      pantryStaples = listOf("Lá bạc hà", "Đá viên", "Nước cốt chanh (tùy chọn)"),
+      steps = listOf(
+        "Lọc bỏ hạt dưa hấu, cắt phần ruột đỏ thành khối nhỏ cho vào cối xay.",
+        "Thêm nước suối mát vào xay nhanh 20 giây rồi lọc qua rây nếu thích nước trong mượt.",
+        "Rót hỗn hợp dưa hấu ra ly lớn cùng nước cam tươi và khuấy nhẹ cho hòa quyện.",
+        "Thêm đá viên và vài lá bạc hà vò nhẹ để tăng hương thơm sảng khoái."
+      ),
+      sourceName = SRC_COOKY,
+      sourceUrl = URL_COOKY
+    ),
+    CulinaryRecipe(
+      id = "canh_trung_ca_chua_bap_ngot",
+      title = "Canh trứng mây sốt cà bắp ngọt thanh mát",
+      emoji = "🍅",
+      summary = "Bát canh quốc dân nấu chỉ 12 phút, vân trứng tơ mềm cùng vị cà chua và bắp ngọt tự nhiên.",
+      cookMinutes = 12,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingEgg(), ingTomatoSauce(), ingCorn("1/2 trái"), ingWater("600ml")),
+      pantryStaples = listOf("Hành tím băm", "Nước mắm", "Hành lá", "Tiêu xay", "Dầu ăn"),
+      steps = listOf(
+        "Phi thơm hành tím với chút dầu, đảo nhanh sốt cà chua trong 1 phút cho lên màu đỏ đẹp.",
+        "Chế nước suối và hạt bắp ngọt vào nồi, đun sôi khoảng 5 phút cho hạt bắp chín mềm.",
+        "Nêm nước mắm và nhúm muối vừa khẩu vị, đánh tan trứng rồi rót thành dòng mỏng vào nồi đang sôi nhẹ.",
+        "Khuấy vòng tròn tạo vân trứng mây mượt, rắc hành lá cùng tiêu xay rồi tắt bếp."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = URL_VNEXPRESS
+    )
+  )
+}
+```
+
 ### `app/src/main/kotlin/com/truong/fridgezero/domain/Freshness.kt` (22 lines)
 
 ```kotlin
@@ -2228,19 +3719,19 @@ import androidx.compose.ui.graphics.Color
 
 enum class Freshness {
   OK,
-  WARN,
+  SOON,
   BAD;
 
   fun color(): Color = when (this) {
     OK -> Color(0xFFA3E635)
-    WARN -> Color(0xFFFACC15)
+    SOON -> Color(0xFFFACC15)
     BAD -> Color(0xFFFB7185)
   }
 }
 
 fun freshnessOf(daysLeft: Int): Freshness = when {
-  daysLeft <= 1 -> Freshness.BAD
-  daysLeft <= 3 -> Freshness.WARN
+  daysLeft <= 0 -> Freshness.BAD
+  daysLeft == 1 -> Freshness.SOON
   else -> Freshness.OK
 }
 ```
@@ -2315,7 +3806,7 @@ data class FridgeUiState(
 )
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/domain/ShelfLife.kt` (79 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/domain/ShelfLife.kt` (122 lines)
 
 ```kotlin
 package com.truong.fridgezero.domain
@@ -2333,8 +3824,7 @@ enum class StorageZone {
 data class ShelfLifeRule(
   val chilledDays: Int? = null,
   val freezerDays: Int? = null,
-  val drawerDays: Int? = null,
-  val openedFactor: Float = 0.5f
+  val drawerDays: Int? = null
 )
 
 interface ShelfLifeRepository {
@@ -2342,20 +3832,64 @@ interface ShelfLifeRepository {
     iconKey: String,
     group: FoodGroup,
     zone: StorageZone,
-    isOpened: Boolean
+    isOpened: Boolean = false
   ): Int?
 }
 
 /**
- * Configurable shelf-life lookup table.
- * Intentionally empty by default per spec.md §0 & §6: do NOT invent unverified
- * storage day numbers. Add verified Vietnamese food storage rules here when approved;
- * missing entries return null so the user enters or picks the expiry date directly.
+ * Standardized shelf-life lookup table based on conservative USDA FoodKeeper / FDA lower-bound
+ * cold-storage guidance across chilled (`~2–4°C`), freezer (`≤ -18°C`), and crisper drawer zones.
  */
 object ConfigurableShelfLifeRepository : ShelfLifeRepository {
 
-  private val byKey: Map<String, ShelfLifeRule> = emptyMap()
-  private val byGroup: Map<FoodGroup, ShelfLifeRule> = emptyMap()
+  private const val OPENED_FACTOR = 0.5f
+
+  private val byKey: Map<String, ShelfLifeRule> = mapOf(
+    "chicken" to ShelfLifeRule(chilledDays = 2, freezerDays = 270, drawerDays = 2),
+    "meat" to ShelfLifeRule(chilledDays = 3, freezerDays = 180, drawerDays = 3),
+    "bacon" to ShelfLifeRule(chilledDays = 7, freezerDays = 30, drawerDays = 7),
+    "shrimp" to ShelfLifeRule(chilledDays = 2, freezerDays = 120, drawerDays = 2),
+    "salmon" to ShelfLifeRule(chilledDays = 2, freezerDays = 60, drawerDays = 2),
+    "crab" to ShelfLifeRule(chilledDays = 2, freezerDays = 90, drawerDays = 2),
+    "squid" to ShelfLifeRule(chilledDays = 2, freezerDays = 90, drawerDays = 2),
+    "lettuce" to ShelfLifeRule(chilledDays = 4, freezerDays = null, drawerDays = 5),
+    "broccoli" to ShelfLifeRule(chilledDays = 4, freezerDays = 240, drawerDays = 5),
+    "mushroom" to ShelfLifeRule(chilledDays = 4, freezerDays = 180, drawerDays = 5),
+    "corn" to ShelfLifeRule(chilledDays = 3, freezerDays = 240, drawerDays = 4),
+    "bell_pepper" to ShelfLifeRule(chilledDays = 7, freezerDays = 180, drawerDays = 10),
+    "carrot" to ShelfLifeRule(chilledDays = 14, freezerDays = 240, drawerDays = 21),
+    "pickle" to ShelfLifeRule(chilledDays = 30, freezerDays = null, drawerDays = 30),
+    "strawberry" to ShelfLifeRule(chilledDays = 3, freezerDays = 180, drawerDays = 4),
+    "banana" to ShelfLifeRule(chilledDays = 4, freezerDays = 60, drawerDays = 5),
+    "mango" to ShelfLifeRule(chilledDays = 5, freezerDays = 180, drawerDays = 6),
+    "grape" to ShelfLifeRule(chilledDays = 7, freezerDays = 180, drawerDays = 10),
+    "watermelon" to ShelfLifeRule(chilledDays = 7, freezerDays = null, drawerDays = 10),
+    "apple" to ShelfLifeRule(chilledDays = 21, freezerDays = 180, drawerDays = 28),
+    "milk" to ShelfLifeRule(chilledDays = 7, freezerDays = 90, drawerDays = 7),
+    "yogurt" to ShelfLifeRule(chilledDays = 14, freezerDays = 60, drawerDays = 14),
+    "egg" to ShelfLifeRule(chilledDays = 21, freezerDays = null, drawerDays = 21),
+    "cheese" to ShelfLifeRule(chilledDays = 21, freezerDays = 180, drawerDays = 21),
+    "butter" to ShelfLifeRule(chilledDays = 30, freezerDays = 180, drawerDays = 30),
+    "rice" to ShelfLifeRule(chilledDays = 3, freezerDays = 30, drawerDays = 3),
+    "bread" to ShelfLifeRule(chilledDays = 5, freezerDays = 90, drawerDays = 5),
+    "tomato_sauce" to ShelfLifeRule(chilledDays = 30, freezerDays = 90, drawerDays = 30),
+    "orange_juice" to ShelfLifeRule(chilledDays = 7, freezerDays = 180, drawerDays = 7),
+    "water" to ShelfLifeRule(chilledDays = 30, freezerDays = null, drawerDays = 30),
+    "dumpling" to ShelfLifeRule(chilledDays = 3, freezerDays = 60, drawerDays = 3),
+    "ice_cream" to ShelfLifeRule(chilledDays = 1, freezerDays = 60, drawerDays = 1)
+  )
+
+  private val byGroup: Map<FoodGroup, ShelfLifeRule> = mapOf(
+    FoodGroup.THIT to ShelfLifeRule(chilledDays = 3, freezerDays = 180, drawerDays = 3),
+    FoodGroup.CA_HAI_SAN to ShelfLifeRule(chilledDays = 2, freezerDays = 90, drawerDays = 2),
+    FoodGroup.RAU to ShelfLifeRule(chilledDays = 4, freezerDays = 180, drawerDays = 5),
+    FoodGroup.TRAI_CAY to ShelfLifeRule(chilledDays = 5, freezerDays = 180, drawerDays = 7),
+    FoodGroup.SUA_TRUNG to ShelfLifeRule(chilledDays = 7, freezerDays = 60, drawerDays = 7),
+    FoodGroup.DO_KHO to ShelfLifeRule(chilledDays = 7, freezerDays = 90, drawerDays = 7),
+    FoodGroup.DO_UONG to ShelfLifeRule(chilledDays = 7, freezerDays = 90, drawerDays = 7),
+    FoodGroup.AN_SAN to ShelfLifeRule(chilledDays = 3, freezerDays = 60, drawerDays = 3),
+    FoodGroup.KHAC to ShelfLifeRule(chilledDays = 4, freezerDays = 60, drawerDays = 4)
+  )
 
   override fun suggestDays(
     iconKey: String,
@@ -2371,7 +3905,7 @@ object ConfigurableShelfLifeRepository : ShelfLifeRepository {
     } ?: return null
 
     return if (isOpened) {
-      (baseDays * rule.openedFactor).toInt().coerceAtLeast(1)
+      (baseDays * OPENED_FACTOR).toInt().coerceAtLeast(1)
     } else {
       baseDays
     }
@@ -2398,7 +3932,7 @@ fun zoneForCompartment(compartment: CompartmentUi): StorageZone =
   zoneForCompartment(compartment.id, compartment.name, compartment.kind)
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/MainActivity.kt` (385 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/MainActivity.kt` (407 lines)
 
 ```kotlin
 package com.truong.fridgezero
@@ -2406,9 +3940,11 @@ package com.truong.fridgezero
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.util.Log
+import android.webkit.WebView
 import android.widget.Toast
 import java.io.File
 import androidx.activity.ComponentActivity
@@ -2462,6 +3998,7 @@ import com.truong.fridgezero.ui.fridge3d.LocalFridge3DStageController
 import com.truong.fridgezero.ui.fridge3d.SharedFridge3DWebView
 import com.truong.fridgezero.ui.fridge3d.rememberFridge3DStageController
 import com.truong.fridgezero.ui.home.HomeScreen
+import com.truong.fridgezero.ui.recipes.CulinaryGuideScreen
 import com.truong.fridgezero.ui.theme.BodyFont
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
@@ -2496,11 +4033,16 @@ private sealed interface RootRoute {
   data object Designer : RootRoute
   data object AiScan : RootRoute
   data class Bento(val compartmentId: String, val filterUrgent: Boolean = false) : RootRoute
+  data class Recipes(val initialRecipeId: String? = null) : RootRoute
 }
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+
+    if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+      WebView.setWebContentsDebuggingEnabled(true)
+    }
 
     val crashFile = File(applicationContext.filesDir, CRASH_TRACE_FILE)
     if (Thread.getDefaultUncaughtExceptionHandler() !is FridgeCrashHandler) {
@@ -2558,6 +4100,7 @@ class MainActivity : ComponentActivity() {
               // Single shared WebView hosted at root above dotGridBackground and below foreground UI
               SharedFridge3DWebView(
                 controller = stageController,
+                appConfig = appConfig,
                 modifier = Modifier.zIndex(1f)
               )
 
@@ -2601,6 +4144,16 @@ class MainActivity : ComponentActivity() {
                     BackHandler { route = RootRoute.Home }
                     AiScanPlaceholderScreen(onBack = { route = RootRoute.Home })
                   }
+                  route is RootRoute.Recipes -> {
+                    val recipesRoute = route as RootRoute.Recipes
+                    BackHandler { route = RootRoute.Home }
+                    CulinaryGuideScreen(
+                      compartments = uiState.compartments,
+                      initialRecipeId = recipesRoute.initialRecipeId,
+                      onBack = { route = RootRoute.Home },
+                      onConsumeRecipe = { rec -> vm.consumeRecipeIngredients(rec.matchedIngredients) }
+                    )
+                  }
                   route is RootRoute.Bento -> {
                     val bentoRoute = route as RootRoute.Bento
                     val comp = uiState.compartments.firstOrNull { it.id == bentoRoute.compartmentId }
@@ -2631,7 +4184,6 @@ class MainActivity : ComponentActivity() {
                           reminderController.onItemSavedWithExpiry(daysLeft)
                         },
                         onAdjustQuantity = vm::adjustQuantity,
-                        onToggleOpened = vm::toggleItemOpened,
                         onMoveCompartment = { ids, targetId, newDays ->
                           vm.moveItemToCompartment(ids, targetId, newDays)
                         },
@@ -2656,6 +4208,10 @@ class MainActivity : ComponentActivity() {
                         vm.addItem(compId, name, iconKey, qty, daysLeft, unit)
                         reminderController.onItemSavedWithExpiry(daysLeft)
                       },
+                      onMarkStatus = { ids, status ->
+                        vm.markItemStatus(ids, status)
+                      },
+                      onOpenRecipes = { recipeId -> route = RootRoute.Recipes(recipeId) },
                       onOpenAiScan = { route = RootRoute.AiScan },
                       onOpenDesigner = { route = RootRoute.Designer }
                     )
@@ -3467,7 +5023,7 @@ private fun CameraViewfinderBox(
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/bento/CompartmentBentoScreen.kt` (499 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/bento/CompartmentBentoScreen.kt` (472 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.bento
@@ -3525,7 +5081,6 @@ import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodGroup
 import com.truong.fridgezero.ui.icons.FoodIcon
 import com.truong.fridgezero.ui.theme.BodyFont
-import com.truong.fridgezero.ui.theme.ButterSoft
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
 import com.truong.fridgezero.ui.theme.InkBlack
@@ -3565,14 +5120,13 @@ fun CompartmentBentoScreen(
   onAddItem: (compartmentId: String, name: String, iconKey: String, quantity: Int, daysLeft: Int, unit: String?) -> Unit,
   onUpdateItem: (id: Long, name: String, iconKey: String, quantity: Int, daysLeft: Int, unit: String?) -> Unit,
   onAdjustQuantity: (id: Long, delta: Int) -> Unit,
-  onToggleOpened: (id: Long) -> Unit,
   onMoveCompartment: (ids: List<Long>, targetCompartmentId: String, newDaysLeft: Int?) -> Unit,
   onMarkStatus: (ids: List<Long>, status: ItemStatus) -> Unit,
   modifier: Modifier = Modifier
 ) {
   var selectedFilter by remember(compartment.id, initialFilter) { mutableStateOf(initialFilter) }
   var showAddSheet by remember { mutableStateOf(false) }
-  var detailTarget by remember { mutableStateOf<Pair<DisplayItem, Boolean>?>(null) }
+  var detailTarget by remember { mutableStateOf<DisplayItem?>(null) }
 
   val isFreezerComp = zoneForCompartment(compartment) == StorageZone.FREEZER
   val filteredItems = remember(compartment.items, selectedFilter, isFreezerComp) {
@@ -3751,10 +5305,10 @@ fun CompartmentBentoScreen(
         items(filteredItems, key = { it.primaryId }) { item ->
           FoodBentoCard(
             item = item,
-            onCardClick = { detailTarget = item to false },
+            onCardClick = { detailTarget = item },
             onDecrement = {
               if (item.quantity <= 1) {
-                detailTarget = item to true
+                onMarkStatus(item.itemIds, ItemStatus.USED_UP)
               } else {
                 onAdjustQuantity(item.primaryId, -1)
               }
@@ -3778,14 +5332,12 @@ fun CompartmentBentoScreen(
 
   val activeDetail = detailTarget
   if (activeDetail != null) {
-    val latestItem = compartment.items.firstOrNull { it.primaryId == activeDetail.first.primaryId }
-      ?: activeDetail.first
+    val latestItem = compartment.items.firstOrNull { it.primaryId == activeDetail.primaryId }
+      ?: activeDetail
     ItemDetailSheet(
       item = latestItem,
       compartments = allCompartments,
-      startWithDeleteReason = activeDetail.second,
       onUpdateItem = onUpdateItem,
-      onToggleOpened = onToggleOpened,
       onMoveCompartment = onMoveCompartment,
       onMarkStatus = onMarkStatus,
       onDismiss = { detailTarget = null }
@@ -3803,7 +5355,7 @@ private fun FoodBentoCard(
   val emoji = (EmojiIconRepository.iconFor(item.iconKey) as? FoodIcon.Emoji)?.glyph ?: "🍽️"
   val freshnessBg = when (item.freshness) {
     Freshness.BAD -> CoralUrgent
-    Freshness.WARN -> LemonWarn
+    Freshness.SOON -> LemonWarn
     Freshness.OK -> LimeFresh
   }
   val expiryText = when {
@@ -3855,7 +5407,7 @@ private fun FoodBentoCard(
 
       Spacer(Modifier.height(8.dp))
 
-      // Middle: full 2-line Vietnamese item name + group / opened tags
+      // Middle: full 2-line Vietnamese item name + group tag
       Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(
           text = item.name,
@@ -3867,44 +5419,21 @@ private fun FoodBentoCard(
           maxLines = 2,
           overflow = TextOverflow.Ellipsis
         )
-        Row(
-          horizontalArrangement = Arrangement.spacedBy(4.dp),
-          verticalAlignment = Alignment.CenterVertically
+        Box(
+          modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(PaperCream)
+            .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+            .padding(horizontal = 5.dp, vertical = 2.dp)
         ) {
-          Box(
-            modifier = Modifier
-              .clip(RoundedCornerShape(6.dp))
-              .background(PaperCream)
-              .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
-              .padding(horizontal = 5.dp, vertical = 2.dp)
-          ) {
-            Text(
-              text = item.group.labelVi,
-              fontFamily = BodyFont,
-              fontWeight = FontWeight.Bold,
-              fontSize = 10.sp,
-              color = InkBlack,
-              maxLines = 1
-            )
-          }
-          if (item.isOpened) {
-            Box(
-              modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(ButterSoft)
-                .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
-                .padding(horizontal = 5.dp, vertical = 2.dp)
-            ) {
-              Text(
-                text = stringResource(R.string.opened_badge),
-                fontFamily = BodyFont,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 10.sp,
-                color = InkBlack,
-                maxLines = 1
-              )
-            }
-          }
+          Text(
+            text = item.group.labelVi,
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            color = InkBlack,
+            maxLines = 1
+          )
         }
       }
 
@@ -3970,7 +5499,7 @@ private fun FoodBentoCard(
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/bento/ItemSheets.kt` (868 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/bento/ItemSheets.kt` (848 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.bento
@@ -4109,7 +5638,13 @@ fun QuickAddItemSheet(
   var quantity by remember { mutableIntStateOf(1) }
   var selectedUnit by remember { mutableStateOf<String?>("hộp") }
   var daysLeftText by remember { mutableStateOf("") }
+  var expiryPinnedManually by remember { mutableStateOf(false) }
+  var autoSuggestedZoneLabel by remember { mutableStateOf<String?>(null) }
   var showDatePicker by remember { mutableStateOf(false) }
+
+  val zoneChilledLabel = stringResource(R.string.zone_label_chilled)
+  val zoneDrawerLabel = stringResource(R.string.zone_label_drawer)
+  val zoneFreezerLabel = stringResource(R.string.zone_label_freezer)
 
   val quickKeys = remember(recentKeys) {
     (recentKeys + DEFAULT_FAVORITE_KEYS).distinct().take(8)
@@ -4118,6 +5653,26 @@ fun QuickAddItemSheet(
     quickKeys.mapNotNull { key -> EmojiIconRepository.entries.firstOrNull { it.key == key } }
   }
   val filteredIcons = remember(iconQuery) { EmojiIconRepository.search(iconQuery) }
+
+  fun applySuggestedExpiry(iconKey: String, compId: String) {
+    val selectedComp = compartments.firstOrNull { it.id == compId }
+    val zone = selectedComp?.let(::zoneForCompartment) ?: zoneForCompartment(compId)
+    val suggested = ConfigurableShelfLifeRepository.suggestDays(
+      iconKey = iconKey,
+      group = EmojiIconRepository.groupFor(iconKey),
+      zone = zone
+    )
+    if (suggested != null) {
+      daysLeftText = suggested.toString()
+      autoSuggestedZoneLabel = when (zone) {
+        StorageZone.CHILLED -> zoneChilledLabel
+        StorageZone.DRAWER -> zoneDrawerLabel
+        StorageZone.FREEZER -> zoneFreezerLabel
+      }
+    } else {
+      autoSuggestedZoneLabel = null
+    }
+  }
 
   fun pickIcon(entry: IconEntry, fillName: Boolean) {
     selectedIconKey = entry.key
@@ -4129,17 +5684,8 @@ fun QuickAddItemSheet(
         selectedCompartmentId = it
       }
     }
-    val selectedComp = compartments.firstOrNull { it.id == selectedCompartmentId }
-    val zone = selectedComp?.let(::zoneForCompartment) ?: zoneForCompartment(selectedCompartmentId)
-    val suggestedDays = ConfigurableShelfLifeRepository.suggestDays(
-      iconKey = entry.key,
-      group = entry.group,
-      zone = zone,
-      isOpened = false
-    )
-    if (suggestedDays != null) {
-      daysLeftText = suggestedDays.toString()
-    }
+    expiryPinnedManually = false
+    applySuggestedExpiry(entry.key, selectedCompartmentId)
   }
 
   fun resetForNextEntry() {
@@ -4147,6 +5693,8 @@ fun QuickAddItemSheet(
     iconQuery = ""
     quantity = 1
     daysLeftText = ""
+    expiryPinnedManually = false
+    autoSuggestedZoneLabel = null
   }
 
   val parsedDays = daysLeftText.toIntOrNull()
@@ -4265,6 +5813,9 @@ fun QuickAddItemSheet(
             onClick = {
               selectedCompartmentId = comp.id
               compartmentPinnedManually = true
+              if (!expiryPinnedManually) {
+                applySuggestedExpiry(selectedIconKey, comp.id)
+              }
             },
             containerColor = if (selected) SkyInfo else SurfaceWhite,
             cornerRadius = 10.dp,
@@ -4367,7 +5918,11 @@ fun QuickAddItemSheet(
         items(QUICK_EXPIRY_CHIPS) { (days, labelRes) ->
           val active = parsedDays == days
           NeoBrutalistButton(
-            onClick = { daysLeftText = days.toString() },
+            onClick = {
+              daysLeftText = days.toString()
+              expiryPinnedManually = true
+              autoSuggestedZoneLabel = null
+            },
             containerColor = if (active) LimeFresh else SurfaceWhite,
             cornerRadius = 10.dp,
             borderWidth = 2.dp,
@@ -4405,11 +5960,24 @@ fun QuickAddItemSheet(
 
       BrutalInputBox(
         value = daysLeftText,
-        onValueChange = { raw -> daysLeftText = raw.filter { it.isDigit() || it == '-' }.take(4) },
+        onValueChange = { raw ->
+          daysLeftText = raw.filter { it.isDigit() || it == '-' }.take(4)
+          expiryPinnedManually = true
+          autoSuggestedZoneLabel = null
+        },
         placeholder = stringResource(R.string.quick_add_expiry_required_hint),
         keyboardType = KeyboardType.Number,
         modifier = Modifier.fillMaxWidth()
       )
+      autoSuggestedZoneLabel?.let { zoneLabel ->
+        Text(
+          text = stringResource(R.string.quick_add_usda_auto_hint, zoneLabel),
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.Bold,
+          fontSize = 11.sp,
+          color = InkBlack.copy(alpha = 0.72f)
+        )
+      }
 
       // Dual Save / Save & Continue buttons
       Row(
@@ -4466,6 +6034,8 @@ fun QuickAddItemSheet(
             val selectedDay = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
             val diff = (selectedDay - LocalDate.now().toEpochDay()).toInt()
             daysLeftText = diff.toString()
+            expiryPinnedManually = true
+            autoSuggestedZoneLabel = null
           }
           showDatePicker = false
         }) {
@@ -4484,16 +6054,14 @@ fun QuickAddItemSheet(
 }
 
 /**
- * Item Detail, Edit, "Đã mở nắp", Compartment Move & Mandatory Waste-Reason Delete Sheet.
+ * Item Detail, Edit, Compartment Move & 1-Tap Direct Delete Sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemDetailSheet(
   item: DisplayItem,
   compartments: List<CompartmentUi>,
-  startWithDeleteReason: Boolean = false,
   onUpdateItem: (id: Long, name: String, iconKey: String, quantity: Int, daysLeft: Int, unit: String?) -> Unit,
-  onToggleOpened: (id: Long) -> Unit,
   onMoveCompartment: (ids: List<Long>, targetCompartmentId: String, newDaysLeft: Int?) -> Unit,
   onMarkStatus: (ids: List<Long>, status: ItemStatus) -> Unit,
   onDismiss: () -> Unit
@@ -4504,14 +6072,11 @@ fun ItemDetailSheet(
   var unit by remember(item.primaryId, item.unit) { mutableStateOf(item.unit) }
   var daysText by remember(item.primaryId, item.minDaysLeft) { mutableStateOf(item.minDaysLeft.toString()) }
   var pendingMoveTargetId by remember { mutableStateOf<String?>(null) }
-  var showDeleteReasons by remember(item.primaryId, startWithDeleteReason) {
-    mutableStateOf(startWithDeleteReason)
-  }
 
   val emoji = (EmojiIconRepository.iconFor(item.iconKey) as? FoodIcon.Emoji)?.glyph ?: "🍽️"
   val badgeColor = when (item.freshness) {
     Freshness.BAD -> CoralUrgent
-    Freshness.WARN -> LemonWarn
+    Freshness.SOON -> LemonWarn
     Freshness.OK -> LimeFresh
   }
   val expiryBadgeText = when {
@@ -4563,9 +6128,6 @@ fun ItemDetailSheet(
           Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             StickerBadge(text = item.group.labelVi, containerColor = SurfaceWhite, tiltDegrees = 0f)
             StickerBadge(text = expiryBadgeText, containerColor = badgeColor, tiltDegrees = -1.5f, mono = true)
-            if (item.isOpened) {
-              StickerBadge(text = stringResource(R.string.opened_badge), containerColor = ButterSoft, tiltDegrees = 1.5f)
-            }
           }
         }
       }
@@ -4633,24 +6195,6 @@ fun ItemDetailSheet(
             color = InkBlack
           )
         }
-      }
-
-      // "Đã mở nắp" toggle
-      NeoBrutalistButton(
-        onClick = { onToggleOpened(item.primaryId) },
-        modifier = Modifier.fillMaxWidth(),
-        containerColor = if (item.isOpened) ButterSoft else SurfaceWhite,
-        cornerRadius = 12.dp,
-        shadowOffset = 3.dp
-      ) {
-        Text(
-          text = if (item.isOpened) "✓ ${stringResource(R.string.opened_toggle_label)} (${stringResource(R.string.opened_badge)})"
-          else "📦 ${stringResource(R.string.opened_toggle_label)}",
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 13.sp,
-          color = InkBlack
-        )
       }
 
       // Move compartment
@@ -4742,57 +6286,22 @@ fun ItemDetailSheet(
         }
       }
 
-      // Waste-tracking mandatory reason delete flow
-      if (!showDeleteReasons) {
-        NeoBrutalistButton(
-          onClick = { showDeleteReasons = true },
-          modifier = Modifier.fillMaxWidth(),
-          containerColor = CoralUrgent
-        ) {
-          Text(
-            text = "🗑️ ${stringResource(R.string.action_delete)}",
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 14.sp,
-            color = InkBlack
-          )
-        }
-      } else {
-        NeoBrutalistCard(modifier = Modifier.fillMaxWidth(), containerColor = SurfaceWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
-          Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-              text = stringResource(R.string.delete_reason_title),
-              fontFamily = DisplayFont,
-              fontWeight = FontWeight.ExtraBold,
-              fontSize = 14.sp,
-              color = InkBlack
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-              NeoBrutalistButton(
-                onClick = {
-                  onMarkStatus(item.itemIds, ItemStatus.USED_UP)
-                  onDismiss()
-                },
-                modifier = Modifier.weight(1f),
-                containerColor = LimeFresh,
-                shadowOffset = 3.dp
-              ) {
-                Text(stringResource(R.string.delete_reason_used_up), fontFamily = BodyFont, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = InkBlack)
-              }
-              NeoBrutalistButton(
-                onClick = {
-                  onMarkStatus(item.itemIds, ItemStatus.DISCARDED)
-                  onDismiss()
-                },
-                modifier = Modifier.weight(1f),
-                containerColor = CoralUrgent,
-                shadowOffset = 3.dp
-              ) {
-                Text(stringResource(R.string.delete_reason_discarded), fontFamily = BodyFont, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = InkBlack)
-              }
-            }
-          }
-        }
+      // 1-Tap Direct Deletion
+      NeoBrutalistButton(
+        onClick = {
+          onMarkStatus(item.itemIds, ItemStatus.USED_UP)
+          onDismiss()
+        },
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = CoralUrgent
+      ) {
+        Text(
+          text = "🗑️ ${stringResource(R.string.action_delete)}",
+          fontFamily = BodyFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 14.sp,
+          color = InkBlack
+        )
       }
     }
   }
@@ -4842,7 +6351,7 @@ private fun BrutalInputBox(
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/designer/FridgeDesignerScreen.kt` (442 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/designer/FridgeDesignerScreen.kt` (450 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.designer
@@ -4895,6 +6404,7 @@ import com.truong.fridgezero.data.CompartmentKind
 import com.truong.fridgezero.data.FridgeEntity
 import com.truong.fridgezero.data.Seed
 import com.truong.fridgezero.ui.fridge3d.Fridge3DStageSlot
+import com.truong.fridgezero.ui.fridge3d.LocalFridge3DStageController
 import com.truong.fridgezero.ui.fridge3d.ShellColors
 import com.truong.fridgezero.ui.theme.BodyFont
 import com.truong.fridgezero.ui.theme.CoralUrgent
@@ -4981,6 +6491,7 @@ fun FridgeDesignerScreen(
 
   val screenH = LocalConfiguration.current.screenHeightDp.dp
   val templateLabel = TEMPLATES.firstOrNull { it.first == template }?.second ?: R.string.template_single
+  val stageController = LocalFridge3DStageController.current
 
   Column(
     modifier = modifier
@@ -5032,7 +6543,13 @@ fun FridgeDesignerScreen(
           modifier = Modifier.fillMaxSize()
         )
         Box(modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
-          StickerBadge(stringResource(R.string.designer_swipe_hint), containerColor = SurfaceWhite, tiltDegrees = 0f)
+          StickerBadge(
+            stringResource(
+              if (stageController.use2DFallback) R.string.fallback_2d_badge else R.string.designer_swipe_hint
+            ),
+            containerColor = if (stageController.use2DFallback) LemonWarn else SurfaceWhite,
+            tiltDegrees = 0f
+          )
         }
         Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
           StickerBadge(stringResource(templateLabel), containerColor = LimeFresh, tiltDegrees = 1f)
@@ -5336,16 +6853,317 @@ fun normalizeCompartmentLayout(
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/fridge3d/Fridge3DView.kt` (636 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/fridge3d/Fridge2DFallback.kt` (294 lines)
+
+```kotlin
+package com.truong.fridgezero.ui.fridge3d
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.truong.fridgezero.data.CompartmentEntity
+import com.truong.fridgezero.data.CompartmentKind
+import com.truong.fridgezero.domain.Freshness
+import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.ButterPale
+import com.truong.fridgezero.ui.theme.CoralUrgent
+import com.truong.fridgezero.ui.theme.InkBlack
+import com.truong.fridgezero.ui.theme.LemonWarn
+import com.truong.fridgezero.ui.theme.LilacAccent
+import com.truong.fridgezero.ui.theme.LimeFresh
+import com.truong.fridgezero.ui.theme.MonoFont
+import com.truong.fridgezero.ui.theme.NeoBrutalistCard
+import com.truong.fridgezero.ui.theme.SkyInfo
+import com.truong.fridgezero.ui.theme.SurfaceWhite
+
+data class FallbackCompartmentStat(
+  val itemCount: Int,
+  val worstFreshness: Freshness
+)
+
+/**
+ * Pure Compose Neo-Brutalist 2D refrigerator fallback used when WebGL exceeds the bounded
+ * crash-recovery budget (`> 2` failures within 60s). Keeps all Designer & Home flows interactive.
+ */
+@Composable
+fun Fridge2DFallback(
+  colorKey: String,
+  compartments: List<CompartmentEntity>,
+  modifier: Modifier = Modifier,
+  openCompartmentId: String? = null,
+  compartmentStats: Map<String, FallbackCompartmentStat> = emptyMap(),
+  showItemCounts: Boolean = false,
+  surfaceBg: Color? = null,
+  onDoorClick: ((compartmentId: String) -> Unit)? = null
+) {
+  val normalizedKey = ShellColors.normalizeKey(colorKey)
+  val shellColor = ShellColors.forKey(normalizedKey).color
+  val handleColor = if (normalizedKey == ShellColors.Matte.key) {
+    Color(0xFF94A3B8)
+  } else {
+    InkBlack
+  }
+
+  val containerModifier = if (surfaceBg != null) {
+    modifier.background(surfaceBg)
+  } else {
+    modifier
+  }
+
+  BoxWithConstraints(
+    modifier = containerModifier
+      .fillMaxSize()
+      .padding(horizontal = 24.dp, vertical = 14.dp),
+    contentAlignment = Alignment.Center
+  ) {
+    val feetHeight = 8.dp
+    val availH = (maxHeight - feetHeight).coerceAtLeast(120.dp)
+    val availW = maxWidth.coerceAtLeast(80.dp)
+    val aspect = 0.54f
+    val cabH = minOf(availH, availW / aspect)
+    val cabW = cabH * aspect
+
+    Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center
+    ) {
+      NeoBrutalistCard(
+        modifier = Modifier.size(width = cabW, height = cabH),
+        containerColor = shellColor,
+        cornerRadius = 16.dp,
+        borderWidth = 2.5.dp,
+        shadowOffset = 4.dp
+      ) {
+        BoxWithConstraints(
+          modifier = Modifier
+            .fillMaxSize()
+            .padding(7.dp)
+        ) {
+          val innerW = maxWidth
+          val innerH = maxHeight
+          val inset = 3.dp
+
+          compartments.forEachIndexed { index, comp ->
+            val xOff = innerW * comp.x + inset
+            val yOff = innerH * comp.y + inset
+            val doorW = (innerW * comp.w - inset * 2).coerceAtLeast(36.dp)
+            val doorH = (innerH * comp.h - inset * 2).coerceAtLeast(36.dp)
+            val isOpen = comp.id == openCompartmentId
+            val isRightHinge = (comp.kind == CompartmentKind.DOOR) && (comp.w < 0.6f && comp.x > 0.4f)
+            val doorShape = RoundedCornerShape(10.dp)
+
+            Box(
+              modifier = Modifier
+                .offset(x = xOff, y = yOff)
+                .size(width = doorW, height = doorH)
+                .clip(doorShape)
+                .background(
+                  color = if (isOpen) ButterPale.copy(alpha = 0.45f) else Color.Transparent,
+                  shape = doorShape
+                )
+                .border(2.dp, InkBlack, doorShape)
+                .clickable(
+                  enabled = onDoorClick != null,
+                  role = Role.Button,
+                  onClick = { onDoorClick?.invoke(comp.id) }
+                )
+                .padding(6.dp)
+            ) {
+              // Handle indicator
+              if (comp.kind == CompartmentKind.DOOR) {
+                Box(
+                  modifier = Modifier
+                    .align(if (isRightHinge) Alignment.CenterStart else Alignment.CenterEnd)
+                    .padding(horizontal = 2.dp)
+                    .width(4.dp)
+                    .height((doorH * 0.28f).coerceIn(14.dp, 40.dp))
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(handleColor)
+                )
+              } else {
+                Box(
+                  modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 2.dp)
+                    .width((doorW * 0.34f).coerceIn(24.dp, 64.dp))
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(handleColor)
+                )
+              }
+
+              // Signature mini magnets on top compartment
+              if (index == 0) {
+                Row(
+                  modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 2.dp, end = 8.dp),
+                  horizontalArrangement = Arrangement.spacedBy(3.dp),
+                  verticalAlignment = Alignment.CenterVertically
+                ) {
+                  Box(
+                    modifier = Modifier
+                      .size(7.dp)
+                      .clip(CircleShape)
+                      .background(LemonWarn)
+                      .border(1.dp, InkBlack, CircleShape)
+                  )
+                  Box(
+                    modifier = Modifier
+                      .size(width = 10.dp, height = 6.dp)
+                      .clip(RoundedCornerShape(2.dp))
+                      .background(CoralUrgent)
+                      .border(1.dp, InkBlack, RoundedCornerShape(2.dp))
+                  )
+                }
+              }
+
+              // Compartment name + optional count badge
+              val stat = compartmentStats[comp.id]
+              val badgeShape = RoundedCornerShape(8.dp)
+              Row(
+                modifier = Modifier
+                  .align(Alignment.Center)
+                  .background(SurfaceWhite, badgeShape)
+                  .border(2.dp, InkBlack, badgeShape)
+                  .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+              ) {
+                if (showItemCounts && stat != null) {
+                  val dotColor = when (stat.worstFreshness) {
+                    Freshness.BAD -> CoralUrgent
+                    Freshness.SOON -> LemonWarn
+                    Freshness.OK -> LimeFresh
+                  }
+                  Box(
+                    modifier = Modifier
+                      .size(8.dp)
+                      .clip(CircleShape)
+                      .background(dotColor)
+                      .border(1.dp, InkBlack, CircleShape)
+                  )
+                  Text(
+                    text = comp.name,
+                    modifier = Modifier.weight(1f, fill = false),
+                    fontFamily = BodyFont,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 11.sp,
+                    color = InkBlack,
+                    softWrap = false,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                  )
+                  Box(
+                    modifier = Modifier
+                      .defaultMinSize(minWidth = 22.dp)
+                      .clip(RoundedCornerShape(6.dp))
+                      .background(InkBlack)
+                      .padding(horizontal = 6.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center
+                  ) {
+                    Text(
+                      text = "${stat.itemCount}",
+                      fontFamily = MonoFont,
+                      fontWeight = FontWeight.ExtraBold,
+                      fontSize = 13.sp,
+                      lineHeight = 14.sp,
+                      color = LimeFresh,
+                      softWrap = false,
+                      maxLines = 1
+                    )
+                  }
+                } else {
+                  val kindDot = if (comp.kind == CompartmentKind.DOOR) LilacAccent else SkyInfo
+                  Box(
+                    modifier = Modifier
+                      .size(7.dp)
+                      .clip(CircleShape)
+                      .background(kindDot)
+                      .border(1.dp, InkBlack, CircleShape)
+                  )
+                  Text(
+                    text = comp.name,
+                    fontFamily = BodyFont,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 11.sp,
+                    color = InkBlack,
+                    softWrap = false,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                  )
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Grounded cabinet feet
+      Row(
+        modifier = Modifier
+          .width(cabW - 28.dp)
+          .padding(top = 0.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+      ) {
+        Spacer(
+          modifier = Modifier
+            .size(width = 16.dp, height = feetHeight)
+            .clip(RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp))
+            .background(InkBlack)
+        )
+        Spacer(
+          modifier = Modifier
+            .size(width = 16.dp, height = feetHeight)
+            .clip(RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp))
+            .background(InkBlack)
+        )
+      }
+    }
+  }
+}
+```
+
+### `app/src/main/kotlin/com/truong/fridgezero/ui/fridge3d/Fridge3DView.kt` (883 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.fridge3d
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
+import android.content.Context
 import android.graphics.Color as AndroidColor
 import android.graphics.Outline
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -5354,12 +7172,14 @@ import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.annotation.Keep
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -5374,6 +7194,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -5393,17 +7214,94 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.truong.fridgezero.data.AppConfig
 import com.truong.fridgezero.data.CompartmentEntity
+import com.truong.fridgezero.ui.theme.DotGridSpec
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val TAG = "Fridge3D"
 private const val PROJECTION_EPS = 0.005f
-private const val DEFAULT_SURFACE_BG = "#FAF8F5"
+private const val DEFAULT_SURFACE_BG = DotGridSpec.PAPER_HEX
+private const val ALLOWED_ASSET_PREFIX = "file:///android_asset/fridge3d/"
+private const val ALLOWED_ABOUT_BLANK = "about:blank"
+internal const val LOW_MEM_THRESHOLD_BYTES = 4L * 1024 * 1024 * 1024
+
+internal fun isAllowedFridge3dUrl(url: String?): Boolean {
+  if (url.isNullOrEmpty()) return false
+  if (url == ALLOWED_ABOUT_BLANK) return true
+  return url.startsWith(ALLOWED_ASSET_PREFIX) && !url.contains("..")
+}
+
+internal fun resolveWebGlQuality(
+  isLowRamDevice: Boolean,
+  totalMemBytes: Long,
+  forceLiteMode: Boolean
+): String {
+  val lowMem = isLowRamDevice || (totalMemBytes in 1L..LOW_MEM_THRESHOLD_BYTES)
+  return if (forceLiteMode || lowMem) "lite" else "high"
+}
+
+private fun isLowRamOrLowMemDevice(context: Context): Boolean {
+  val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+  if (am.isLowRamDevice) return true
+  val memInfo = ActivityManager.MemoryInfo()
+  am.getMemoryInfo(memInfo)
+  return memInfo.totalMem in 1L..LOW_MEM_THRESHOLD_BYTES
+}
+
+internal enum class WebGlRecoveryAction {
+  REBUILD_IN_LITE_AND_PERSIST,
+  REBUILD_IN_LITE,
+  FALLBACK_TO_2D
+}
+
+/**
+ * Sliding-window recovery budget: up to [maxRecoveries] WebView rebuilds within [windowMs]
+ * before degrading cleanly to the Compose Neo-Brutalist 2D fallback.
+ */
+internal class BoundedWebGlCrashTracker(
+  private val windowMs: Long = 60_000L,
+  private val maxRecoveries: Int = 2
+) {
+  private val timestamps = ArrayDeque<Long>()
+
+  fun recordCrash(nowMs: Long): WebGlRecoveryAction {
+    pruneOld(nowMs)
+    timestamps.addLast(nowMs)
+    val count = timestamps.size
+    return when {
+      count == 1 -> WebGlRecoveryAction.REBUILD_IN_LITE_AND_PERSIST
+      count <= maxRecoveries -> WebGlRecoveryAction.REBUILD_IN_LITE
+      else -> WebGlRecoveryAction.FALLBACK_TO_2D
+    }
+  }
+
+  fun recentCrashCount(nowMs: Long): Int {
+    pruneOld(nowMs)
+    return timestamps.size
+  }
+
+  fun reset() {
+    timestamps.clear()
+  }
+
+  private fun pruneOld(nowMs: Long) {
+    while (timestamps.isNotEmpty() && (nowMs - timestamps.first()) > windowMs) {
+      timestamps.removeFirst()
+    }
+  }
+}
 
 data class DoorProjection(
   val xFrac: Float,
@@ -5450,13 +7348,23 @@ class Fridge3DStageController {
     private set
   var itemAddedPulseNonce by mutableIntStateOf(0)
     private set
+  var use2DFallback by mutableStateOf(false)
+    private set
+  var fallbackResetNonce by mutableIntStateOf(0)
+    private set
 
   internal var onWelcomeSpinConsumed: () -> Unit = {}
   internal var onDoorClick: ((String) -> Unit)? = null
   internal var onProjectionsUpdated: ((Map<String, DoorProjection>) -> Unit)? = null
 
   val isVisible: Boolean
-    get() = activeToken != null && boundsPx.isValid
+    get() = activeToken != null && boundsPx.isValid && !use2DFallback
+
+  fun set2DFallback(active: Boolean) {
+    if (use2DFallback != active) {
+      use2DFallback = active
+    }
+  }
 
   fun updateSlot(
     token: Any,
@@ -5473,7 +7381,12 @@ class Fridge3DStageController {
     onDoorClick: ((String) -> Unit)?,
     onProjectionsUpdated: ((Map<String, DoorProjection>) -> Unit)?
   ) {
+    val slotSwitched = activeToken !== token
     activeToken = token
+    if (slotSwitched && use2DFallback) {
+      use2DFallback = false
+      fallbackResetNonce += 1
+    }
     this.colorKey = colorKey
     this.compartments = compartments
     this.template = template
@@ -5508,6 +7421,10 @@ class Fridge3DStageController {
       boundsPx = StageBoundsPx()
       onDoorClick = null
       onProjectionsUpdated = null
+      if (use2DFallback) {
+        use2DFallback = false
+        fallbackResetNonce += 1
+      }
     }
   }
 }
@@ -5523,7 +7440,8 @@ val LocalFridge3DStageController = staticCompositionLocalOf<Fridge3DStageControl
 internal class FridgeJsBridge(
   private val onDoorTappedCallback: (String) -> Unit,
   private val onStickersProjectedCallback: (String) -> Unit,
-  private val onWelcomeSpinFinishedCallback: () -> Unit
+  private val onWelcomeSpinFinishedCallback: () -> Unit,
+  private val onWebGlContextLostCallback: () -> Unit
 ) {
   @JavascriptInterface
   fun onDoorTapped(compartmentId: String) = onDoorTappedCallback(compartmentId)
@@ -5533,6 +7451,9 @@ internal class FridgeJsBridge(
 
   @JavascriptInterface
   fun onWelcomeSpinFinished() = onWelcomeSpinFinishedCallback()
+
+  @JavascriptInterface
+  fun onWebGlContextLost() = onWebGlContextLostCallback()
 }
 
 /** Optional framed backdrop (e.g. `SurfaceWhite` card face in Designer) drawn strictly behind the WebView. */
@@ -5556,17 +7477,56 @@ fun Fridge3DStageBackdrop(
 
 /**
  * Single shared WebView host mounted once at [com.truong.fridgezero.MainActivity] root.
- * Only destroyed when the Activity leaves composition or recovers from renderer crash.
+ * Resolves `lite` vs `high` quality before creating the WebView and degrades to [Fridge2DFallback]
+ * after >2 WebGL/renderer crashes in 60 seconds.
  */
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun SharedFridge3DWebView(
   controller: Fridge3DStageController,
+  appConfig: AppConfig,
+  modifier: Modifier = Modifier
+) {
+  val context = LocalContext.current
+  val persistedForceLite by appConfig.forceLiteMode.collectAsStateWithLifecycle(initialValue = null)
+  val resolvedPersistedLite = persistedForceLite ?: return
+  val hardwareRequiresLite = remember(context) { isLowRamOrLowMemDevice(context) }
+  var runtimeForceLite by remember { mutableStateOf(false) }
+  val crashTracker = remember { BoundedWebGlCrashTracker() }
+
+  LaunchedEffect(controller.fallbackResetNonce) {
+    crashTracker.reset()
+  }
+
+  if (controller.use2DFallback) return
+
+  SharedFridge3DWebViewHost(
+    controller = controller,
+    appConfig = appConfig,
+    hardwareRequiresLite = hardwareRequiresLite,
+    persistedForceLite = resolvedPersistedLite,
+    runtimeForceLite = runtimeForceLite,
+    onRequireRuntimeLite = { runtimeForceLite = true },
+    crashTracker = crashTracker,
+    modifier = modifier
+  )
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun SharedFridge3DWebViewHost(
+  controller: Fridge3DStageController,
+  appConfig: AppConfig,
+  hardwareRequiresLite: Boolean,
+  persistedForceLite: Boolean,
+  runtimeForceLite: Boolean,
+  onRequireRuntimeLite: () -> Unit,
+  crashTracker: BoundedWebGlCrashTracker,
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
   val haptic = LocalHapticFeedback.current
   val density = LocalDensity.current
+  val scope = rememberCoroutineScope()
   val mainHandler = remember { Handler(Looper.getMainLooper()) }
   val latestHaptic by rememberUpdatedState(haptic)
 
@@ -5585,13 +7545,18 @@ fun SharedFridge3DWebView(
     }
   }
 
+  val offsetXDp = if (controller.boundsPx.isValid) controller.boundsPx.left / density.density else 0f
+  val offsetYDp = if (controller.boundsPx.isValid) controller.boundsPx.top / density.density else 0f
+
   val configJson = remember(
     controller.template,
     controller.colorKey,
     controller.compartments,
     controller.openCompartmentId,
     controller.showStickers,
-    controller.surfaceBg
+    controller.surfaceBg,
+    offsetXDp,
+    offsetYDp
   ) {
     buildConfigJson(
       template = controller.template,
@@ -5599,14 +7564,49 @@ fun SharedFridge3DWebView(
       compartments = controller.compartments,
       openCompartmentId = controller.openCompartmentId,
       showStickers = controller.showStickers,
-      surfaceBg = controller.surfaceBg
+      surfaceBg = controller.surfaceBg,
+      dotGridOffsetXDp = offsetXDp,
+      dotGridOffsetYDp = offsetYDp
     )
   }
 
   val webViewDestroyed = remember(recoveryKey) { AtomicBoolean(false) }
 
+  // Deliberately keyed on (context, recoveryKey) only so persisting forceLiteMode mid-session
+  // does not trigger a duplicate WebView creation beyond the single bounded recovery.
   val webView = remember(context, recoveryKey) {
-    WebView.setWebContentsDebuggingEnabled(true)
+    val instanceCrashHandled = AtomicBoolean(false)
+    val initialQuality = if (hardwareRequiresLite || persistedForceLite || runtimeForceLite) {
+      "lite"
+    } else {
+      "high"
+    }
+    Log.d(TAG, "Initializing WebView (recoveryKey=$recoveryKey, quality=$initialQuality)")
+
+    fun handleWebGlFailure(source: String) {
+      if (!instanceCrashHandled.compareAndSet(false, true)) return
+      mainHandler.post {
+        if (webViewDestroyed.get() || controller.use2DFallback) return@post
+        val action = crashTracker.recordCrash(SystemClock.elapsedRealtime())
+        Log.e(TAG, "WebGL failure via $source -> action=$action")
+        pageReady = false
+        when (action) {
+          WebGlRecoveryAction.REBUILD_IN_LITE_AND_PERSIST -> {
+            onRequireRuntimeLite()
+            scope.launch { appConfig.setForceLiteMode(true) }
+            recoveryKey += 1
+          }
+          WebGlRecoveryAction.REBUILD_IN_LITE -> {
+            onRequireRuntimeLite()
+            recoveryKey += 1
+          }
+          WebGlRecoveryAction.FALLBACK_TO_2D -> {
+            controller.set2DFallback(true)
+          }
+        }
+      }
+    }
+
     val jsBridge = FridgeJsBridge(
       onDoorTappedCallback = { compartmentId ->
         mainHandler.post {
@@ -5653,6 +7653,9 @@ fun SharedFridge3DWebView(
             }
           }
         }
+      },
+      onWebGlContextLostCallback = {
+        handleWebGlFailure("webglcontextlost")
       }
     )
 
@@ -5670,8 +7673,12 @@ fun SharedFridge3DWebView(
       settings.apply {
         javaScriptEnabled = true
         domStorageEnabled = false
+        allowFileAccess = false
+        allowContentAccess = false
         @Suppress("DEPRECATION")
-        allowFileAccess = true
+        allowFileAccessFromFileURLs = false
+        @Suppress("DEPRECATION")
+        allowUniversalAccessFromFileURLs = false
         builtInZoomControls = false
         displayZoomControls = false
         setSupportZoom(false)
@@ -5695,19 +7702,48 @@ fun SharedFridge3DWebView(
       }
 
       webViewClient = object : WebViewClient() {
+        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+          val url = request?.url?.toString()
+          val allowed = isAllowedFridge3dUrl(url)
+          if (!allowed) {
+            Log.w(TAG, "Blocked external navigation: $url")
+          }
+          return !allowed
+        }
+
         override fun onPageFinished(view: WebView?, url: String?) {
           pageReady = true
         }
 
         override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-          Log.e(TAG, "renderer gone, didCrash=${detail?.didCrash()}")
-          pageReady = false
-          recoveryKey += 1
+          handleWebGlFailure("onRenderProcessGone(didCrash=${detail?.didCrash()})")
           return true
         }
       }
 
-      loadUrl("file:///android_asset/fridge3d/index.html")
+      loadUrl("file:///android_asset/fridge3d/index.html?q=$initialQuality")
+    }
+  }
+
+  val lifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(lifecycleOwner, webView, webViewDestroyed) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (webViewDestroyed.get()) return@LifecycleEventObserver
+      when (event) {
+        Lifecycle.Event.ON_STOP -> {
+          Log.d(TAG, "ON_STOP -> webView.onPause()")
+          webView.onPause()
+        }
+        Lifecycle.Event.ON_START -> {
+          Log.d(TAG, "ON_START -> webView.onResume()")
+          webView.onResume()
+        }
+        else -> Unit
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose {
+      lifecycleOwner.lifecycle.removeObserver(observer)
     }
   }
 
@@ -5835,6 +7871,7 @@ fun Fridge3DStageSlot(
   playWelcomeSpin: Boolean = false,
   onWelcomeSpinConsumed: () -> Unit = {},
   showStickers: Boolean = false,
+  compartmentStats: Map<String, FallbackCompartmentStat> = emptyMap(),
   surfaceBg: String = DEFAULT_SURFACE_BG,
   cornerRadius: Dp = 0.dp,
   backdropColor: Color? = null,
@@ -5905,7 +7942,20 @@ fun Fridge3DStageSlot(
         )
       )
     }
-  )
+  ) {
+    if (controller.use2DFallback) {
+      Fridge2DFallback(
+        colorKey = colorKey,
+        compartments = compartments,
+        openCompartmentId = openCompartmentId,
+        compartmentStats = compartmentStats,
+        showItemCounts = showStickers,
+        surfaceBg = backdropColor,
+        onDoorClick = latestOnDoorClick,
+        modifier = Modifier.fillMaxSize()
+      )
+    }
+  }
 }
 
 private fun safeEvaluateJs(
@@ -5918,7 +7968,8 @@ private fun safeEvaluateJs(
 }
 
 private fun parseSurfaceColorInt(hex: String): Int =
-  runCatching { AndroidColor.parseColor(hex) }.getOrDefault(0xFFFAF8F5.toInt())
+  runCatching { AndroidColor.parseColor(hex) }
+    .getOrElse { AndroidColor.parseColor(DotGridSpec.PAPER_HEX) }
 
 private fun buildConfigJson(
   template: String,
@@ -5926,7 +7977,9 @@ private fun buildConfigJson(
   compartments: List<CompartmentEntity>,
   openCompartmentId: String?,
   showStickers: Boolean,
-  surfaceBg: String
+  surfaceBg: String,
+  dotGridOffsetXDp: Float = 0f,
+  dotGridOffsetYDp: Float = 0f
 ): String {
   val compsArray = JSONArray()
   compartments.forEach { c ->
@@ -5944,6 +7997,14 @@ private fun buildConfigJson(
     )
   }
   val showDotGrid = showStickers || !surfaceBg.equals("#FFFFFF", ignoreCase = true)
+  val dotGridObj = JSONObject().apply {
+    put("paperHex", DotGridSpec.PAPER_HEX)
+    put("dotHex", DotGridSpec.DOT_HEX)
+    put("stepDp", DotGridSpec.STEP_DP.toDouble())
+    put("dotRadiusDp", DotGridSpec.DOT_RADIUS_DP.toDouble())
+    put("offsetXDp", dotGridOffsetXDp.toDouble())
+    put("offsetYDp", dotGridOffsetYDp.toDouble())
+  }
   return JSONObject().apply {
     put("template", template)
     put("colorKey", colorKey)
@@ -5952,6 +8013,7 @@ private fun buildConfigJson(
     put("springReturn", showStickers)
     put("surfaceBg", surfaceBg)
     put("showDotGrid", showDotGrid)
+    put("dotGrid", dotGridObj)
     put("compartments", compsArray)
   }.toString()
 }
@@ -6016,21 +8078,22 @@ object ShellColors {
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/home/HomeDashboardHeader.kt` (452 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/home/HomeDashboardHeader.kt` (666 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -6053,17 +8116,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.truong.fridgezero.R
+import com.truong.fridgezero.data.ItemStatus
 import com.truong.fridgezero.domain.CompartmentUi
 import com.truong.fridgezero.domain.DisplayItem
 import com.truong.fridgezero.domain.Freshness
+import com.truong.fridgezero.domain.RecipeRecommendation
 import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodIcon
 import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.ButterPale
+import com.truong.fridgezero.ui.theme.ButterSoft
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
 import com.truong.fridgezero.ui.theme.InkBlack
@@ -6073,7 +8143,6 @@ import com.truong.fridgezero.ui.theme.MonoFont
 import com.truong.fridgezero.ui.theme.NeoBrutalistButton
 import com.truong.fridgezero.ui.theme.NeoBrutalistCard
 import com.truong.fridgezero.ui.theme.PaperCream
-import com.truong.fridgezero.ui.theme.SkyPale
 import com.truong.fridgezero.ui.theme.StickerBadge
 import com.truong.fridgezero.ui.theme.SurfaceWhite
 import kotlinx.coroutines.delay
@@ -6102,16 +8171,19 @@ private fun DayOfWeek.toViShort(): String = when (this) {
 }
 
 /**
- * Top Home Dashboard (spec §3.2):
- * Row 1: FRIDGEZERO + dynamic greeting | live HH:mm:ss + day/date pill
- * Row 2: Weather badge (☀️ 28°C · Đà Nẵng) | Interactive expiring-items alert badge
+ * Top Home Dashboard:
+ * Row 1: Compact brand+weather caption + dynamic greeting | live HH:mm:ss + day/date pill
+ * Row 2: Prominent centered expiring-items assistant banner directly above the 3D fridge
  */
 @Composable
 fun HomeDashboardHeader(
   compartments: List<CompartmentUi>,
+  topRecommendation: RecipeRecommendation?,
   remindersEnabled: Boolean,
   onToggleReminders: () -> Unit,
   onOpenCompartment: (compartmentId: String, filterUrgent: Boolean) -> Unit,
+  onOpenRecipes: (recipeId: String?) -> Unit,
+  onMarkStatus: (ids: List<Long>, status: ItemStatus) -> Unit,
   modifier: Modifier = Modifier
 ) {
   var now by remember { mutableStateOf(LocalDateTime.now()) }
@@ -6125,7 +8197,7 @@ fun HomeDashboardHeader(
   val urgentEntries = remember(compartments) {
     compartments.flatMap { comp ->
       comp.items
-        .filter { it.freshness == Freshness.WARN || it.freshness == Freshness.BAD }
+        .filter { it.freshness == Freshness.SOON || it.freshness == Freshness.BAD }
         .map { UrgentEntry(comp.id, comp.name, it) }
     }.sortedBy { it.item.minDaysLeft }
   }
@@ -6142,10 +8214,10 @@ fun HomeDashboardHeader(
   Column(
     modifier = modifier
       .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 8.dp),
+      .padding(horizontal = 16.dp, vertical = 6.dp),
     verticalArrangement = Arrangement.spacedBy(8.dp)
   ) {
-    // Row 1: Brand + Greeting | Live digital clock
+    // Row 1: Merged brand + weather caption above Greeting | Live digital clock
     Row(
       modifier = Modifier.fillMaxWidth(),
       verticalAlignment = Alignment.CenterVertically,
@@ -6153,12 +8225,14 @@ fun HomeDashboardHeader(
     ) {
       Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
         Text(
-          text = stringResource(R.string.home_brand),
+          text = stringResource(R.string.home_brand_weather),
           fontFamily = MonoFont,
           fontWeight = FontWeight.ExtraBold,
           fontSize = 10.sp,
-          letterSpacing = 1.4.sp,
-          color = InkBlack.copy(alpha = 0.65f)
+          letterSpacing = 1.0.sp,
+          color = InkBlack.copy(alpha = 0.65f),
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
         )
         Text(
           text = stringResource(greetingRes),
@@ -6173,41 +8247,165 @@ fun HomeDashboardHeader(
       DigitalClockPill(now = now)
     }
 
-    // Row 2: Weather badge | Urgent expiring alert badge
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-      WeatherBadge()
-
-      val alertBg = when {
-        hasBad -> CoralUrgent
-        urgentEntries.isNotEmpty() -> LemonWarn
-        else -> LimeFresh
-      }
-      val alertLabel = if (urgentEntries.isEmpty()) {
-        stringResource(R.string.home_all_fresh_badge)
-      } else {
-        stringResource(R.string.home_urgent_badge_fmt, urgentEntries.size)
-      }
-
-      NeoBrutalistButton(
-        onClick = { showUrgentSheet = true },
-        containerColor = alertBg,
-        cornerRadius = 10.dp,
-        borderWidth = 2.dp,
-        shadowOffset = 3.dp,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+    // Row 2: Alert banner + live recipe recommendation strip
+    if (urgentEntries.isNotEmpty()) {
+      NeoBrutalistCard(
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = if (hasBad) CoralUrgent else LemonWarn,
+        cornerRadius = 14.dp,
+        borderWidth = 2.5.dp,
+        shadowOffset = 4.dp
       ) {
-        Text(
-          text = alertLabel,
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 12.sp,
-          color = InkBlack,
-          maxLines = 1
-        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .clickable(role = Role.Button) { showUrgentSheet = true }
+              .padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+            Text(
+              text = stringResource(R.string.home_urgent_banner_title_fmt, urgentEntries.size),
+              modifier = Modifier.weight(1f),
+              fontFamily = DisplayFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 14.sp,
+              color = InkBlack,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
+            )
+            Box(
+              modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceWhite)
+                .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+              Text(
+                text = stringResource(R.string.home_urgent_view_list),
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 10.sp,
+                color = InkBlack,
+                softWrap = false,
+                maxLines = 1
+              )
+            }
+          }
+
+          if (topRecommendation != null) {
+            Box(
+              modifier = Modifier
+                .fillMaxWidth()
+                .height(1.5.dp)
+                .background(InkBlack)
+            )
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .background(ButterSoft)
+                .clickable(role = Role.Button) { onOpenRecipes(topRecommendation.recipe.id) }
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+              Text(
+                text = stringResource(
+                  R.string.home_banner_recipe_fmt,
+                  topRecommendation.recipe.title,
+                  topRecommendation.recipe.cookMinutes
+                ),
+                modifier = Modifier.weight(1f),
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 12.sp,
+                color = InkBlack,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+              )
+              Box(
+                modifier = Modifier
+                  .clip(RoundedCornerShape(6.dp))
+                  .background(if (topRecommendation.isReadyToCook) LimeFresh else LemonWarn)
+                  .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+                  .padding(horizontal = 6.dp, vertical = 2.dp)
+              ) {
+                Text(
+                  text = stringResource(
+                    R.string.recipe_match_ratio_fmt,
+                    topRecommendation.matchedCount,
+                    topRecommendation.totalFridgeIngredients
+                  ),
+                  fontFamily = MonoFont,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 10.sp,
+                  color = InkBlack,
+                  softWrap = false,
+                  maxLines = 1
+                )
+              }
+            }
+          }
+        }
+      }
+    } else {
+      val remindersCd = stringResource(R.string.home_reminders_cd)
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        NeoBrutalistButton(
+          onClick = { onOpenRecipes(topRecommendation?.recipe?.id) },
+          modifier = Modifier.weight(1f),
+          containerColor = LimeFresh,
+          cornerRadius = 12.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 3.dp,
+          contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp)
+        ) {
+          Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+              text = stringResource(R.string.home_all_fresh_title),
+              fontFamily = MonoFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 10.sp,
+              color = InkBlack.copy(alpha = 0.85f),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
+            )
+            if (topRecommendation != null) {
+              Text(
+                text = stringResource(
+                  R.string.home_banner_recipe_fmt,
+                  topRecommendation.recipe.title,
+                  topRecommendation.recipe.cookMinutes
+                ),
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 12.sp,
+                color = InkBlack,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+              )
+            }
+          }
+        }
+
+        NeoBrutalistButton(
+          onClick = { showUrgentSheet = true },
+          modifier = Modifier
+            .size(46.dp)
+            .semantics { contentDescription = remindersCd },
+          containerColor = if (remindersEnabled) ButterPale else SurfaceWhite,
+          cornerRadius = 12.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 3.dp,
+          contentPadding = PaddingValues(0.dp)
+        ) {
+          Text(text = "🔔", fontSize = 16.sp)
+        }
       }
     }
   }
@@ -6215,8 +8413,14 @@ fun HomeDashboardHeader(
   if (showUrgentSheet) {
     UrgentItemsBottomSheet(
       entries = urgentEntries,
+      topRecommendation = topRecommendation,
       remindersEnabled = remindersEnabled,
       onToggleReminders = onToggleReminders,
+      onMarkStatus = onMarkStatus,
+      onOpenRecipe = { recipeId ->
+        showUrgentSheet = false
+        onOpenRecipes(recipeId)
+      },
       onDismiss = { showUrgentSheet = false },
       onOpenCompartment = { compId ->
         showUrgentSheet = false
@@ -6266,40 +8470,15 @@ private fun DigitalClockPill(now: LocalDateTime) {
   }
 }
 
-@Composable
-private fun WeatherBadge() {
-  val shape = RoundedCornerShape(10.dp)
-  Box(modifier = Modifier.padding(end = 2.dp, bottom = 2.dp)) {
-    Box(
-      modifier = Modifier
-        .matchParentSize()
-        .offset(2.dp, 2.dp)
-        .background(InkBlack, shape)
-    )
-    Box(
-      modifier = Modifier
-        .background(SkyPale, shape)
-        .border(2.dp, InkBlack, shape)
-        .padding(horizontal = 10.dp, vertical = 6.dp)
-    ) {
-      Text(
-        text = stringResource(R.string.home_weather_badge),
-        fontFamily = BodyFont,
-        fontWeight = FontWeight.Bold,
-        fontSize = 12.sp,
-        color = InkBlack,
-        maxLines = 1
-      )
-    }
-  }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UrgentItemsBottomSheet(
   entries: List<UrgentEntry>,
+  topRecommendation: RecipeRecommendation?,
   remindersEnabled: Boolean,
   onToggleReminders: () -> Unit,
+  onMarkStatus: (ids: List<Long>, status: ItemStatus) -> Unit,
+  onOpenRecipe: (String) -> Unit,
   onDismiss: () -> Unit,
   onOpenCompartment: (String) -> Unit
 ) {
@@ -6359,14 +8538,79 @@ private fun UrgentItemsBottomSheet(
           )
         }
       } else {
+        // Highlighted clickable recipe suggestion card linked directly to CulinaryGuideScreen
+        if (topRecommendation != null) {
+          val recipe = topRecommendation.recipe
+          NeoBrutalistCard(
+            modifier = Modifier
+              .fillMaxWidth()
+              .clickable(role = Role.Button) { onOpenRecipe(recipe.id) },
+            containerColor = ButterSoft,
+            cornerRadius = 14.dp,
+            borderWidth = 2.5.dp,
+            shadowOffset = 3.dp
+          ) {
+            Column(
+              modifier = Modifier.fillMaxWidth().padding(12.dp),
+              verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+              ) {
+                Text(
+                  text = stringResource(R.string.urgent_meal_title),
+                  fontFamily = DisplayFont,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 13.sp,
+                  color = InkBlack
+                )
+                StickerBadge(
+                  text = stringResource(
+                    R.string.recipe_match_ratio_fmt,
+                    topRecommendation.matchedCount,
+                    topRecommendation.totalFridgeIngredients
+                  ),
+                  containerColor = if (topRecommendation.isReadyToCook) LimeFresh else LemonWarn,
+                  tiltDegrees = 0f,
+                  mono = true
+                )
+              }
+              Text(
+                text = stringResource(
+                  R.string.urgent_meal_recipe_fmt,
+                  recipe.emoji,
+                  recipe.title,
+                  recipe.cookMinutes
+                ),
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 13.sp,
+                color = InkBlack,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+              )
+              Text(
+                text = stringResource(R.string.urgent_meal_cta),
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 11.sp,
+                color = InkBlack
+              )
+            }
+          }
+        }
+
         LazyColumn(
-          modifier = Modifier.fillMaxWidth().height(310.dp),
+          modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
           verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
           items(entries, key = { "${it.compartmentId}_${it.item.primaryId}" }) { entry ->
             UrgentItemRow(
               entry = entry,
-              onClick = { onOpenCompartment(entry.compartmentId) }
+              onMarkUsedUp = { onMarkStatus(entry.item.itemIds, ItemStatus.USED_UP) },
+              onOpenCompartment = { onOpenCompartment(entry.compartmentId) }
             )
           }
         }
@@ -6396,7 +8640,8 @@ private fun UrgentItemsBottomSheet(
 @Composable
 private fun UrgentItemRow(
   entry: UrgentEntry,
-  onClick: () -> Unit
+  onMarkUsedUp: () -> Unit,
+  onOpenCompartment: () -> Unit
 ) {
   val item = entry.item
   val icon = EmojiIconRepository.iconFor(item.iconKey)
@@ -6409,70 +8654,101 @@ private fun UrgentItemRow(
   val badgeColor = if (item.freshness == Freshness.BAD) CoralUrgent else LemonWarn
 
   NeoBrutalistCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 14.dp, shadowOffset = 3.dp) {
-    Row(
+    Column(
       modifier = Modifier.fillMaxWidth().padding(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(10.dp)
+      verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-      Box(
-        modifier = Modifier
-          .size(44.dp)
-          .clip(RoundedCornerShape(10.dp))
-          .background(PaperCream)
-          .border(2.dp, InkBlack, RoundedCornerShape(10.dp)),
-        contentAlignment = Alignment.Center
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
       ) {
-        Text(text = emoji, fontSize = 24.sp)
-      }
-      Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(
-          text = item.name,
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 15.sp,
-          color = InkBlack,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis
-        )
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(6.dp)
+        Box(
+          modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(PaperCream)
+            .border(2.dp, InkBlack, RoundedCornerShape(10.dp)),
+          contentAlignment = Alignment.Center
         ) {
-          StickerBadge(
-            text = entry.compartmentName,
-            containerColor = SurfaceWhite,
-            tiltDegrees = 0f
+          Text(text = emoji, fontSize = 24.sp)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+          Text(
+            text = item.name,
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 15.sp,
+            color = InkBlack,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
           )
-          StickerBadge(
-            text = daysText,
-            containerColor = badgeColor,
-            tiltDegrees = -1.5f,
-            mono = true
-          )
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
+            StickerBadge(
+              text = entry.compartmentName,
+              containerColor = SurfaceWhite,
+              tiltDegrees = 0f
+            )
+            StickerBadge(
+              text = daysText,
+              containerColor = badgeColor,
+              tiltDegrees = -1.5f,
+              mono = true
+            )
+          }
         }
       }
-      NeoBrutalistButton(
-        onClick = onClick,
-        containerColor = LimeFresh,
-        cornerRadius = 10.dp,
-        borderWidth = 2.dp,
-        shadowOffset = 2.dp,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp)
+
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
       ) {
-        Text(
-          text = stringResource(R.string.urgent_sheet_open_compartment),
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 12.sp,
-          color = InkBlack
-        )
+        NeoBrutalistButton(
+          onClick = onMarkUsedUp,
+          modifier = Modifier.weight(1f),
+          containerColor = LimeFresh,
+          cornerRadius = 10.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 2.dp,
+          contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+          Text(
+            text = stringResource(R.string.urgent_sheet_mark_used_up),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 12.sp,
+            color = InkBlack,
+            maxLines = 1
+          )
+        }
+        NeoBrutalistButton(
+          onClick = onOpenCompartment,
+          modifier = Modifier.weight(1f),
+          containerColor = SurfaceWhite,
+          cornerRadius = 10.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 2.dp,
+          contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+          Text(
+            text = stringResource(R.string.urgent_sheet_open_compartment),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 12.sp,
+            color = InkBlack,
+            maxLines = 1
+          )
+        }
       }
     }
   }
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/home/HomeScreen.kt` (503 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/home/HomeScreen.kt` (569 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.home
@@ -6489,6 +8765,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -6518,6 +8795,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -6534,15 +8812,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.truong.fridgezero.R
 import com.truong.fridgezero.data.CompartmentEntity
+import com.truong.fridgezero.data.ItemStatus
 import com.truong.fridgezero.domain.CompartmentUi
+import com.truong.fridgezero.domain.CulinaryFilter
+import com.truong.fridgezero.domain.CulinaryGuideEngine
 import com.truong.fridgezero.domain.Freshness
 import com.truong.fridgezero.domain.FridgeUiState
 import com.truong.fridgezero.ui.bento.QuickAddItemSheet
 import com.truong.fridgezero.ui.fridge3d.DoorProjection
+import com.truong.fridgezero.ui.fridge3d.FallbackCompartmentStat
 import com.truong.fridgezero.ui.fridge3d.Fridge3DStageSlot
+import com.truong.fridgezero.ui.fridge3d.LocalFridge3DStageController
 import com.truong.fridgezero.ui.theme.BodyFont
 import com.truong.fridgezero.ui.theme.ButterPale
 import com.truong.fridgezero.ui.theme.CoralUrgent
+import com.truong.fridgezero.ui.theme.DotGridSpec
 import com.truong.fridgezero.ui.theme.InkBlack
 import com.truong.fridgezero.ui.theme.LemonWarn
 import com.truong.fridgezero.ui.theme.LilacAccent
@@ -6570,12 +8854,26 @@ fun HomeScreen(
   onWelcomeSpinConsumed: () -> Unit,
   onOpenCompartment: (compartmentId: String, filterUrgent: Boolean) -> Unit,
   onAddItem: (compartmentId: String, name: String, iconKey: String, quantity: Int, daysLeft: Int, unit: String?) -> Unit,
+  onMarkStatus: (ids: List<Long>, status: ItemStatus) -> Unit,
+  onOpenRecipes: (recipeId: String?) -> Unit,
   onOpenAiScan: () -> Unit,
   onOpenDesigner: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   val fridge = uiState.activeFridge
   val compartments = uiState.compartments
+  val allItems = remember(compartments) { compartments.flatMap { it.items } }
+  val recommendations = remember(allItems) {
+    CulinaryGuideEngine.recommend(allItems, CulinaryFilter.ALL)
+  }
+  val readyRecipeCount = remember(recommendations) {
+    recommendations.count { it.isReadyToCook }
+  }
+  val topRecommendation = remember(recommendations) {
+    recommendations.firstOrNull { it.hasUrgentMatch }
+      ?: recommendations.firstOrNull { it.matchedCount > 0 }
+      ?: recommendations.firstOrNull()
+  }
   val entities = remember(fridge?.id, compartments) {
     val fridgeId = fridge?.id ?: "default_fridge"
     compartments.mapIndexed { idx, c ->
@@ -6611,13 +8909,26 @@ fun HomeScreen(
     }
   }
 
+  val stageController = LocalFridge3DStageController.current
+  val fallbackStats = remember(compartments) {
+    compartments.associate { comp ->
+      comp.id to FallbackCompartmentStat(
+        itemCount = comp.items.size,
+        worstFreshness = comp.worstFreshness
+      )
+    }
+  }
   val scope = rememberCoroutineScope()
   val haptic = LocalHapticFeedback.current
 
   fun triggerDoorOpen(compartmentId: String) {
     if (isNavigatingOut) return
-    isNavigatingOut = true
     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    if (stageController.use2DFallback) {
+      onOpenCompartment(compartmentId, false)
+      return
+    }
+    isNavigatingOut = true
     openingId = compartmentId
     scope.launch {
       delay(DOOR_OPEN_NAV_DELAY_MS)
@@ -6634,29 +8945,20 @@ fun HomeScreen(
   ) {
     HomeDashboardHeader(
       compartments = compartments,
+      topRecommendation = topRecommendation,
       remindersEnabled = remindersEnabled,
       onToggleReminders = onToggleReminders,
-      onOpenCompartment = onOpenCompartment
+      onOpenCompartment = onOpenCompartment,
+      onOpenRecipes = onOpenRecipes,
+      onMarkStatus = onMarkStatus
     )
 
     // Center 3D Hero Stage + Floating "+ Thêm nhanh" button
     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
       Box(
         modifier = Modifier
-          .align(Alignment.TopCenter)
-          .padding(top = 4.dp)
-      ) {
-        StickerBadge(
-          text = stringResource(R.string.home_stage_hint),
-          containerColor = SurfaceWhite,
-          tiltDegrees = 0f
-        )
-      }
-
-      Box(
-        modifier = Modifier
           .fillMaxSize()
-          .padding(top = 24.dp, bottom = 12.dp)
+          .padding(top = 6.dp, bottom = 8.dp)
       ) {
         Fridge3DStageSlot(
           colorKey = fridge?.colorKey ?: "inox",
@@ -6668,16 +8970,19 @@ fun HomeScreen(
           playWelcomeSpin = uiState.playWelcomeSpin,
           onWelcomeSpinConsumed = onWelcomeSpinConsumed,
           showStickers = true,
-          surfaceBg = "#FAF8F5",
+          compartmentStats = fallbackStats,
+          surfaceBg = DotGridSpec.PAPER_HEX,
           onDoorClick = { compId -> triggerDoorOpen(compId) },
           onProjectionsUpdated = { projections = it },
           modifier = Modifier.fillMaxSize()
         )
-        DoorStickersOverlay(
-          compartments = compartments,
-          projections = projections,
-          onStickerClick = { compId -> triggerDoorOpen(compId) }
-        )
+        if (!stageController.use2DFallback) {
+          DoorStickersOverlay(
+            compartments = compartments,
+            projections = projections,
+            onStickerClick = { compId -> triggerDoorOpen(compId) }
+          )
+        }
       }
 
       // Floating "+ Thêm nhanh" CTA anchored above bottom-right of Task Bar
@@ -6717,9 +9022,11 @@ fun HomeScreen(
       }
     }
 
-    // Fixed 72.dp Neo-Brutalist Bottom Task Bar
+    // Fixed Neo-Brutalist 4-Button Bottom Task Bar calibrated for 360dp+ viewports
     HomeTaskBar(
+      readyRecipeCount = readyRecipeCount,
       onResetFridgeView = { resetOrbitKey++ },
+      onOpenRecipes = { onOpenRecipes(null) },
       onOpenAiScan = onOpenAiScan,
       onOpenDesigner = onOpenDesigner
     )
@@ -6798,7 +9105,7 @@ private fun DoorStickerBadge(
 ) {
   val dotColor = when (compartment.worstFreshness) {
     Freshness.BAD -> CoralUrgent
-    Freshness.WARN -> LemonWarn
+    Freshness.SOON -> LemonWarn
     Freshness.OK -> LimeFresh
   }
   val cd = stringResource(
@@ -6832,13 +9139,13 @@ private fun DoorStickerBadge(
         .border(2.dp, InkBlack, shape)
         .clip(shape)
         .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-        .padding(horizontal = 9.dp, vertical = 5.dp),
+        .padding(horizontal = 10.dp, vertical = 6.dp),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(5.dp)
+      horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
       Box(
         modifier = Modifier
-          .size(9.dp)
+          .size(10.dp)
           .clip(CircleShape)
           .background(dotColor)
           .border(1.5.dp, InkBlack, CircleShape)
@@ -6847,7 +9154,7 @@ private fun DoorStickerBadge(
         text = compartment.name,
         fontFamily = BodyFont,
         fontWeight = FontWeight.ExtraBold,
-        fontSize = 11.sp,
+        fontSize = 12.sp,
         color = InkBlack,
         softWrap = false,
         maxLines = 1,
@@ -6855,15 +9162,18 @@ private fun DoorStickerBadge(
       )
       Box(
         modifier = Modifier
-          .clip(RoundedCornerShape(6.dp))
+          .defaultMinSize(minWidth = 22.dp)
+          .clip(RoundedCornerShape(7.dp))
           .background(InkBlack)
-          .padding(horizontal = 5.dp, vertical = 1.dp)
+          .padding(horizontal = 7.dp, vertical = 2.dp),
+        contentAlignment = Alignment.Center
       ) {
         Text(
           text = "${compartment.items.size}",
           fontFamily = MonoFont,
           fontWeight = FontWeight.ExtraBold,
-          fontSize = 10.sp,
+          fontSize = 13.sp,
+          lineHeight = 14.sp,
           color = LimeFresh,
           softWrap = false,
           maxLines = 1
@@ -6875,7 +9185,9 @@ private fun DoorStickerBadge(
 
 @Composable
 private fun HomeTaskBar(
+  readyRecipeCount: Int,
   onResetFridgeView: () -> Unit,
+  onOpenRecipes: () -> Unit,
   onOpenAiScan: () -> Unit,
   onOpenDesigner: () -> Unit
 ) {
@@ -6893,80 +9205,87 @@ private fun HomeTaskBar(
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .height(72.dp)
-        .padding(horizontal = 12.dp, vertical = 10.dp),
+        .height(74.dp)
+        .padding(horizontal = 8.dp, vertical = 8.dp),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(10.dp)
+      horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-      NeoBrutalistButton(
-        onClick = onResetFridgeView,
-        modifier = Modifier.weight(1f).fillMaxHeight(),
+      CompactTaskTabButton(
+        emoji = "🧊",
+        label = stringResource(R.string.home_tab_fridge_short),
         containerColor = ButterPale,
-        cornerRadius = 12.dp,
-        borderWidth = 2.dp,
-        shadowOffset = 3.dp,
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
-      ) {
-        Text(
-          text = stringResource(R.string.home_tab_fridge),
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 12.sp,
-          color = InkBlack,
-          softWrap = false,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis
-        )
-      }
-
-      Box(modifier = Modifier.weight(1.05f).fillMaxHeight()) {
-        NeoBrutalistButton(
-          onClick = onOpenAiScan,
-          modifier = Modifier.fillMaxSize(),
-          containerColor = LilacAccent,
-          cornerRadius = 12.dp,
-          borderWidth = 2.dp,
-          shadowOffset = 3.dp,
-          contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
-        ) {
-          Text(
-            text = stringResource(R.string.home_tab_scan_ai),
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 12.sp,
-            color = InkBlack,
-            softWrap = false,
-            maxLines = 1
-          )
-        }
-        Box(
-          modifier = Modifier
-            .align(Alignment.TopEnd)
-            .offset(x = 4.dp, y = (-6).dp)
-        ) {
-          StickerBadge(
-            text = stringResource(R.string.home_tab_scan_badge),
-            containerColor = LemonWarn,
-            tiltDegrees = 3f,
-            mono = true
-          )
-        }
-      }
-
-      NeoBrutalistButton(
-        onClick = onOpenDesigner,
-        modifier = Modifier.weight(1f).fillMaxHeight(),
+        onClick = onResetFridgeView,
+        modifier = Modifier.weight(1f).fillMaxHeight()
+      )
+      CompactTaskTabButton(
+        emoji = "🍳",
+        label = stringResource(R.string.home_tab_recipes_short),
         containerColor = SurfaceWhite,
-        cornerRadius = 12.dp,
-        borderWidth = 2.dp,
-        shadowOffset = 3.dp,
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+        badgeText = if (readyRecipeCount > 0) "$readyRecipeCount" else null,
+        badgeColor = LimeFresh,
+        contentDescriptionText = stringResource(R.string.home_tab_recipes_cd),
+        onClick = onOpenRecipes,
+        modifier = Modifier.weight(1f).fillMaxHeight()
+      )
+      CompactTaskTabButton(
+        emoji = "📷",
+        label = stringResource(R.string.home_tab_scan_ai_short),
+        containerColor = LilacAccent,
+        badgeText = stringResource(R.string.home_tab_scan_badge),
+        badgeColor = LemonWarn,
+        onClick = onOpenAiScan,
+        modifier = Modifier.weight(1f).fillMaxHeight()
+      )
+      CompactTaskTabButton(
+        emoji = "⚙️",
+        label = stringResource(R.string.home_tab_redesign_short),
+        containerColor = SurfaceWhite,
+        onClick = onOpenDesigner,
+        modifier = Modifier.weight(1f).fillMaxHeight()
+      )
+    }
+    Spacer(Modifier.navigationBarsPadding())
+  }
+}
+
+@Composable
+private fun CompactTaskTabButton(
+  emoji: String,
+  label: String,
+  containerColor: Color,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+  badgeText: String? = null,
+  badgeColor: Color = LimeFresh,
+  contentDescriptionText: String? = null
+) {
+  val buttonModifier = if (contentDescriptionText != null) {
+    Modifier.fillMaxSize().semantics { contentDescription = contentDescriptionText }
+  } else {
+    Modifier.fillMaxSize()
+  }
+  Box(modifier = modifier) {
+    NeoBrutalistButton(
+      onClick = onClick,
+      modifier = buttonModifier,
+      containerColor = containerColor,
+      cornerRadius = 11.dp,
+      borderWidth = 2.dp,
+      shadowOffset = 2.5.dp,
+      contentPadding = PaddingValues(horizontal = 3.dp, vertical = 4.dp)
+    ) {
+      Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp)
       ) {
+        Text(text = emoji, fontSize = 15.sp, lineHeight = 16.sp)
         Text(
-          text = stringResource(R.string.home_tab_redesign),
+          text = label,
           fontFamily = BodyFont,
           fontWeight = FontWeight.ExtraBold,
-          fontSize = 12.sp,
+          fontSize = 10.5.sp,
+          lineHeight = 12.sp,
           color = InkBlack,
           softWrap = false,
           maxLines = 1,
@@ -6974,7 +9293,30 @@ private fun HomeTaskBar(
         )
       }
     }
-    Spacer(Modifier.navigationBarsPadding())
+
+    if (badgeText != null) {
+      Box(
+        modifier = Modifier
+          .align(Alignment.TopEnd)
+          .offset(x = (-1).dp, y = (-5).dp)
+          .rotate(3f)
+          .clip(RoundedCornerShape(6.dp))
+          .background(badgeColor)
+          .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+          .padding(horizontal = 5.dp, vertical = 1.dp)
+      ) {
+        Text(
+          text = badgeText,
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 9.sp,
+          lineHeight = 10.sp,
+          color = InkBlack,
+          softWrap = false,
+          maxLines = 1
+        )
+      }
+    }
   }
 }
 ```
@@ -7075,6 +9417,1015 @@ object EmojiIconRepository : IconRepository {
 }
 ```
 
+### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/CulinaryGuideScreen.kt` (508 lines)
+
+```kotlin
+package com.truong.fridgezero.ui.recipes
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.truong.fridgezero.R
+import com.truong.fridgezero.domain.CompartmentUi
+import com.truong.fridgezero.domain.CulinaryFilter
+import com.truong.fridgezero.domain.CulinaryGuideEngine
+import com.truong.fridgezero.domain.Freshness
+import com.truong.fridgezero.domain.RecipeCategory
+import com.truong.fridgezero.domain.RecipeIngredient
+import com.truong.fridgezero.domain.RecipeRecommendation
+import com.truong.fridgezero.ui.icons.EmojiIconRepository
+import com.truong.fridgezero.ui.icons.FoodIcon
+import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.ButterSoft
+import com.truong.fridgezero.ui.theme.CoralUrgent
+import com.truong.fridgezero.ui.theme.DisplayFont
+import com.truong.fridgezero.ui.theme.InkBlack
+import com.truong.fridgezero.ui.theme.LemonWarn
+import com.truong.fridgezero.ui.theme.LimeFresh
+import com.truong.fridgezero.ui.theme.MonoFont
+import com.truong.fridgezero.ui.theme.NeoBrutalistButton
+import com.truong.fridgezero.ui.theme.NeoBrutalistCard
+import com.truong.fridgezero.ui.theme.PaperCream
+import com.truong.fridgezero.ui.theme.StickerBadge
+import com.truong.fridgezero.ui.theme.SurfaceWhite
+import com.truong.fridgezero.ui.theme.dotGridBackground
+
+/**
+ * Screen 4 — Neo-Brutalist Culinary Guide with top rescue hero card, category chips,
+ * and 2-column Bento recipe grid.
+ */
+@Composable
+fun CulinaryGuideScreen(
+  compartments: List<CompartmentUi>,
+  initialRecipeId: String? = null,
+  onBack: () -> Unit,
+  onConsumeRecipe: (RecipeRecommendation) -> Unit,
+  modifier: Modifier = Modifier
+) {
+  val allItems = remember(compartments) { compartments.flatMap { it.items } }
+  val allRecommendations = remember(allItems) {
+    CulinaryGuideEngine.recommend(allItems, CulinaryFilter.ALL)
+  }
+  val readyCount = remember(allRecommendations) {
+    allRecommendations.count { it.isReadyToCook }
+  }
+  val heroRecommendation = remember(allRecommendations) {
+    allRecommendations.firstOrNull { it.hasUrgentMatch }
+      ?: allRecommendations.firstOrNull { it.matchedCount > 0 }
+      ?: allRecommendations.firstOrNull()
+  }
+
+  var selectedFilter by remember { mutableStateOf(RecipeCategory.ALL) }
+  var selectedRecipeId by remember(initialRecipeId) { mutableStateOf(initialRecipeId) }
+
+  val filteredRecommendations = remember(allItems, selectedFilter) {
+    CulinaryGuideEngine.recommend(allItems, selectedFilter)
+  }
+  val activeDetail = remember(allRecommendations, selectedRecipeId) {
+    selectedRecipeId?.let { id -> allRecommendations.firstOrNull { it.recipe.id == id } }
+  }
+
+  Column(
+    modifier = modifier
+      .fillMaxSize()
+      .dotGridBackground()
+      .statusBarsPadding()
+      .navigationBarsPadding()
+  ) {
+    // Top Bar: square ← button | "CẨM NANG ẨM THỰC" | Ready count badge
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp, vertical = 10.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+      val backCd = stringResource(R.string.recipe_back_cd)
+      NeoBrutalistButton(
+        onClick = onBack,
+        modifier = Modifier
+          .size(44.dp)
+          .semantics { contentDescription = backCd },
+        containerColor = SurfaceWhite,
+        cornerRadius = 12.dp,
+        borderWidth = 2.5.dp,
+        shadowOffset = 3.dp,
+        contentPadding = PaddingValues(0.dp)
+      ) {
+        Text(
+          text = stringResource(R.string.bento_back_symbol),
+          fontFamily = DisplayFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 20.sp,
+          color = InkBlack
+        )
+      }
+
+      Text(
+        text = stringResource(R.string.recipe_screen_title),
+        modifier = Modifier.weight(1f),
+        fontFamily = DisplayFont,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 18.sp,
+        color = InkBlack,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+      )
+
+      StickerBadge(
+        text = stringResource(R.string.recipe_ready_badge_fmt, readyCount),
+        containerColor = if (readyCount > 0) LimeFresh else LemonWarn,
+        mono = true
+      )
+    }
+
+    LazyVerticalGrid(
+      columns = GridCells.Fixed(2),
+      modifier = Modifier.fillMaxSize(),
+      contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 20.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+      horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+      if (heroRecommendation != null) {
+        item(span = { GridItemSpan(maxLineSpan) }, key = "hero_rescue_card") {
+          HeroRescueRecipeCard(
+            recommendation = heroRecommendation,
+            onClick = { selectedRecipeId = heroRecommendation.recipe.id }
+          )
+        }
+      }
+
+      item(span = { GridItemSpan(maxLineSpan) }, key = "category_chips") {
+        LazyRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          contentPadding = PaddingValues(vertical = 2.dp)
+        ) {
+          items(RecipeCategory.entries, key = { it.name }) { category ->
+            val selected = selectedFilter == category
+            NeoBrutalistButton(
+              onClick = { selectedFilter = category },
+              containerColor = if (selected) LimeFresh else SurfaceWhite,
+              cornerRadius = 10.dp,
+              borderWidth = 2.dp,
+              shadowOffset = if (selected) 3.dp else 2.dp,
+              contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+            ) {
+              Text(
+                text = categoryLabel(category),
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 12.sp,
+                color = InkBlack,
+                softWrap = false,
+                maxLines = 1
+              )
+            }
+          }
+        }
+      }
+
+      if (filteredRecommendations.isEmpty()) {
+        item(span = { GridItemSpan(maxLineSpan) }, key = "empty_filter") {
+          NeoBrutalistCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+              text = stringResource(R.string.recipe_empty_filter),
+              modifier = Modifier.padding(20.dp),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.Bold,
+              fontSize = 14.sp,
+              color = InkBlack.copy(alpha = 0.78f)
+            )
+          }
+        }
+      } else {
+        items(filteredRecommendations, key = { it.recipe.id }) { rec ->
+          RecipeBentoCard(
+            recommendation = rec,
+            onClick = { selectedRecipeId = rec.recipe.id }
+          )
+        }
+      }
+    }
+  }
+
+  if (activeDetail != null) {
+    RecipeDetailSheet(
+      recommendation = activeDetail,
+      onCooked = { onConsumeRecipe(activeDetail) },
+      onDismiss = { selectedRecipeId = null }
+    )
+  }
+}
+
+@Composable
+private fun HeroRescueRecipeCard(
+  recommendation: RecipeRecommendation,
+  onClick: () -> Unit
+) {
+  val recipe = recommendation.recipe
+  val hasUrgent = recommendation.hasUrgentMatch
+  val cardColor = if (hasUrgent) CoralUrgent else ButterSoft
+  val ratioColor = if (recommendation.isReadyToCook) LimeFresh else LemonWarn
+
+  NeoBrutalistCard(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable(role = Role.Button, onClick = onClick),
+    containerColor = cardColor,
+    cornerRadius = 16.dp,
+    borderWidth = 2.5.dp,
+    shadowOffset = 4.dp
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(14.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+      ) {
+        StickerBadge(
+          text = stringResource(
+            if (hasUrgent) R.string.recipe_hero_badge else R.string.recipe_hero_all_fresh_badge
+          ),
+          containerColor = SurfaceWhite,
+          tiltDegrees = -1.2f
+        )
+        StickerBadge(
+          text = stringResource(
+            R.string.recipe_match_ratio_fmt,
+            recommendation.matchedCount,
+            recommendation.totalFridgeIngredients
+          ),
+          containerColor = ratioColor,
+          tiltDegrees = 1.5f,
+          mono = true
+        )
+      }
+
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+      ) {
+        Box(
+          modifier = Modifier
+            .size(52.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(PaperCream)
+            .border(2.dp, InkBlack, RoundedCornerShape(12.dp)),
+          contentAlignment = Alignment.Center
+        ) {
+          Text(text = recipe.emoji, fontSize = 28.sp)
+        }
+        Column(
+          modifier = Modifier.weight(1f),
+          verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+          Text(
+            text = recipe.title,
+            fontFamily = DisplayFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 16.sp,
+            lineHeight = 20.sp,
+            color = InkBlack,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+          )
+          Text(
+            text = recipe.summary,
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            color = InkBlack.copy(alpha = 0.85f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+          )
+        }
+      }
+
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        if (hasUrgent) {
+          StickerBadge(
+            text = stringResource(R.string.recipe_hero_rescue_fmt, recommendation.urgentMatchedCount),
+            containerColor = LemonWarn,
+            tiltDegrees = 0f
+          )
+        }
+        Text(
+          text = "${stringResource(R.string.recipe_prep_time_short_fmt, recipe.cookMinutes)} · ${recipe.sourceName}",
+          modifier = Modifier.weight(1f),
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.Bold,
+          fontSize = 11.sp,
+          color = InkBlack,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+        Box(
+          modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(InkBlack)
+            .padding(horizontal = 9.dp, vertical = 5.dp)
+        ) {
+          Text(
+            text = stringResource(R.string.recipe_hero_cta),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 11.sp,
+            color = LimeFresh,
+            softWrap = false,
+            maxLines = 1
+          )
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun RecipeBentoCard(
+  recommendation: RecipeRecommendation,
+  onClick: () -> Unit
+) {
+  val recipe = recommendation.recipe
+  val matchedByIng = remember(recommendation) {
+    recommendation.matchedIngredients.associateBy { it.ingredient.name }
+  }
+  val ratioColor = if (recommendation.isReadyToCook) LimeFresh else LemonWarn
+
+  NeoBrutalistCard(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable(role = Role.Button, onClick = onClick),
+    containerColor = SurfaceWhite,
+    cornerRadius = 16.dp,
+    borderWidth = 2.5.dp,
+    shadowOffset = 4.dp
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(12.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+      ) {
+        Box(
+          modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(PaperCream)
+            .border(2.dp, InkBlack, RoundedCornerShape(10.dp)),
+          contentAlignment = Alignment.Center
+        ) {
+          Text(text = recipe.emoji, fontSize = 22.sp)
+        }
+        StickerBadge(
+          text = stringResource(
+            R.string.recipe_match_ratio_fmt,
+            recommendation.matchedCount,
+            recommendation.totalFridgeIngredients
+          ),
+          containerColor = ratioColor,
+          tiltDegrees = -2f,
+          mono = true
+        )
+      }
+
+      Text(
+        text = recipe.title,
+        fontFamily = BodyFont,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 13.sp,
+        lineHeight = 17.sp,
+        color = InkBlack,
+        minLines = 2,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis
+      )
+
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        recipe.fridgeIngredients.take(4).forEach { ingredient ->
+          val match = matchedByIng[ingredient.name]
+          val bg = when {
+            match == null -> PaperCream
+            match.item.freshness == Freshness.BAD -> CoralUrgent
+            match.item.freshness == Freshness.SOON -> LemonWarn
+            else -> LimeFresh
+          }
+          Box(
+            modifier = Modifier
+              .size(26.dp)
+              .alpha(if (match != null) 1f else 0.45f)
+              .clip(RoundedCornerShape(7.dp))
+              .background(bg)
+              .border(1.5.dp, InkBlack, RoundedCornerShape(7.dp)),
+            contentAlignment = Alignment.Center
+          ) {
+            Text(text = ingredientGlyph(ingredient), fontSize = 14.sp)
+          }
+        }
+      }
+
+      Spacer(Modifier.height(1.dp))
+
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+      ) {
+        Text(
+          text = stringResource(R.string.recipe_prep_time_short_fmt, recipe.cookMinutes),
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 10.sp,
+          color = InkBlack,
+          softWrap = false,
+          maxLines = 1
+        )
+        Text(
+          text = "· ${recipe.sourceName}",
+          modifier = Modifier.weight(1f),
+          fontFamily = BodyFont,
+          fontWeight = FontWeight.SemiBold,
+          fontSize = 10.sp,
+          color = InkBlack.copy(alpha = 0.68f),
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun categoryLabel(category: RecipeCategory): String = when (category) {
+  CulinaryFilter.ALL -> stringResource(R.string.recipe_filter_all)
+  CulinaryFilter.READY_NOW -> stringResource(R.string.recipe_filter_ready)
+  CulinaryFilter.RESCUE_URGENT -> stringResource(R.string.recipe_filter_rescue)
+  CulinaryFilter.QUICK_15 -> stringResource(R.string.recipe_filter_quick)
+  CulinaryFilter.VIET_HOME -> stringResource(R.string.recipe_filter_viet)
+  CulinaryFilter.EAT_CLEAN -> stringResource(R.string.recipe_filter_eat_clean)
+}
+
+internal fun ingredientGlyph(ingredient: RecipeIngredient): String {
+  val key = ingredient.iconKeys.firstOrNull()
+  val icon = key?.let { EmojiIconRepository.iconFor(it) }
+  return (icon as? FoodIcon.Emoji)?.glyph ?: ingredient.fallbackGroup.fallbackEmoji
+}
+```
+
+### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/RecipeDetailSheet.kt` (493 lines)
+
+```kotlin
+package com.truong.fridgezero.ui.recipes
+
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.truong.fridgezero.R
+import com.truong.fridgezero.domain.Freshness
+import com.truong.fridgezero.domain.MatchTier
+import com.truong.fridgezero.domain.MatchedIngredient
+import com.truong.fridgezero.domain.RecipeDifficulty
+import com.truong.fridgezero.domain.RecipeIngredient
+import com.truong.fridgezero.domain.RecipeRecommendation
+import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.CoralUrgent
+import com.truong.fridgezero.ui.theme.DisplayFont
+import com.truong.fridgezero.ui.theme.InkBlack
+import com.truong.fridgezero.ui.theme.LemonWarn
+import com.truong.fridgezero.ui.theme.LimeFresh
+import com.truong.fridgezero.ui.theme.MonoFont
+import com.truong.fridgezero.ui.theme.NeoBrutalistButton
+import com.truong.fridgezero.ui.theme.NeoBrutalistCard
+import com.truong.fridgezero.ui.theme.PaperCream
+import com.truong.fridgezero.ui.theme.SkyPale
+import com.truong.fridgezero.ui.theme.StickerBadge
+import com.truong.fridgezero.ui.theme.SurfaceWhite
+
+/**
+ * Detailed recipe sheet separating in-fridge items, missing items, pantry staples,
+ * cooking steps, original culinary citation link, and 1-tap inventory deduction.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun RecipeDetailSheet(
+  recommendation: RecipeRecommendation,
+  onCooked: () -> Unit,
+  onDismiss: () -> Unit
+) {
+  val recipe = recommendation.recipe
+  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+  val uriHandler = LocalUriHandler.current
+  val context = LocalContext.current
+  val openErrorText = stringResource(R.string.recipe_open_source_error)
+  val cookedToastText = if (recommendation.matchedCount > 0) {
+    stringResource(R.string.recipe_cooked_toast_fmt, recommendation.matchedCount)
+  } else {
+    stringResource(R.string.recipe_cooked_toast_empty)
+  }
+
+  ModalBottomSheet(
+    onDismissRequest = onDismiss,
+    sheetState = sheetState,
+    containerColor = PaperCream,
+    dragHandle = null
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .navigationBarsPadding()
+        .padding(horizontal = 16.dp, vertical = 16.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+      // Scrollable body
+      Column(
+        modifier = Modifier
+          .weight(1f, fill = false)
+          .fillMaxWidth()
+          .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+      ) {
+        // Header: Emoji + Title + Summary + Meta badges
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+          Box(
+            modifier = Modifier
+              .size(54.dp)
+              .clip(RoundedCornerShape(14.dp))
+              .background(SurfaceWhite)
+              .border(2.5.dp, InkBlack, RoundedCornerShape(14.dp)),
+            contentAlignment = Alignment.Center
+          ) {
+            Text(text = recipe.emoji, fontSize = 30.sp)
+          }
+          Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+          ) {
+            Text(
+              text = recipe.title,
+              fontFamily = DisplayFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 19.sp,
+              lineHeight = 23.sp,
+              color = InkBlack
+            )
+            Text(
+              text = recipe.summary,
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.Medium,
+              fontSize = 12.sp,
+              lineHeight = 16.sp,
+              color = InkBlack.copy(alpha = 0.78f)
+            )
+          }
+        }
+
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          StickerBadge(
+            text = stringResource(R.string.recipe_prep_time_long_fmt, recipe.cookMinutes),
+            containerColor = SurfaceWhite,
+            tiltDegrees = 0f,
+            mono = true
+          )
+          StickerBadge(
+            text = stringResource(
+              if (recipe.difficulty == RecipeDifficulty.EASY) {
+                R.string.recipe_difficulty_easy
+              } else {
+                R.string.recipe_difficulty_medium
+              }
+            ),
+            containerColor = if (recipe.difficulty == RecipeDifficulty.EASY) LimeFresh else LemonWarn,
+            tiltDegrees = 0f
+          )
+          StickerBadge(
+            text = recipe.sourceName,
+            containerColor = SkyPale,
+            tiltDegrees = 0f
+          )
+        }
+
+        // Section 1: In Fridge
+        RecipeSectionHeader(stringResource(R.string.recipe_section_in_fridge))
+        if (recommendation.matchedIngredients.isEmpty()) {
+          NeoBrutalistCard(
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = SurfaceWhite,
+            cornerRadius = 12.dp,
+            borderWidth = 2.dp,
+            shadowOffset = 2.dp
+          ) {
+            Text(
+              text = stringResource(R.string.recipe_section_in_fridge_empty),
+              modifier = Modifier.padding(12.dp),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.Medium,
+              fontSize = 13.sp,
+              color = InkBlack.copy(alpha = 0.72f)
+            )
+          }
+        } else {
+          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            recommendation.matchedIngredients.forEach { matched ->
+              MatchedIngredientRow(matched = matched)
+            }
+          }
+        }
+
+        // Section 2: Missing Fridge Ingredients
+        RecipeSectionHeader(stringResource(R.string.recipe_section_missing))
+        if (recommendation.missingIngredients.isEmpty()) {
+          NeoBrutalistCard(
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = LimeFresh,
+            cornerRadius = 12.dp,
+            borderWidth = 2.dp,
+            shadowOffset = 2.dp
+          ) {
+            Text(
+              text = stringResource(R.string.recipe_section_missing_none),
+              modifier = Modifier.padding(12.dp),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 13.sp,
+              color = InkBlack
+            )
+          }
+        } else {
+          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            recommendation.missingIngredients.forEach { missing ->
+              MissingIngredientRow(ingredient = missing)
+            }
+          }
+        }
+
+        // Section 3: Pantry Staples
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+          RecipeSectionHeader(stringResource(R.string.recipe_section_pantry))
+          Text(
+            text = stringResource(R.string.recipe_section_pantry_hint),
+            fontFamily = MonoFont,
+            fontWeight = FontWeight.Medium,
+            fontSize = 10.sp,
+            color = InkBlack.copy(alpha = 0.65f)
+          )
+          FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
+            recipe.pantryStaples.forEach { staple ->
+              Box(
+                modifier = Modifier
+                  .clip(RoundedCornerShape(8.dp))
+                  .background(SurfaceWhite)
+                  .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
+                  .padding(horizontal = 9.dp, vertical = 4.dp)
+              ) {
+                Text(
+                  text = staple,
+                  fontFamily = BodyFont,
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 12.sp,
+                  color = InkBlack
+                )
+              }
+            }
+          }
+        }
+
+        // Section 4: Cooking Steps inside NeoBrutalistCard
+        RecipeSectionHeader(stringResource(R.string.recipe_section_steps))
+        NeoBrutalistCard(
+          modifier = Modifier.fillMaxWidth(),
+          containerColor = SurfaceWhite,
+          cornerRadius = 16.dp,
+          borderWidth = 2.5.dp,
+          shadowOffset = 3.dp
+        ) {
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+          ) {
+            recipe.steps.forEachIndexed { index, stepText ->
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+              ) {
+                Box(
+                  modifier = Modifier
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(InkBlack),
+                  contentAlignment = Alignment.Center
+                ) {
+                  Text(
+                    text = "${index + 1}",
+                    fontFamily = MonoFont,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 12.sp,
+                    color = LimeFresh
+                  )
+                }
+                Text(
+                  text = stepText,
+                  modifier = Modifier.weight(1f),
+                  fontFamily = BodyFont,
+                  fontWeight = FontWeight.Medium,
+                  fontSize = 13.sp,
+                  lineHeight = 18.sp,
+                  color = InkBlack
+                )
+              }
+            }
+          }
+        }
+      }
+
+      // Bottom Action Row: Source Link | 1-Tap Cook Deduction
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+      ) {
+        NeoBrutalistButton(
+          onClick = {
+            runCatching { uriHandler.openUri(recipe.sourceUrl) }
+              .onFailure {
+                Toast.makeText(context, openErrorText, Toast.LENGTH_SHORT).show()
+              }
+          },
+          modifier = Modifier.weight(1f),
+          containerColor = SurfaceWhite,
+          cornerRadius = 12.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 3.dp,
+          contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)
+        ) {
+          Text(
+            text = stringResource(R.string.recipe_action_source),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 13.sp,
+            color = InkBlack,
+            softWrap = false,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+          )
+        }
+
+        NeoBrutalistButton(
+          onClick = {
+            onCooked()
+            Toast.makeText(context, cookedToastText, Toast.LENGTH_SHORT).show()
+            onDismiss()
+          },
+          modifier = Modifier.weight(1.15f),
+          containerColor = LimeFresh,
+          cornerRadius = 12.dp,
+          borderWidth = 2.5.dp,
+          shadowOffset = 4.dp,
+          contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)
+        ) {
+          Text(
+            text = stringResource(R.string.recipe_action_cooked),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 13.sp,
+            color = InkBlack,
+            softWrap = false,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+          )
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun RecipeSectionHeader(text: String) {
+  Text(
+    text = text,
+    fontFamily = DisplayFont,
+    fontWeight = FontWeight.ExtraBold,
+    fontSize = 14.sp,
+    color = InkBlack
+  )
+}
+
+@Composable
+private fun MatchedIngredientRow(matched: MatchedIngredient) {
+  val freshness = matched.item.freshness
+  val rowColor: Color = when (freshness) {
+    Freshness.BAD -> CoralUrgent
+    Freshness.SOON -> LemonWarn
+    Freshness.OK -> SurfaceWhite
+  }
+  val expiryBadgeColor = freshness.color()
+  val expiryLabel = when {
+    matched.item.minDaysLeft < 0 ->
+      stringResource(R.string.urgent_badge_overdue_fmt, -matched.item.minDaysLeft)
+    matched.item.minDaysLeft == 0 -> stringResource(R.string.urgent_badge_today)
+    else -> stringResource(R.string.urgent_badge_days_fmt, matched.item.minDaysLeft)
+  }
+
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(10.dp))
+      .background(rowColor)
+      .border(2.dp, InkBlack, RoundedCornerShape(10.dp))
+      .padding(horizontal = 10.dp, vertical = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(10.dp)
+  ) {
+    Box(
+      modifier = Modifier
+        .size(34.dp)
+        .clip(RoundedCornerShape(8.dp))
+        .background(PaperCream)
+        .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp)),
+      contentAlignment = Alignment.Center
+    ) {
+      Text(text = ingredientGlyph(matched.ingredient), fontSize = 18.sp)
+    }
+    Column(
+      modifier = Modifier.weight(1f),
+      verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+      Text(
+        text = "${matched.ingredient.name} · ${matched.ingredient.amountText}",
+        fontFamily = BodyFont,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 13.sp,
+        color = InkBlack,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+      )
+      val subtitle = if (matched.tier == MatchTier.GROUP_FALLBACK) {
+        stringResource(R.string.recipe_substitute_fmt, matched.item.name)
+      } else {
+        "${matched.item.name} (${matched.item.quantity})"
+      }
+      Text(
+        text = subtitle,
+        fontFamily = BodyFont,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp,
+        color = InkBlack.copy(alpha = 0.78f),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+      )
+    }
+    StickerBadge(
+      text = expiryLabel,
+      containerColor = expiryBadgeColor,
+      tiltDegrees = 0f,
+      mono = true
+    )
+  }
+}
+
+@Composable
+private fun MissingIngredientRow(ingredient: RecipeIngredient) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(10.dp))
+      .background(SurfaceWhite)
+      .border(2.dp, InkBlack, RoundedCornerShape(10.dp))
+      .padding(horizontal = 10.dp, vertical = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(10.dp)
+  ) {
+    Box(
+      modifier = Modifier
+        .size(34.dp)
+        .clip(RoundedCornerShape(8.dp))
+        .background(PaperCream)
+        .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp)),
+      contentAlignment = Alignment.Center
+    ) {
+      Text(text = ingredientGlyph(ingredient), fontSize = 18.sp)
+    }
+    Text(
+      text = ingredient.name,
+      modifier = Modifier.weight(1f),
+      fontFamily = BodyFont,
+      fontWeight = FontWeight.Bold,
+      fontSize = 13.sp,
+      color = InkBlack,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis
+    )
+    Text(
+      text = ingredient.amountText,
+      fontFamily = MonoFont,
+      fontWeight = FontWeight.Bold,
+      fontSize = 12.sp,
+      color = InkBlack.copy(alpha = 0.75f),
+      softWrap = false,
+      maxLines = 1
+    )
+  }
+}
+```
+
 ### `app/src/main/kotlin/com/truong/fridgezero/ui/theme/BrutalistComponents.kt` (240 lines)
 
 ```kotlin
@@ -7129,12 +10480,12 @@ val BrutalBorder = 2.5.dp
 val BrutalShadow = 4.dp
 val PressShift = 2.dp
 
-/** Warm paper with a cached tiled dot grid (spec §1.1: 1.25.dp dots, 18.dp step). */
+/** Warm paper with a cached tiled dot grid (spec §1.1 & DotGridSpec). */
 fun Modifier.dotGridBackground(
-  paper: Color = PaperCream,
-  dot: Color = DotGridInk,
-  step: Dp = 18.dp,
-  dotRadius: Dp = 0.625.dp
+  paper: Color = DotGridSpec.paperColor,
+  dot: Color = DotGridSpec.dotColor,
+  step: Dp = DotGridSpec.step,
+  dotRadius: Dp = DotGridSpec.dotRadius
 ): Modifier = this.drawWithCache {
   if (size.width <= 0f || size.height <= 0f) {
     return@drawWithCache onDrawBehind {}
@@ -7319,16 +10670,18 @@ fun StickerBadge(
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/theme/Color.kt` (20 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/theme/Color.kt` (35 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 // spec.md §1.1 — Neo-Brutalist palette
-val PaperCream = Color(0xFFFAF8F5)
-val DotGridInk = Color(0xFFD6D3CD)
+val PaperCream = Color(0xFFEAE2D3)
+val DotGridInk = Color(0xFFC4B8A3)
 val SurfaceWhite = Color(0xFFFFFFFF)
 val InkBlack = Color(0xFF111111)
 val LimeFresh = Color(0xFFA3E635)
@@ -7341,6 +10694,19 @@ val CavitySlate = Color(0xFF1E293B)
 val ButterSoft = Color(0xFFFEF08A)
 val ButterPale = Color(0xFFFEF9C3)
 val SkyPale = Color(0xFFE0F2FE)
+
+/** Single source of truth for the Neo-Brutalist dot-grid background shared by Compose and Three.js. */
+object DotGridSpec {
+  const val PAPER_HEX: String = "#EAE2D3"
+  const val DOT_HEX: String = "#C4B8A3"
+  const val STEP_DP: Float = 18f
+  const val DOT_RADIUS_DP: Float = 1.5f
+
+  val paperColor: Color = PaperCream
+  val dotColor: Color = DotGridInk
+  val step: Dp = STEP_DP.dp
+  val dotRadius: Dp = DOT_RADIUS_DP.dp
+}
 ```
 
 ### `app/src/main/kotlin/com/truong/fridgezero/ui/theme/Theme.kt` (32 lines)
@@ -7457,7 +10823,7 @@ val NeoBrutalistTypography = Typography(
 val FridgeTypography: Typography = NeoBrutalistTypography
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/vm/FridgeViewModel.kt` (271 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/vm/FridgeViewModel.kt` (292 lines)
 
 ```kotlin
 package com.truong.fridgezero.vm
@@ -7474,8 +10840,10 @@ import com.truong.fridgezero.data.FridgeRepository
 import com.truong.fridgezero.data.ItemStatus
 import com.truong.fridgezero.domain.ConfigurableShelfLifeRepository
 import com.truong.fridgezero.domain.CompartmentUi
+import com.truong.fridgezero.domain.CulinaryGuideEngine
 import com.truong.fridgezero.domain.Freshness
 import com.truong.fridgezero.domain.FridgeUiState
+import com.truong.fridgezero.domain.MatchedIngredient
 import com.truong.fridgezero.domain.NRect
 import com.truong.fridgezero.domain.toDisplay
 import com.truong.fridgezero.domain.zoneForCompartment
@@ -7654,6 +11022,25 @@ class FridgeViewModel(
 
   fun markItemStatus(id: Long, status: ItemStatus) = markItemStatus(listOf(id), status)
 
+  fun consumeRecipeIngredients(matched: List<MatchedIngredient>) {
+    if (matched.isEmpty()) return
+    viewModelScope.launch {
+      val uniqueIds = matched.flatMap { it.item.itemIds }.distinct()
+      val entitiesById = uniqueIds.mapNotNull { id ->
+        repository.getFoodItem(id)?.let { id to it }
+      }.toMap()
+      val deductions = CulinaryGuideEngine.planDeductions(matched, entitiesById)
+      deductions.forEach { deduction ->
+        val entity = entitiesById[deduction.itemId] ?: return@forEach
+        if (deduction.remainingQuantity <= 0) {
+          repository.updateItemStatus(deduction.itemId, ItemStatus.USED_UP)
+        } else {
+          repository.upsertFoodItem(entity.copy(quantity = deduction.remainingQuantity))
+        }
+      }
+    }
+  }
+
   fun moveItemToCompartment(
     ids: List<Long>,
     compartmentId: String,
@@ -7732,7 +11119,7 @@ class FridgeViewModel(
 }
 ```
 
-### `app/src/test/kotlin/com/truong/fridgezero/domain/LodAndFreshnessTest.kt` (106 lines)
+### `app/src/test/kotlin/com/truong/fridgezero/domain/LodAndFreshnessTest.kt` (490 lines)
 
 ```kotlin
 package com.truong.fridgezero.domain
@@ -7740,8 +11127,21 @@ package com.truong.fridgezero.domain
 import com.truong.fridgezero.data.CompartmentEntity
 import com.truong.fridgezero.data.CompartmentKind
 import com.truong.fridgezero.data.FoodItemEntity
+import com.truong.fridgezero.data.ItemStatus
 import com.truong.fridgezero.data.Seed
+import com.truong.fridgezero.ui.fridge3d.BoundedWebGlCrashTracker
+import com.truong.fridgezero.ui.fridge3d.LOW_MEM_THRESHOLD_BYTES
+import com.truong.fridgezero.ui.fridge3d.WebGlRecoveryAction
+import com.truong.fridgezero.ui.fridge3d.isAllowedFridge3dUrl
+import com.truong.fridgezero.ui.fridge3d.resolveWebGlQuality
+import com.truong.fridgezero.ui.icons.EmojiIconRepository
+import com.truong.fridgezero.ui.icons.FoodGroup
+import com.truong.fridgezero.ui.theme.DotGridInk
+import com.truong.fridgezero.ui.theme.DotGridSpec
+import com.truong.fridgezero.ui.theme.PaperCream
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -7749,10 +11149,11 @@ class LodAndFreshnessTest {
 
   @Test
   fun freshnessThresholdsMatchSpec() {
+    assertEquals(Freshness.BAD, freshnessOf(-1))
     assertEquals(Freshness.BAD, freshnessOf(0))
-    assertEquals(Freshness.BAD, freshnessOf(1))
-    assertEquals(Freshness.WARN, freshnessOf(2))
-    assertEquals(Freshness.WARN, freshnessOf(3))
+    assertEquals(Freshness.SOON, freshnessOf(1))
+    assertEquals(Freshness.OK, freshnessOf(2))
+    assertEquals(Freshness.OK, freshnessOf(3))
     assertEquals(Freshness.OK, freshnessOf(4))
   }
 
@@ -7838,6 +11239,376 @@ class LodAndFreshnessTest {
     assertTrue(comps[0].y == 0.02f && comps[1].y == 0.02f)
     assertEquals(CompartmentKind.DRAWER, comps[2].kind)
     assertEquals(CompartmentKind.DRAWER, comps[3].kind)
+  }
+
+  @Test
+  fun shelfLifeItemRuleOverridesGroupFallback() {
+    assertEquals(7, ConfigurableShelfLifeRepository.suggestDays("milk", FoodGroup.SUA_TRUNG, StorageZone.CHILLED))
+    assertEquals(21, ConfigurableShelfLifeRepository.suggestDays("egg", FoodGroup.SUA_TRUNG, StorageZone.CHILLED))
+    EmojiIconRepository.entries.forEach { entry ->
+      assertNotNull(
+        "Missing chilled shelf-life rule for ${entry.key}",
+        ConfigurableShelfLifeRepository.suggestDays(entry.key, entry.group, StorageZone.CHILLED)
+      )
+    }
+  }
+
+  @Test
+  fun shelfLifeZoneSwitchingUsesChilledFreezerAndDrawerRules() {
+    assertEquals(2, ConfigurableShelfLifeRepository.suggestDays("chicken", FoodGroup.THIT, StorageZone.CHILLED))
+    assertEquals(270, ConfigurableShelfLifeRepository.suggestDays("chicken", FoodGroup.THIT, StorageZone.FREEZER))
+    assertEquals(14, ConfigurableShelfLifeRepository.suggestDays("carrot", FoodGroup.RAU, StorageZone.CHILLED))
+    assertEquals(21, ConfigurableShelfLifeRepository.suggestDays("carrot", FoodGroup.RAU, StorageZone.DRAWER))
+  }
+
+  @Test
+  fun shelfLifeFallsBackToGroupForUnknownItemKeys() {
+    assertEquals(3, ConfigurableShelfLifeRepository.suggestDays("custom_item", FoodGroup.THIT, StorageZone.CHILLED))
+    assertEquals(3, ConfigurableShelfLifeRepository.suggestDays("custom_item", FoodGroup.AN_SAN, StorageZone.CHILLED))
+  }
+
+  @Test
+  fun culinaryCatalogCoversAll32IconKeysAndMeetsRecipeMetadataSpec() {
+    val recipes = CulinaryGuideRepository.recipes
+    assertEquals(36, recipes.size)
+    assertEquals(36, recipes.map { it.id }.toSet().size)
+
+    val coveredKeys = recipes
+      .flatMap { it.fridgeIngredients }
+      .flatMap { it.iconKeys }
+      .toSet()
+    val allIconKeys = EmojiIconRepository.entries.map { it.key }.toSet()
+    assertTrue("Missing icon keys: ${allIconKeys - coveredKeys}", coveredKeys.containsAll(allIconKeys))
+
+    recipes.forEach { recipe ->
+      assertTrue("${recipe.id} must have 1..4 fridge ingredients", recipe.fridgeIngredients.size in 1..4)
+      assertTrue("${recipe.id} must declare pantry staples", recipe.pantryStaples.isNotEmpty())
+      assertTrue("${recipe.id} must have 4..5 steps", recipe.steps.size in 4..5)
+      assertTrue("${recipe.id} must cite sourceName", recipe.sourceName.isNotBlank())
+      assertTrue("${recipe.id} must cite https sourceUrl", recipe.sourceUrl.startsWith("https://"))
+      assertEquals(
+        "${recipe.id} QUICK_15 tag must align with cookMinutes <= 15",
+        recipe.cookMinutes <= 15,
+        CulinaryFilter.QUICK_15 in recipe.categories
+      )
+      assertEquals(
+        "${recipe.id} difficulty should default from cookMinutes",
+        if (recipe.cookMinutes <= 15) RecipeDifficulty.EASY else RecipeDifficulty.MEDIUM,
+        recipe.difficulty
+      )
+      recipe.fridgeIngredients.forEach { ing ->
+        assertTrue("${recipe.id}/${ing.name} amountText blank", ing.amountText.isNotBlank())
+        assertTrue("${recipe.id}/${ing.name} unitsToConsume < 1", ing.unitsToConsume >= 1)
+      }
+    }
+
+    val seedDisplay = Seed.foodItems(20_000L).toDisplay(20_000L)
+    val readyNow = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.READY_NOW)
+    assertTrue("Expected at least 10 seed-ready recipes, found ${readyNow.size}", readyNow.size >= 10)
+
+    val rescueUrgent = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.RESCUE_URGENT)
+    assertTrue(rescueUrgent.isNotEmpty())
+    assertTrue(rescueUrgent.all { it.hasUrgentMatch })
+
+    val topOverall = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ALL).first()
+    assertTrue(topOverall.isReadyToCook)
+    assertTrue(topOverall.hasUrgentMatch)
+    assertTrue(topOverall.matchedIngredients.all { it.tier == MatchTier.EXACT_ICON })
+  }
+
+  @Test
+  fun culinaryEngineThreeLayerMatchingPicksEarliestExpiryAndAvoidsDoubleAssignment() {
+    val recipe = CulinaryRecipe(
+      id = "test_3layer",
+      title = "Test 3-layer recipe",
+      emoji = "🍳",
+      summary = "Test",
+      cookMinutes = 15,
+      categories = setOf(CulinaryFilter.QUICK_15),
+      fridgeIngredients = listOf(
+        RecipeIngredient("Thịt gà", listOf("chicken"), listOf("thịt gà", "gà"), FoodGroup.THIT, "200g"),
+        RecipeIngredient("Ớt chuông", listOf("bell_pepper"), listOf("ớt chuông"), FoodGroup.RAU, "1 quả"),
+        RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "1 củ"),
+        RecipeIngredient("Bơ", listOf("butter"), listOf("bơ"), FoodGroup.SUA_TRUNG, "10g")
+      ),
+      pantryStaples = listOf("Muối"),
+      steps = listOf("B1", "B2", "B3", "B4"),
+      sourceName = "VnExpress Ẩm Thực",
+      sourceUrl = "https://vnexpress.net/doi-song/cooking"
+    )
+    val fridge = listOf(
+      DisplayItem(10L, listOf(10L), "fresh", "Ức gà tươi", "chicken", FoodGroup.THIT, 1, minDaysLeft = 5),
+      DisplayItem(11L, listOf(11L), "fresh", "Đùi gà", "chicken", FoodGroup.THIT, 1, minDaysLeft = 1),
+      DisplayItem(12L, listOf(12L), "fresh", "Thịt bò", "meat", FoodGroup.THIT, 1, minDaysLeft = 0),
+      DisplayItem(13L, listOf(13L), "crisper", "Ot chuong do", "custom_veg", FoodGroup.RAU, 1, minDaysLeft = 2),
+      DisplayItem(14L, listOf(14L), "crisper", "Nấm đùi gà", "mushroom", FoodGroup.RAU, 1, minDaysLeft = 3)
+    )
+
+    val eval = CulinaryGuideEngine.evaluate(recipe, fridge)
+    assertEquals(3, eval.matchedCount)
+    assertEquals(1, eval.missingIngredients.size)
+    assertEquals("Bơ", eval.missingIngredients.single().name)
+
+    val chickenMatch = eval.matchedIngredients.first { it.ingredient.name == "Thịt gà" }
+    assertEquals(MatchTier.EXACT_ICON, chickenMatch.tier)
+    assertEquals(11L, chickenMatch.item.primaryId)
+
+    val pepperMatch = eval.matchedIngredients.first { it.ingredient.name == "Ớt chuông" }
+    assertEquals(MatchTier.KEYWORD, pepperMatch.tier)
+    assertEquals(13L, pepperMatch.item.primaryId)
+
+    val carrotMatch = eval.matchedIngredients.first { it.ingredient.name == "Cà rốt" }
+    assertEquals(MatchTier.GROUP_FALLBACK, carrotMatch.tier)
+    assertEquals(14L, carrotMatch.item.primaryId)
+
+    // Layer 3 must not steal an exact Layer 1 item belonging to another ingredient in the same recipe.
+    val antiStealRecipe = CulinaryRecipe(
+      id = "anti_steal",
+      title = "Anti steal",
+      emoji = "🥗",
+      summary = "Test",
+      cookMinutes = 10,
+      categories = setOf(CulinaryFilter.QUICK_15),
+      fridgeIngredients = listOf(
+        RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "1 củ"),
+        RecipeIngredient("Xà lách", listOf("lettuce"), listOf("xà lách"), FoodGroup.RAU, "1 bó")
+      ),
+      pantryStaples = listOf("Muối"),
+      steps = listOf("B1", "B2", "B3", "B4"),
+      sourceName = "Cooky",
+      sourceUrl = "https://www.cooky.vn/cach-lam"
+    )
+    val antiStealEval = CulinaryGuideEngine.evaluate(
+      antiStealRecipe,
+      listOf(
+        DisplayItem(20L, listOf(20L), "crisper", "Xà lách", "lettuce", FoodGroup.RAU, 1, minDaysLeft = 2),
+        DisplayItem(21L, listOf(21L), "crisper", "Nấm rơm", "mushroom", FoodGroup.RAU, 1, minDaysLeft = 4)
+      )
+    )
+    assertTrue(antiStealEval.isReadyToCook)
+    val lettuceRes = antiStealEval.matchedIngredients.first { it.ingredient.name == "Xà lách" }
+    assertEquals(MatchTier.EXACT_ICON, lettuceRes.tier)
+    assertEquals(20L, lettuceRes.item.primaryId)
+    val carrotRes = antiStealEval.matchedIngredients.first { it.ingredient.name == "Cà rốt" }
+    assertEquals(MatchTier.GROUP_FALLBACK, carrotRes.tier)
+    assertEquals(21L, carrotRes.item.primaryId)
+
+    // Single RAU item must never be assigned to two ingredients in the same recipe.
+    val singleRauEval = CulinaryGuideEngine.evaluate(
+      antiStealRecipe,
+      listOf(DisplayItem(21L, listOf(21L), "crisper", "Nấm rơm", "mushroom", FoodGroup.RAU, 1, minDaysLeft = 4))
+    )
+    assertEquals(1, singleRauEval.matchedCount)
+    assertEquals(1, singleRauEval.missingIngredients.size)
+    assertFalse(singleRauEval.isReadyToCook)
+  }
+
+  @Test
+  fun culinaryEngineExpiryRescueScoringAndFilterRanking() {
+    fun makeRecipe(
+      id: String,
+      cookMinutes: Int,
+      categories: Set<CulinaryFilter>,
+      vararg keys: Pair<String, FoodGroup>
+    ) = CulinaryRecipe(
+      id = id,
+      title = id,
+      emoji = "🍽️",
+      summary = id,
+      cookMinutes = cookMinutes,
+      categories = categories,
+      fridgeIngredients = keys.map { (k, g) ->
+        RecipeIngredient(k, listOf(k), listOf(k), g, "1 phần")
+      },
+      pantryStaples = listOf("Muối"),
+      steps = listOf("B1", "B2", "B3", "B4"),
+      sourceName = "Savoury Days",
+      sourceUrl = "https://www.savourydays.com/"
+    )
+
+    val twoUrgentReady = makeRecipe(
+      "two_urgent_ready", 12, setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      "salmon" to FoodGroup.CA_HAI_SAN, "lettuce" to FoodGroup.RAU
+    ) // 15 + 15 + 8 = 38
+    val twoFreshReady = makeRecipe(
+      "two_fresh_ready", 25, setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      "milk" to FoodGroup.SUA_TRUNG, "carrot" to FoodGroup.RAU
+    ) // 6 + 6 + 8 = 20
+    val oneUrgentOneMissing = makeRecipe(
+      "one_urgent_missing", 15, setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      "chicken" to FoodGroup.THIT, "dumpling" to FoodGroup.AN_SAN
+    ) // 15 - 3 = 12
+    val twoMissing = makeRecipe(
+      "two_missing", 20, setOf(CulinaryFilter.VIET_HOME),
+      "mango" to FoodGroup.TRAI_CAY, "apple" to FoodGroup.TRAI_CAY
+    ) // -3 - 3 = -6
+
+    val fridge = listOf(
+      DisplayItem(1L, listOf(1L), "freezer", "Cá hồi", "salmon", FoodGroup.CA_HAI_SAN, 1, minDaysLeft = -1),
+      DisplayItem(2L, listOf(2L), "crisper", "Xà lách", "lettuce", FoodGroup.RAU, 1, minDaysLeft = 1),
+      DisplayItem(3L, listOf(3L), "fresh", "Thịt gà", "chicken", FoodGroup.THIT, 1, minDaysLeft = 1),
+      DisplayItem(4L, listOf(4L), "fresh", "Sữa", "milk", FoodGroup.SUA_TRUNG, 1, minDaysLeft = 2),
+      DisplayItem(5L, listOf(5L), "crisper", "Cà rốt", "carrot", FoodGroup.RAU, 1, minDaysLeft = 8)
+    )
+    val subset = listOf(twoMissing, twoFreshReady, oneUrgentOneMissing, twoUrgentReady)
+
+    val all = CulinaryGuideEngine.recommend(fridge, CulinaryFilter.ALL, subset)
+    assertEquals(listOf("two_urgent_ready", "two_fresh_ready", "one_urgent_missing", "two_missing"), all.map { it.recipe.id })
+    assertEquals(listOf(38, 20, 12, -6), all.map { it.score })
+
+    assertEquals(listOf("two_urgent_ready", "two_fresh_ready"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.READY_NOW, subset).map { it.recipe.id })
+    assertEquals(listOf("two_urgent_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.RESCUE_URGENT, subset).map { it.recipe.id })
+    assertEquals(listOf("two_urgent_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.QUICK_15, subset).map { it.recipe.id })
+    assertEquals(listOf("two_urgent_ready", "two_fresh_ready", "two_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.VIET_HOME, subset).map { it.recipe.id })
+    assertEquals(listOf("two_fresh_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.EAT_CLEAN, subset).map { it.recipe.id })
+  }
+
+  @Test
+  fun culinaryEnginePantryStaplesNeverBlockReadiness() {
+    val recipe = CulinaryRecipe(
+      id = "pantry_only_test",
+      title = "Trứng chiên nước mắm tỏi",
+      emoji = "🥚",
+      summary = "Gia vị cơ bản không bao giờ chặn trạng thái đủ đồ.",
+      cookMinutes = 10,
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(
+        RecipeIngredient("Trứng gà", listOf("egg"), listOf("trứng"), FoodGroup.SUA_TRUNG, "2 quả")
+      ),
+      pantryStaples = listOf("Tỏi băm", "Nước mắm", "Dầu ăn", "Tiêu xay", "Muối", "Đường"),
+      steps = listOf("Đánh trứng.", "Phi thơm tỏi.", "Chiên trứng.", "Chan nước mắm đường và rắc tiêu."),
+      sourceName = "VnExpress Ẩm Thực",
+      sourceUrl = "https://vnexpress.net/doi-song/cooking"
+    )
+    val fridgeWithOnlyEgg = listOf(
+      DisplayItem(1L, listOf(1L), "fresh", "Trứng", "egg", FoodGroup.SUA_TRUNG, 2, minDaysLeft = 5)
+    )
+
+    val result = CulinaryGuideEngine.evaluate(recipe, fridgeWithOnlyEgg)
+    assertTrue(result.isReadyToCook)
+    assertTrue(result.missingIngredients.isEmpty())
+    assertEquals(1, result.matchedCount)
+    assertEquals(14, result.score)
+  }
+
+  @Test
+  fun culinaryEnginePlanDeductionsDecrementsAndMarksUsedUpEarliestFirst() {
+    val today = 20_000L
+    val milkEarly = FoodItemEntity(
+      id = 101L,
+      compartmentId = "fresh",
+      name = "Sữa tươi",
+      iconKey = "milk",
+      group = FoodGroup.SUA_TRUNG.name,
+      quantity = 1,
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 1,
+      status = ItemStatus.ACTIVE
+    )
+    val milkLater = FoodItemEntity(
+      id = 102L,
+      compartmentId = "fresh",
+      name = "Sữa tươi",
+      iconKey = "milk",
+      group = FoodGroup.SUA_TRUNG.name,
+      quantity = 3,
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 4,
+      status = ItemStatus.ACTIVE
+    )
+    val chickenSingle = FoodItemEntity(
+      id = 103L,
+      compartmentId = "fresh",
+      name = "Thịt gà",
+      iconKey = "chicken",
+      group = FoodGroup.THIT.name,
+      quantity = 1,
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 1,
+      status = ItemStatus.ACTIVE
+    )
+
+    val milkDisplay = listOf(milkLater, milkEarly).toDisplay(today).single()
+    val chickenDisplay = listOf(chickenSingle).toDisplay(today).single()
+
+    val matched = listOf(
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Sữa tươi", listOf("milk"), listOf("sữa"), FoodGroup.SUA_TRUNG, "2 hộp", unitsToConsume = 2),
+        item = milkDisplay,
+        tier = MatchTier.EXACT_ICON
+      ),
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Thịt gà", listOf("chicken"), listOf("gà"), FoodGroup.THIT, "300g", unitsToConsume = 1),
+        item = chickenDisplay,
+        tier = MatchTier.EXACT_ICON
+      )
+    )
+    val entitiesById = mapOf(
+      101L to milkEarly,
+      102L to milkLater,
+      103L to chickenSingle
+    )
+
+    val deductions = CulinaryGuideEngine.planDeductions(matched, entitiesById).associateBy { it.itemId }
+    assertEquals(3, deductions.size)
+    assertEquals(0, deductions[101L]?.remainingQuantity)
+    assertEquals(2, deductions[102L]?.remainingQuantity)
+    assertEquals(0, deductions[103L]?.remainingQuantity)
+  }
+
+  @Test
+  fun fridge3dUrlAllowlistAllowsOnlyLocalAssetsAndAboutBlank() {
+    assertTrue(isAllowedFridge3dUrl("file:///android_asset/fridge3d/index.html"))
+    assertTrue(isAllowedFridge3dUrl("file:///android_asset/fridge3d/index.html?q=lite"))
+    assertTrue(isAllowedFridge3dUrl("file:///android_asset/fridge3d/index.html?q=high"))
+    assertTrue(isAllowedFridge3dUrl("file:///android_asset/fridge3d/three.min.js"))
+    assertTrue(isAllowedFridge3dUrl("about:blank"))
+
+    assertFalse(isAllowedFridge3dUrl("https://example.com"))
+    assertFalse(isAllowedFridge3dUrl("http://localhost:8080/"))
+    assertFalse(isAllowedFridge3dUrl("file:///data/local/tmp/exploit.html"))
+    assertFalse(isAllowedFridge3dUrl("file:///android_asset/fridge3d/../secret.html"))
+    assertFalse(isAllowedFridge3dUrl(""))
+    assertFalse(isAllowedFridge3dUrl(null))
+  }
+
+  @Test
+  fun webGlQualityResolvesLiteForLowRamLowMemOrForcedFlag() {
+    assertEquals("high", resolveWebGlQuality(isLowRamDevice = false, totalMemBytes = 8L * 1024 * 1024 * 1024, forceLiteMode = false))
+    assertEquals("lite", resolveWebGlQuality(isLowRamDevice = true, totalMemBytes = 8L * 1024 * 1024 * 1024, forceLiteMode = false))
+    assertEquals("lite", resolveWebGlQuality(isLowRamDevice = false, totalMemBytes = LOW_MEM_THRESHOLD_BYTES, forceLiteMode = false))
+    assertEquals("lite", resolveWebGlQuality(isLowRamDevice = false, totalMemBytes = 8L * 1024 * 1024 * 1024, forceLiteMode = true))
+  }
+
+  @Test
+  fun boundedWebGlCrashTrackerEnforcesTwoRecoveriesIn60SecondsThenFallback() {
+    val tracker = BoundedWebGlCrashTracker(windowMs = 60_000L, maxRecoveries = 2)
+
+    assertEquals(WebGlRecoveryAction.REBUILD_IN_LITE_AND_PERSIST, tracker.recordCrash(1_000L))
+    assertEquals(1, tracker.recentCrashCount(1_000L))
+    assertEquals(WebGlRecoveryAction.REBUILD_IN_LITE, tracker.recordCrash(10_000L))
+    assertEquals(2, tracker.recentCrashCount(10_000L))
+    assertEquals(WebGlRecoveryAction.FALLBACK_TO_2D, tracker.recordCrash(59_000L))
+
+    // Leaving and re-entering screen resets recovery budget.
+    tracker.reset()
+    assertEquals(0, tracker.recentCrashCount(60_000L))
+    assertEquals(WebGlRecoveryAction.REBUILD_IN_LITE_AND_PERSIST, tracker.recordCrash(100_000L))
+    assertEquals(WebGlRecoveryAction.REBUILD_IN_LITE, tracker.recordCrash(120_000L))
+
+    // Old entries (> 60s earlier) expire from sliding window.
+    assertEquals(WebGlRecoveryAction.REBUILD_IN_LITE, tracker.recordCrash(165_000L))
+    assertEquals(2, tracker.recentCrashCount(165_000L))
+  }
+
+  @Test
+  fun dotGridSpecMatchesDesignTokens() {
+    assertEquals("#EAE2D3", DotGridSpec.PAPER_HEX)
+    assertEquals("#C4B8A3", DotGridSpec.DOT_HEX)
+    assertEquals(18f, DotGridSpec.STEP_DP, 0.0001f)
+    assertEquals(1.5f, DotGridSpec.DOT_RADIUS_DP, 0.0001f)
+    assertEquals(PaperCream, DotGridSpec.paperColor)
+    assertEquals(DotGridInk, DotGridSpec.dotColor)
   }
 }
 ```

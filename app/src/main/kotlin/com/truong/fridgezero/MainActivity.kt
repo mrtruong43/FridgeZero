@@ -3,9 +3,11 @@ package com.truong.fridgezero
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.util.Log
+import android.webkit.WebView
 import android.widget.Toast
 import java.io.File
 import androidx.activity.ComponentActivity
@@ -59,6 +61,7 @@ import com.truong.fridgezero.ui.fridge3d.LocalFridge3DStageController
 import com.truong.fridgezero.ui.fridge3d.SharedFridge3DWebView
 import com.truong.fridgezero.ui.fridge3d.rememberFridge3DStageController
 import com.truong.fridgezero.ui.home.HomeScreen
+import com.truong.fridgezero.ui.recipes.CulinaryGuideScreen
 import com.truong.fridgezero.ui.theme.BodyFont
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
@@ -93,11 +96,16 @@ private sealed interface RootRoute {
   data object Designer : RootRoute
   data object AiScan : RootRoute
   data class Bento(val compartmentId: String, val filterUrgent: Boolean = false) : RootRoute
+  data class Recipes(val initialRecipeId: String? = null) : RootRoute
 }
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+
+    if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+      WebView.setWebContentsDebuggingEnabled(true)
+    }
 
     val crashFile = File(applicationContext.filesDir, CRASH_TRACE_FILE)
     if (Thread.getDefaultUncaughtExceptionHandler() !is FridgeCrashHandler) {
@@ -155,6 +163,7 @@ class MainActivity : ComponentActivity() {
               // Single shared WebView hosted at root above dotGridBackground and below foreground UI
               SharedFridge3DWebView(
                 controller = stageController,
+                appConfig = appConfig,
                 modifier = Modifier.zIndex(1f)
               )
 
@@ -198,6 +207,16 @@ class MainActivity : ComponentActivity() {
                     BackHandler { route = RootRoute.Home }
                     AiScanPlaceholderScreen(onBack = { route = RootRoute.Home })
                   }
+                  route is RootRoute.Recipes -> {
+                    val recipesRoute = route as RootRoute.Recipes
+                    BackHandler { route = RootRoute.Home }
+                    CulinaryGuideScreen(
+                      compartments = uiState.compartments,
+                      initialRecipeId = recipesRoute.initialRecipeId,
+                      onBack = { route = RootRoute.Home },
+                      onConsumeRecipe = { rec -> vm.consumeRecipeIngredients(rec.matchedIngredients) }
+                    )
+                  }
                   route is RootRoute.Bento -> {
                     val bentoRoute = route as RootRoute.Bento
                     val comp = uiState.compartments.firstOrNull { it.id == bentoRoute.compartmentId }
@@ -228,7 +247,6 @@ class MainActivity : ComponentActivity() {
                           reminderController.onItemSavedWithExpiry(daysLeft)
                         },
                         onAdjustQuantity = vm::adjustQuantity,
-                        onToggleOpened = vm::toggleItemOpened,
                         onMoveCompartment = { ids, targetId, newDays ->
                           vm.moveItemToCompartment(ids, targetId, newDays)
                         },
@@ -253,6 +271,10 @@ class MainActivity : ComponentActivity() {
                         vm.addItem(compId, name, iconKey, qty, daysLeft, unit)
                         reminderController.onItemSavedWithExpiry(daysLeft)
                       },
+                      onMarkStatus = { ids, status ->
+                        vm.markItemStatus(ids, status)
+                      },
+                      onOpenRecipes = { recipeId -> route = RootRoute.Recipes(recipeId) },
                       onOpenAiScan = { route = RootRoute.AiScan },
                       onOpenDesigner = { route = RootRoute.Designer }
                     )

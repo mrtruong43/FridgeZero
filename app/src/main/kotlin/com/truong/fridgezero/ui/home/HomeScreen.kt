@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +42,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -57,15 +59,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.truong.fridgezero.R
 import com.truong.fridgezero.data.CompartmentEntity
+import com.truong.fridgezero.data.ItemStatus
 import com.truong.fridgezero.domain.CompartmentUi
+import com.truong.fridgezero.domain.CulinaryFilter
+import com.truong.fridgezero.domain.CulinaryGuideEngine
 import com.truong.fridgezero.domain.Freshness
 import com.truong.fridgezero.domain.FridgeUiState
 import com.truong.fridgezero.ui.bento.QuickAddItemSheet
 import com.truong.fridgezero.ui.fridge3d.DoorProjection
+import com.truong.fridgezero.ui.fridge3d.FallbackCompartmentStat
 import com.truong.fridgezero.ui.fridge3d.Fridge3DStageSlot
+import com.truong.fridgezero.ui.fridge3d.LocalFridge3DStageController
 import com.truong.fridgezero.ui.theme.BodyFont
 import com.truong.fridgezero.ui.theme.ButterPale
 import com.truong.fridgezero.ui.theme.CoralUrgent
+import com.truong.fridgezero.ui.theme.DotGridSpec
 import com.truong.fridgezero.ui.theme.InkBlack
 import com.truong.fridgezero.ui.theme.LemonWarn
 import com.truong.fridgezero.ui.theme.LilacAccent
@@ -93,12 +101,26 @@ fun HomeScreen(
   onWelcomeSpinConsumed: () -> Unit,
   onOpenCompartment: (compartmentId: String, filterUrgent: Boolean) -> Unit,
   onAddItem: (compartmentId: String, name: String, iconKey: String, quantity: Int, daysLeft: Int, unit: String?) -> Unit,
+  onMarkStatus: (ids: List<Long>, status: ItemStatus) -> Unit,
+  onOpenRecipes: (recipeId: String?) -> Unit,
   onOpenAiScan: () -> Unit,
   onOpenDesigner: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   val fridge = uiState.activeFridge
   val compartments = uiState.compartments
+  val allItems = remember(compartments) { compartments.flatMap { it.items } }
+  val recommendations = remember(allItems) {
+    CulinaryGuideEngine.recommend(allItems, CulinaryFilter.ALL)
+  }
+  val readyRecipeCount = remember(recommendations) {
+    recommendations.count { it.isReadyToCook }
+  }
+  val topRecommendation = remember(recommendations) {
+    recommendations.firstOrNull { it.hasUrgentMatch }
+      ?: recommendations.firstOrNull { it.matchedCount > 0 }
+      ?: recommendations.firstOrNull()
+  }
   val entities = remember(fridge?.id, compartments) {
     val fridgeId = fridge?.id ?: "default_fridge"
     compartments.mapIndexed { idx, c ->
@@ -134,13 +156,26 @@ fun HomeScreen(
     }
   }
 
+  val stageController = LocalFridge3DStageController.current
+  val fallbackStats = remember(compartments) {
+    compartments.associate { comp ->
+      comp.id to FallbackCompartmentStat(
+        itemCount = comp.items.size,
+        worstFreshness = comp.worstFreshness
+      )
+    }
+  }
   val scope = rememberCoroutineScope()
   val haptic = LocalHapticFeedback.current
 
   fun triggerDoorOpen(compartmentId: String) {
     if (isNavigatingOut) return
-    isNavigatingOut = true
     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    if (stageController.use2DFallback) {
+      onOpenCompartment(compartmentId, false)
+      return
+    }
+    isNavigatingOut = true
     openingId = compartmentId
     scope.launch {
       delay(DOOR_OPEN_NAV_DELAY_MS)
@@ -157,29 +192,20 @@ fun HomeScreen(
   ) {
     HomeDashboardHeader(
       compartments = compartments,
+      topRecommendation = topRecommendation,
       remindersEnabled = remindersEnabled,
       onToggleReminders = onToggleReminders,
-      onOpenCompartment = onOpenCompartment
+      onOpenCompartment = onOpenCompartment,
+      onOpenRecipes = onOpenRecipes,
+      onMarkStatus = onMarkStatus
     )
 
     // Center 3D Hero Stage + Floating "+ Thêm nhanh" button
     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
       Box(
         modifier = Modifier
-          .align(Alignment.TopCenter)
-          .padding(top = 4.dp)
-      ) {
-        StickerBadge(
-          text = stringResource(R.string.home_stage_hint),
-          containerColor = SurfaceWhite,
-          tiltDegrees = 0f
-        )
-      }
-
-      Box(
-        modifier = Modifier
           .fillMaxSize()
-          .padding(top = 24.dp, bottom = 12.dp)
+          .padding(top = 6.dp, bottom = 8.dp)
       ) {
         Fridge3DStageSlot(
           colorKey = fridge?.colorKey ?: "inox",
@@ -191,16 +217,19 @@ fun HomeScreen(
           playWelcomeSpin = uiState.playWelcomeSpin,
           onWelcomeSpinConsumed = onWelcomeSpinConsumed,
           showStickers = true,
-          surfaceBg = "#FAF8F5",
+          compartmentStats = fallbackStats,
+          surfaceBg = DotGridSpec.PAPER_HEX,
           onDoorClick = { compId -> triggerDoorOpen(compId) },
           onProjectionsUpdated = { projections = it },
           modifier = Modifier.fillMaxSize()
         )
-        DoorStickersOverlay(
-          compartments = compartments,
-          projections = projections,
-          onStickerClick = { compId -> triggerDoorOpen(compId) }
-        )
+        if (!stageController.use2DFallback) {
+          DoorStickersOverlay(
+            compartments = compartments,
+            projections = projections,
+            onStickerClick = { compId -> triggerDoorOpen(compId) }
+          )
+        }
       }
 
       // Floating "+ Thêm nhanh" CTA anchored above bottom-right of Task Bar
@@ -240,9 +269,11 @@ fun HomeScreen(
       }
     }
 
-    // Fixed 72.dp Neo-Brutalist Bottom Task Bar
+    // Fixed Neo-Brutalist 4-Button Bottom Task Bar calibrated for 360dp+ viewports
     HomeTaskBar(
+      readyRecipeCount = readyRecipeCount,
       onResetFridgeView = { resetOrbitKey++ },
+      onOpenRecipes = { onOpenRecipes(null) },
       onOpenAiScan = onOpenAiScan,
       onOpenDesigner = onOpenDesigner
     )
@@ -321,7 +352,7 @@ private fun DoorStickerBadge(
 ) {
   val dotColor = when (compartment.worstFreshness) {
     Freshness.BAD -> CoralUrgent
-    Freshness.WARN -> LemonWarn
+    Freshness.SOON -> LemonWarn
     Freshness.OK -> LimeFresh
   }
   val cd = stringResource(
@@ -355,13 +386,13 @@ private fun DoorStickerBadge(
         .border(2.dp, InkBlack, shape)
         .clip(shape)
         .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-        .padding(horizontal = 9.dp, vertical = 5.dp),
+        .padding(horizontal = 10.dp, vertical = 6.dp),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(5.dp)
+      horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
       Box(
         modifier = Modifier
-          .size(9.dp)
+          .size(10.dp)
           .clip(CircleShape)
           .background(dotColor)
           .border(1.5.dp, InkBlack, CircleShape)
@@ -370,7 +401,7 @@ private fun DoorStickerBadge(
         text = compartment.name,
         fontFamily = BodyFont,
         fontWeight = FontWeight.ExtraBold,
-        fontSize = 11.sp,
+        fontSize = 12.sp,
         color = InkBlack,
         softWrap = false,
         maxLines = 1,
@@ -378,15 +409,18 @@ private fun DoorStickerBadge(
       )
       Box(
         modifier = Modifier
-          .clip(RoundedCornerShape(6.dp))
+          .defaultMinSize(minWidth = 22.dp)
+          .clip(RoundedCornerShape(7.dp))
           .background(InkBlack)
-          .padding(horizontal = 5.dp, vertical = 1.dp)
+          .padding(horizontal = 7.dp, vertical = 2.dp),
+        contentAlignment = Alignment.Center
       ) {
         Text(
           text = "${compartment.items.size}",
           fontFamily = MonoFont,
           fontWeight = FontWeight.ExtraBold,
-          fontSize = 10.sp,
+          fontSize = 13.sp,
+          lineHeight = 14.sp,
           color = LimeFresh,
           softWrap = false,
           maxLines = 1
@@ -398,7 +432,9 @@ private fun DoorStickerBadge(
 
 @Composable
 private fun HomeTaskBar(
+  readyRecipeCount: Int,
   onResetFridgeView: () -> Unit,
+  onOpenRecipes: () -> Unit,
   onOpenAiScan: () -> Unit,
   onOpenDesigner: () -> Unit
 ) {
@@ -416,80 +452,87 @@ private fun HomeTaskBar(
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .height(72.dp)
-        .padding(horizontal = 12.dp, vertical = 10.dp),
+        .height(74.dp)
+        .padding(horizontal = 8.dp, vertical = 8.dp),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(10.dp)
+      horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-      NeoBrutalistButton(
-        onClick = onResetFridgeView,
-        modifier = Modifier.weight(1f).fillMaxHeight(),
+      CompactTaskTabButton(
+        emoji = "🧊",
+        label = stringResource(R.string.home_tab_fridge_short),
         containerColor = ButterPale,
-        cornerRadius = 12.dp,
-        borderWidth = 2.dp,
-        shadowOffset = 3.dp,
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
-      ) {
-        Text(
-          text = stringResource(R.string.home_tab_fridge),
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 12.sp,
-          color = InkBlack,
-          softWrap = false,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis
-        )
-      }
-
-      Box(modifier = Modifier.weight(1.05f).fillMaxHeight()) {
-        NeoBrutalistButton(
-          onClick = onOpenAiScan,
-          modifier = Modifier.fillMaxSize(),
-          containerColor = LilacAccent,
-          cornerRadius = 12.dp,
-          borderWidth = 2.dp,
-          shadowOffset = 3.dp,
-          contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
-        ) {
-          Text(
-            text = stringResource(R.string.home_tab_scan_ai),
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 12.sp,
-            color = InkBlack,
-            softWrap = false,
-            maxLines = 1
-          )
-        }
-        Box(
-          modifier = Modifier
-            .align(Alignment.TopEnd)
-            .offset(x = 4.dp, y = (-6).dp)
-        ) {
-          StickerBadge(
-            text = stringResource(R.string.home_tab_scan_badge),
-            containerColor = LemonWarn,
-            tiltDegrees = 3f,
-            mono = true
-          )
-        }
-      }
-
-      NeoBrutalistButton(
-        onClick = onOpenDesigner,
-        modifier = Modifier.weight(1f).fillMaxHeight(),
+        onClick = onResetFridgeView,
+        modifier = Modifier.weight(1f).fillMaxHeight()
+      )
+      CompactTaskTabButton(
+        emoji = "🍳",
+        label = stringResource(R.string.home_tab_recipes_short),
         containerColor = SurfaceWhite,
-        cornerRadius = 12.dp,
-        borderWidth = 2.dp,
-        shadowOffset = 3.dp,
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+        badgeText = if (readyRecipeCount > 0) "$readyRecipeCount" else null,
+        badgeColor = LimeFresh,
+        contentDescriptionText = stringResource(R.string.home_tab_recipes_cd),
+        onClick = onOpenRecipes,
+        modifier = Modifier.weight(1f).fillMaxHeight()
+      )
+      CompactTaskTabButton(
+        emoji = "📷",
+        label = stringResource(R.string.home_tab_scan_ai_short),
+        containerColor = LilacAccent,
+        badgeText = stringResource(R.string.home_tab_scan_badge),
+        badgeColor = LemonWarn,
+        onClick = onOpenAiScan,
+        modifier = Modifier.weight(1f).fillMaxHeight()
+      )
+      CompactTaskTabButton(
+        emoji = "⚙️",
+        label = stringResource(R.string.home_tab_redesign_short),
+        containerColor = SurfaceWhite,
+        onClick = onOpenDesigner,
+        modifier = Modifier.weight(1f).fillMaxHeight()
+      )
+    }
+    Spacer(Modifier.navigationBarsPadding())
+  }
+}
+
+@Composable
+private fun CompactTaskTabButton(
+  emoji: String,
+  label: String,
+  containerColor: Color,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+  badgeText: String? = null,
+  badgeColor: Color = LimeFresh,
+  contentDescriptionText: String? = null
+) {
+  val buttonModifier = if (contentDescriptionText != null) {
+    Modifier.fillMaxSize().semantics { contentDescription = contentDescriptionText }
+  } else {
+    Modifier.fillMaxSize()
+  }
+  Box(modifier = modifier) {
+    NeoBrutalistButton(
+      onClick = onClick,
+      modifier = buttonModifier,
+      containerColor = containerColor,
+      cornerRadius = 11.dp,
+      borderWidth = 2.dp,
+      shadowOffset = 2.5.dp,
+      contentPadding = PaddingValues(horizontal = 3.dp, vertical = 4.dp)
+    ) {
+      Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp)
       ) {
+        Text(text = emoji, fontSize = 15.sp, lineHeight = 16.sp)
         Text(
-          text = stringResource(R.string.home_tab_redesign),
+          text = label,
           fontFamily = BodyFont,
           fontWeight = FontWeight.ExtraBold,
-          fontSize = 12.sp,
+          fontSize = 10.5.sp,
+          lineHeight = 12.sp,
           color = InkBlack,
           softWrap = false,
           maxLines = 1,
@@ -497,6 +540,29 @@ private fun HomeTaskBar(
         )
       }
     }
-    Spacer(Modifier.navigationBarsPadding())
+
+    if (badgeText != null) {
+      Box(
+        modifier = Modifier
+          .align(Alignment.TopEnd)
+          .offset(x = (-1).dp, y = (-5).dp)
+          .rotate(3f)
+          .clip(RoundedCornerShape(6.dp))
+          .background(badgeColor)
+          .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+          .padding(horizontal = 5.dp, vertical = 1.dp)
+      ) {
+        Text(
+          text = badgeText,
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 9.sp,
+          lineHeight = 10.sp,
+          color = InkBlack,
+          softWrap = false,
+          maxLines = 1
+        )
+      }
+    }
   }
 }

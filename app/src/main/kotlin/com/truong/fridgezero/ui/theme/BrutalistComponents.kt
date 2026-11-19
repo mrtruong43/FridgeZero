@@ -49,12 +49,12 @@ val BrutalBorder = 2.5.dp
 val BrutalShadow = 4.dp
 val PressShift = 2.dp
 
-/** Warm paper with a cached tiled dot grid (spec §1.1: 1.25.dp dots, 18.dp step). */
+/** Warm paper with a cached tiled dot grid (spec §1.1 & DotGridSpec). */
 fun Modifier.dotGridBackground(
-  paper: Color = PaperCream,
-  dot: Color = DotGridInk,
-  step: Dp = 18.dp,
-  dotRadius: Dp = 0.625.dp
+  paper: Color = DotGridSpec.paperColor,
+  dot: Color = DotGridSpec.dotColor,
+  step: Dp = DotGridSpec.step,
+  dotRadius: Dp = DotGridSpec.dotRadius
 ): Modifier = this.drawWithCache {
   if (size.width <= 0f || size.height <= 0f) {
     return@drawWithCache onDrawBehind {}

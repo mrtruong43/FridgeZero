@@ -10,7 +10,7 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #FAF8F5;
+    background: #EAE2D3;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
@@ -19,7 +19,7 @@
     display: block;
     width: 100%;
     height: 100%;
-    background: #FAF8F5;
+    background: #EAE2D3;
     touch-action: none;
   }
 </style>
@@ -33,6 +33,13 @@ window.addEventListener("error", function(e) {
 console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE) ? THREE.REVISION : "missing");
 (function () {
   "use strict";
+
+  var qualityParam = "";
+  try {
+    qualityParam = new URLSearchParams(window.location.search).get("q") || "";
+  } catch (_) {}
+  var isLiteMode = (qualityParam.toLowerCase() === "lite");
+  console.log("QUALITY_MODE", isLiteMode ? "lite" : "high");
 
   var CAB_W = 1.15;
   var CAB_H = 2.25;
@@ -101,40 +108,63 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
 
   var PROP_COLORS = [0xA3E635, 0xFACC15, 0xFB7185, 0xC084FC];
 
-  // Solid surface-matched WebGL renderer with crisp MSAA anti-aliasing.
+  // Surface-matched WebGL renderer tuned by resolved quality tier (?q=lite vs ?q=high).
   var dpr = window.devicePixelRatio || 1;
-  var currentSurfaceBg = "#FAF8F5";
+  var currentSurfaceBg = "#EAE2D3";
   var renderer = new THREE.WebGLRenderer({
     alpha: false,
-    antialias: true,
-    powerPreference: "high-performance"
+    antialias: !isLiteMode
   });
   renderer.setClearColor(currentSurfaceBg, 1);
-  renderer.setPixelRatio(Math.min(dpr, 2.0));
+  renderer.setPixelRatio(Math.min(dpr, isLiteMode ? 1.5 : 2.0));
   renderer.outputEncoding = THREE.sRGBEncoding;
   document.body.appendChild(renderer.domElement);
 
-  // Power-of-two 64x64 tiled dot-grid matching Compose dotGridBackground() (#FAF8F5 + #D6D3CD @ 18dp).
-  var DOT_STEP_PX = 18;
+  // Power-of-two 64x64 tiled dot-grid driven by Kotlin's single-source-of-truth DotGridSpec.
+  var dotGridConfig = {
+    paperHex: "#EAE2D3",
+    dotHex: "#C4B8A3",
+    stepDp: 18,
+    dotRadiusDp: 1.5,
+    offsetXDp: 0,
+    offsetYDp: 0
+  };
   var lastCssW = window.innerWidth || 360;
   var lastCssH = window.innerHeight || 480;
+
+  function syncDotGridUv(tex) {
+    if (!tex) return;
+    var step = Math.max(2, Number(dotGridConfig.stepDp) || 18);
+    var repX = lastCssW / step;
+    var repY = lastCssH / step;
+    var ox = Number(dotGridConfig.offsetXDp) || 0;
+    var oy = Number(dotGridConfig.offsetYDp) || 0;
+    tex.repeat.set(repX, repY);
+    tex.offset.set(
+      (((ox / step) % 1) + 1) % 1,
+      (((-(repY + oy / step)) % 1) + 1) % 1
+    );
+  }
+
   function createDotGridTexture() {
     var size = 64;
+    var step = Math.max(2, Number(dotGridConfig.stepDp) || 18);
+    var radius = Math.max(0.25, Number(dotGridConfig.dotRadiusDp) || 1.5);
     var canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
     var ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#FAF8F5";
+    ctx.fillStyle = dotGridConfig.paperHex || "#EAE2D3";
     ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = "#D6D3CD";
+    ctx.fillStyle = dotGridConfig.dotHex || "#C4B8A3";
     ctx.beginPath();
-    ctx.arc(size / 2, size / 2, (0.72 / DOT_STEP_PX) * size, 0, Math.PI * 2);
+    ctx.arc(size / 2, size / 2, (radius / step) * size, 0, Math.PI * 2);
     ctx.fill();
     var tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
     tex.encoding = THREE.sRGBEncoding;
-    tex.repeat.set(lastCssW / DOT_STEP_PX, lastCssH / DOT_STEP_PX);
+    syncDotGridUv(tex);
     return tex;
   }
 
@@ -203,8 +233,8 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   scene.environment = studioEnv;
 
   var camera = new THREE.PerspectiveCamera(38, 1, 0.1, 30);
-  camera.position.set(0, 1.30, 4.18);
-  camera.lookAt(0, 1.15, 0);
+  camera.position.set(0, 1.32, 4.72);
+  camera.lookAt(0, 1.16, 0);
 
   // Sculpted high-contrast 3-point studio lighting: upper-front-left key creates bold light/shadow planes.
   var hemiLight = new THREE.HemisphereLight(0xFFFFFF, 0x334155, 0.52);
@@ -265,22 +295,36 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     transparent: true,
     opacity: 0.54
   });
-  var handleMat = new THREE.MeshPhysicalMaterial({
-    color: 0x1E293B,
-    metalness: 0.5,
-    roughness: 0.25,
-    clearcoat: 0.4,
-    clearcoatRoughness: 0.18,
-    envMapIntensity: 0.95
-  });
-  var shellMat = new THREE.MeshPhysicalMaterial({
-    color: SHELL_SPECS.inox.color,
-    metalness: SHELL_SPECS.inox.metalness,
-    roughness: SHELL_SPECS.inox.roughness,
-    clearcoat: SHELL_SPECS.inox.clearcoat,
-    clearcoatRoughness: SHELL_SPECS.inox.clearcoatRoughness,
-    envMapIntensity: SHELL_SPECS.inox.envMapIntensity
-  });
+  var handleMat = isLiteMode
+    ? new THREE.MeshStandardMaterial({
+        color: 0x1E293B,
+        metalness: 0.45,
+        roughness: 0.30,
+        envMapIntensity: 0.90
+      })
+    : new THREE.MeshPhysicalMaterial({
+        color: 0x1E293B,
+        metalness: 0.5,
+        roughness: 0.25,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.18,
+        envMapIntensity: 0.95
+      });
+  var shellMat = isLiteMode
+    ? new THREE.MeshStandardMaterial({
+        color: SHELL_SPECS.inox.color,
+        metalness: SHELL_SPECS.inox.metalness,
+        roughness: SHELL_SPECS.inox.roughness,
+        envMapIntensity: SHELL_SPECS.inox.envMapIntensity
+      })
+    : new THREE.MeshPhysicalMaterial({
+        color: SHELL_SPECS.inox.color,
+        metalness: SHELL_SPECS.inox.metalness,
+        roughness: SHELL_SPECS.inox.roughness,
+        clearcoat: SHELL_SPECS.inox.clearcoat,
+        clearcoatRoughness: SHELL_SPECS.inox.clearcoatRoughness,
+        envMapIntensity: SHELL_SPECS.inox.envMapIntensity
+      });
   var propMats = PROP_COLORS.map(function (c) {
     return new THREE.MeshStandardMaterial({ color: c, roughness: 0.46, metalness: 0.06 });
   });
@@ -356,16 +400,24 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   var doorControllers = []; // { id, kind, rightHinge, pivot, anchor, progress }
   var raycastTargets = [];
   var lastProjectedPayload = "";
+  var dirty = true;
+
+  function markDirty() {
+    dirty = true;
+  }
 
   function updateShellMaterial(colorKey) {
     var spec = SHELL_SPECS[colorKey] || SHELL_SPECS.inox;
     shellMat.color.setHex(spec.color);
     shellMat.metalness = spec.metalness;
     shellMat.roughness = spec.roughness;
-    shellMat.clearcoat = spec.clearcoat;
-    shellMat.clearcoatRoughness = spec.clearcoatRoughness;
+    if (!isLiteMode) {
+      shellMat.clearcoat = spec.clearcoat;
+      shellMat.clearcoatRoughness = spec.clearcoatRoughness;
+    }
     shellMat.envMapIntensity = spec.envMapIntensity;
     shellMat.needsUpdate = true;
+    markDirty();
   }
 
   function rebuildFridge() {
@@ -373,6 +425,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     doorControllers = [];
     raycastTargets = [];
     lastProjectedPayload = "";
+    markDirty();
 
     var halfW = CAB_W / 2;
     var midY = FOOT_H + CAB_H / 2;
@@ -694,7 +747,30 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
         }
       }
 
-      var nextBg = cfg.surfaceBg || (state.showDotGrid ? "#FAF8F5" : "#FFFFFF");
+      if (cfg.dotGrid) {
+        var dg = cfg.dotGrid;
+        var nextPaper = dg.paperHex || dotGridConfig.paperHex;
+        var nextDot = dg.dotHex || dotGridConfig.dotHex;
+        var nextStep = Number(dg.stepDp) || dotGridConfig.stepDp;
+        var nextRadius = Number(dg.dotRadiusDp) || dotGridConfig.dotRadiusDp;
+        var texDirty =
+          nextPaper !== dotGridConfig.paperHex ||
+          nextDot !== dotGridConfig.dotHex ||
+          nextStep !== dotGridConfig.stepDp ||
+          nextRadius !== dotGridConfig.dotRadiusDp;
+        dotGridConfig.paperHex = nextPaper;
+        dotGridConfig.dotHex = nextDot;
+        dotGridConfig.stepDp = nextStep;
+        dotGridConfig.dotRadiusDp = nextRadius;
+        dotGridConfig.offsetXDp = Number(dg.offsetXDp) || 0;
+        dotGridConfig.offsetYDp = Number(dg.offsetYDp) || 0;
+        if (texDirty) {
+          if (dotGridTex) dotGridTex.dispose();
+          dotGridTex = createDotGridTexture();
+        }
+      }
+
+      var nextBg = cfg.surfaceBg || (state.showDotGrid ? dotGridConfig.paperHex : "#FFFFFF");
       if (nextBg !== currentSurfaceBg) {
         currentSurfaceBg = nextBg;
         document.documentElement.style.backgroundColor = nextBg;
@@ -704,7 +780,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       renderer.setClearColor(nextBg, 1);
 
       if (state.showDotGrid) {
-        dotGridTex.repeat.set(lastCssW / DOT_STEP_PX, lastCssH / DOT_STEP_PX);
+        syncDotGridUv(dotGridTex);
         scene.background = dotGridTex;
       } else {
         solidBgColor.set(nextBg);
@@ -720,6 +796,10 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
         layoutSignature = nextSig;
         rebuildFridge();
       }
+      if (state.showStickers) {
+        lastProjectedPayload = "";
+      }
+      markDirty();
     } catch (err) {
       console.error("UPDATE_ERR", err);
     }
@@ -736,6 +816,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       startYaw: restYaw,
       targetYaw: restYaw
     };
+    markDirty();
   };
 
   window.resetView = function () {
@@ -748,6 +829,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       } else {
         yawVel = 0;
       }
+      markDirty();
       return;
     }
     yawVel = 0;
@@ -757,6 +839,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       targetYaw: nearestYaw(yaw, restYaw),
       startPitch: pitch
     };
+    markDirty();
   };
 
   window.playItemAddedBounce = function () {
@@ -764,6 +847,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       startTime: performance.now(),
       impulseApplied: false
     };
+    markDirty();
   };
 
   // Pointer & Raycaster handling
@@ -795,6 +879,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     if (dom.setPointerCapture) {
       try { dom.setPointerCapture(e.pointerId); } catch (_) {}
     }
+    markDirty();
   });
 
   dom.addEventListener("pointermove", function (e) {
@@ -822,6 +907,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
       yawVel = dyaw * 0.75;
     }
     pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, pitch - dy * 0.0022));
+    markDirty();
   });
 
   function handlePointerEnd(e) {
@@ -851,6 +937,7 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
         }
       }
     }
+    markDirty();
   }
 
   dom.addEventListener("pointerup", handlePointerEnd);
@@ -862,13 +949,12 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     console.log("CANVAS_RESIZE", w, h);
     lastCssW = w;
     lastCssH = h;
-    if (dotGridTex) {
-      dotGridTex.repeat.set(w / DOT_STEP_PX, h / DOT_STEP_PX);
-    }
+    syncDotGridUv(dotGridTex);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
     lastProjectedPayload = "";
+    markDirty();
   }
   if (typeof ResizeObserver !== "undefined") {
     var ro = new ResizeObserver(function (entries) {
@@ -883,6 +969,9 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
   window.addEventListener("resize", function () {
     applyResize(window.innerWidth || 0, window.innerHeight || 0);
   });
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) markDirty();
+  });
   applyResize(window.innerWidth || 0, window.innerHeight || 0);
 
   // Frame loop
@@ -893,10 +982,44 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
+  function hasDoorAnimation() {
+    for (var i = 0; i < doorControllers.length; i++) {
+      var dc = doorControllers[i];
+      var target = (dc.id === state.openCompartmentId) ? 1 : 0;
+      if (dc.progress !== target) return true;
+    }
+    return false;
+  }
+
+  function hasActiveMotion() {
+    if (Math.abs(DEFAULT_PITCH - pitch) >= 0.0005) return true;
+    if (state.springReturn) {
+      return Math.abs(yaw - HOME_REST_YAW) >= 0.0005 || Math.abs(yawVel) >= 0.002;
+    }
+    return Math.abs(yawVel) > 0.0002;
+  }
+
+  var contextLost = false;
+  var rafId = 0;
+
   function animate(now) {
-    requestAnimationFrame(animate);
+    if (contextLost) {
+      rafId = 0;
+      return;
+    }
+    rafId = requestAnimationFrame(animate);
     var dt = Math.min(0.05, Math.max(0.001, (now - lastFrameTime) / 1000));
     lastFrameTime = now;
+
+    var shouldStep =
+      dirty ||
+      isDragging ||
+      welcomeSpin !== null ||
+      resetAnim !== null ||
+      bounceAnim !== null ||
+      hasDoorAnimation() ||
+      hasActiveMotion();
+    if (!shouldStep) return;
 
     if (welcomeSpin) {
       var t = Math.min(1, (now - welcomeSpin.startTime) / 1000);
@@ -944,8 +1067,12 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
           yawVel = 0;
         }
       }
-      // Spring pitch back to grounded -4.5 deg
-      pitch += (DEFAULT_PITCH - pitch) * Math.min(1, dt * 10);
+      // Spring pitch back to grounded -4.5 deg and snap cleanly when settled
+      if (Math.abs(DEFAULT_PITCH - pitch) < 0.0005) {
+        pitch = DEFAULT_PITCH;
+      } else {
+        pitch += (DEFAULT_PITCH - pitch) * Math.min(1, dt * 10);
+      }
     }
 
     if (bounceAnim) {
@@ -1037,9 +1164,52 @@ console.log("THREE_CHECK", typeof THREE, (typeof THREE !== "undefined" && THREE)
     }
 
     renderer.render(scene, camera);
+
+    dirty =
+      isDragging ||
+      welcomeSpin !== null ||
+      resetAnim !== null ||
+      bounceAnim !== null ||
+      hasDoorAnimation() ||
+      hasActiveMotion();
   }
 
-  requestAnimationFrame(animate);
+  dom.addEventListener("webglcontextlost", function (e) {
+    e.preventDefault();
+    contextLost = true;
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    console.error("WEBGL_CONTEXT_LOST");
+    if (window.AndroidBridge && window.AndroidBridge.onWebGlContextLost) {
+      window.AndroidBridge.onWebGlContextLost();
+    }
+  }, false);
+
+  dom.addEventListener("webglcontextrestored", function () {
+    console.log("WEBGL_CONTEXT_RESTORED");
+    contextLost = false;
+    if (dotGridTex) dotGridTex.dispose();
+    dotGridTex = createDotGridTexture();
+    if (studioEnv) studioEnv.dispose();
+    studioEnv = createStudioEnvMap();
+    scene.environment = studioEnv;
+    scene.background = state.showDotGrid ? dotGridTex : solidBgColor;
+    if (floorShadow.material.map) floorShadow.material.map.dispose();
+    floorShadow.material.map = createShadowTexture();
+    floorShadow.material.needsUpdate = true;
+    updateShellMaterial(state.colorKey);
+    rebuildFridge();
+    applyResize(lastCssW, lastCssH);
+    lastFrameTime = performance.now();
+    markDirty();
+    if (!rafId) {
+      rafId = requestAnimationFrame(animate);
+    }
+  }, false);
+
+  rafId = requestAnimationFrame(animate);
 })();
 </script>
 </body>

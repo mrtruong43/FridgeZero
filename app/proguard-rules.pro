@@ -1,5 +1,5 @@
 # Preserve WebView JavascriptInterface bridge methods under R8/ProGuard minification
--keepattributes JavascriptInterface, *Annotation*
+-keepattributes JavascriptInterface, RuntimeVisibleAnnotations, *Annotation*
 
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;

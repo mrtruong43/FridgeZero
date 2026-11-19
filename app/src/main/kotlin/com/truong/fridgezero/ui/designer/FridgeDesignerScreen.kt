@@ -48,6 +48,7 @@ import com.truong.fridgezero.data.CompartmentKind
 import com.truong.fridgezero.data.FridgeEntity
 import com.truong.fridgezero.data.Seed
 import com.truong.fridgezero.ui.fridge3d.Fridge3DStageSlot
+import com.truong.fridgezero.ui.fridge3d.LocalFridge3DStageController
 import com.truong.fridgezero.ui.fridge3d.ShellColors
 import com.truong.fridgezero.ui.theme.BodyFont
 import com.truong.fridgezero.ui.theme.CoralUrgent
@@ -134,6 +135,7 @@ fun FridgeDesignerScreen(
 
   val screenH = LocalConfiguration.current.screenHeightDp.dp
   val templateLabel = TEMPLATES.firstOrNull { it.first == template }?.second ?: R.string.template_single
+  val stageController = LocalFridge3DStageController.current
 
   Column(
     modifier = modifier
@@ -185,7 +187,13 @@ fun FridgeDesignerScreen(
           modifier = Modifier.fillMaxSize()
         )
         Box(modifier = Modifier.align(Alignment.TopStart).padding(8.dp)) {
-          StickerBadge(stringResource(R.string.designer_swipe_hint), containerColor = SurfaceWhite, tiltDegrees = 0f)
+          StickerBadge(
+            stringResource(
+              if (stageController.use2DFallback) R.string.fallback_2d_badge else R.string.designer_swipe_hint
+            ),
+            containerColor = if (stageController.use2DFallback) LemonWarn else SurfaceWhite,
+            tiltDegrees = 0f
+          )
         }
         Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
           StickerBadge(stringResource(templateLabel), containerColor = LimeFresh, tiltDegrees = 1f)
