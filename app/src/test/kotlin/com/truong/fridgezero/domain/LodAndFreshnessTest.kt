@@ -18,6 +18,7 @@ import com.truong.fridgezero.ui.theme.PaperCream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -154,8 +155,8 @@ class LodAndFreshnessTest {
   @Test
   fun culinaryCatalogCoversAll32IconKeysAndMeetsRecipeMetadataSpec() {
     val recipes = CulinaryGuideRepository.recipes
-    assertEquals(32, recipes.size)
-    assertEquals(32, recipes.map { it.id }.toSet().size)
+    assertEquals(48, recipes.size)
+    assertEquals(48, recipes.map { it.id }.toSet().size)
 
     val bannedArtificialIds = setOf(
       "salad_ca_hoi_dua_muoi",
@@ -189,10 +190,9 @@ class LodAndFreshnessTest {
         "${recipe.id} sourceUrl must target a dish-specific path or query",
         hostAndPath.contains('?') || hostAndPath.trimEnd('/').contains('/')
       )
-      assertEquals(
-        "${recipe.id} QUICK_15 tag must align with cookMinutes <= 15",
-        recipe.cookMinutes <= 15,
-        CulinaryFilter.QUICK_15 in recipe.categories
+      assertTrue(
+        "${recipe.id} must belong to at least one dish category",
+        recipe.categories.any { it != CulinaryFilter.ALL }
       )
       assertEquals(
         "${recipe.id} difficulty should default from cookMinutes",
@@ -206,14 +206,9 @@ class LodAndFreshnessTest {
     }
 
     val seedDisplay = Seed.foodItems(20_000L).toDisplay(20_000L)
-    val readyNow = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.READY_NOW)
-    assertTrue("Expected at least 8 seed-ready recipes, found ${readyNow.size}", readyNow.size >= 8)
-
-    val rescueUrgent = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.RESCUE_URGENT)
-    assertTrue(rescueUrgent.isNotEmpty())
-    assertTrue(rescueUrgent.all { it.hasUrgentMatch })
-
     val allFeed = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ALL)
+    assertTrue("Expected at least 8 seed-ready recipes", allFeed.count { it.isReadyToCook } >= 8)
+    assertTrue(allFeed.any { it.hasUrgentMatch })
     val topOverall = allFeed.first()
     assertTrue(topOverall.isReadyToCook)
     assertTrue(topOverall.hasUrgentMatch)
@@ -240,7 +235,7 @@ class LodAndFreshnessTest {
       prepMinutes = 8,
       cookMinutes = 15,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(
         RecipeIngredient("Thịt gà", listOf("chicken"), listOf("thịt gà", "gà"), FoodGroup.THIT, "200g"),
         RecipeIngredient("Ớt chuông", listOf("bell_pepper"), listOf("ớt chuông"), FoodGroup.RAU, "1 quả"),
@@ -286,7 +281,7 @@ class LodAndFreshnessTest {
       prepMinutes = 5,
       cookMinutes = 10,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(
         RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "1 củ"),
         RecipeIngredient("Xà lách", listOf("lettuce"), listOf("xà lách"), FoodGroup.RAU, "1 bó")
@@ -347,7 +342,7 @@ class LodAndFreshnessTest {
     )
 
     val twoUrgentReady = makeRecipe(
-      "two_urgent_ready", 12, setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      "two_urgent_ready", 12, setOf(CulinaryFilter.VIET_HOME),
       "salmon" to FoodGroup.CA_HAI_SAN, "lettuce" to FoodGroup.RAU
     ) // 15 + 15 + 8 = 38
     val twoFreshReady = makeRecipe(
@@ -355,7 +350,7 @@ class LodAndFreshnessTest {
       "milk" to FoodGroup.SUA_TRUNG, "carrot" to FoodGroup.RAU
     ) // 6 + 6 + 8 = 20
     val oneUrgentOneMissing = makeRecipe(
-      "one_urgent_missing", 15, setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      "one_urgent_missing", 15, setOf(CulinaryFilter.EAT_CLEAN),
       "chicken" to FoodGroup.THIT, "dumpling" to FoodGroup.AN_SAN
     ) // 15 - 3 = 12
     val twoMissing = makeRecipe(
@@ -376,9 +371,6 @@ class LodAndFreshnessTest {
     assertEquals(listOf("two_urgent_ready", "two_fresh_ready", "one_urgent_missing", "two_missing"), all.map { it.recipe.id })
     assertEquals(listOf(38, 20, 12, -6), all.map { it.score })
 
-    assertEquals(listOf("two_urgent_ready", "two_fresh_ready"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.READY_NOW, subset).map { it.recipe.id })
-    assertEquals(listOf("two_urgent_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.RESCUE_URGENT, subset).map { it.recipe.id })
-    assertEquals(listOf("two_urgent_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.QUICK_15, subset).map { it.recipe.id })
     assertEquals(listOf("two_urgent_ready", "two_fresh_ready", "two_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.VIET_HOME, subset).map { it.recipe.id })
     assertEquals(listOf("two_fresh_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.EAT_CLEAN, subset).map { it.recipe.id })
   }
@@ -394,7 +386,7 @@ class LodAndFreshnessTest {
         prepMinutes = 5,
         cookMinutes = 10,
         servingsLabel = "2 người ăn",
-        categories = setOf(CulinaryFilter.QUICK_15),
+        categories = setOf(CulinaryFilter.EAT_CLEAN),
         fridgeIngredients = buildList {
           add(RecipeIngredient(primaryKey, listOf(primaryKey), listOf(primaryKey), primaryGroup, "200g"))
           if (secondaryKey != null) {
@@ -434,9 +426,12 @@ class LodAndFreshnessTest {
     assertEquals(listOf("salmon_1", "salmon_2", "chicken_1", "egg_1", "meat_1", "shrimp_1"), top6Ids)
     assertEquals(listOf("salmon_3", "salmon_4"), allFeed.drop(6).map { it.recipe.id })
 
-    // Category filters keep pure score ranking without cross-feed diversity deferrals.
-    val urgentOnly = CulinaryGuideEngine.recommend(fridge, CulinaryFilter.RESCUE_URGENT, subset)
-    assertEquals(listOf("salmon_1", "salmon_2", "salmon_3", "salmon_4"), urgentOnly.map { it.recipe.id })
+    // Dish category filters keep pure score ranking without cross-feed diversity deferrals.
+    val eatCleanOnly = CulinaryGuideEngine.recommend(fridge, CulinaryFilter.EAT_CLEAN, subset)
+    assertEquals(
+      listOf("salmon_1", "salmon_2", "salmon_3", "salmon_4", "chicken_1", "egg_1", "meat_1", "shrimp_1"),
+      eatCleanOnly.map { it.recipe.id }
+    )
   }
 
   @Test
@@ -449,7 +444,7 @@ class LodAndFreshnessTest {
       prepMinutes = 5,
       cookMinutes = 10,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(
         RecipeIngredient("Trứng gà", listOf("egg"), listOf("trứng"), FoodGroup.SUA_TRUNG, "3 quả")
       ),
@@ -698,5 +693,97 @@ class LodAndFreshnessTest {
 
     assertEquals(0, deductions[301L]?.remainingQuantity)
     assertEquals(3, deductions[302L]?.remainingQuantity)
+  }
+
+  @Test
+  fun culinaryCatalogIncludesExpandedStylesAndSupportsKeywordSearch() {
+    val seedDisplay = Seed.foodItems(20_000L).toDisplay(20_000L)
+
+    assertTrue(CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ASIAN_FUSION).size >= 6)
+    assertTrue(CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.WESTERN).size >= 8)
+    assertTrue(CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.VEGETARIAN).size >= 8)
+    assertTrue(CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.BREAKFAST_DRINK).size >= 8)
+
+    // Accent-insensitive keyword search across dish title and ingredients
+    val salmonResults = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ALL, query = "ca hoi")
+    assertTrue(salmonResults.isNotEmpty())
+    assertTrue(salmonResults.all {
+      it.recipe.title.contains("cá hồi", ignoreCase = true) ||
+        it.recipe.summary.contains("cá hồi", ignoreCase = true)
+    })
+
+    // Combined category + keyword search
+    val japaneseEgg = CulinaryGuideEngine.recommend(
+      fridgeItems = seedDisplay,
+      filter = CulinaryFilter.ASIAN_FUSION,
+      query = "tamagoyaki"
+    )
+    assertEquals(listOf("trung_cuon_nhat_tamagoyaki"), japaneseEgg.map { it.recipe.id })
+  }
+
+  @Test
+  fun cookingStepAnalyzerCoversAllRecipesTimersAndMentionedIngredients() {
+    val allRecipes = CulinaryGuideRepository.recipes
+    assertEquals(48, allRecipes.size)
+
+    val analyzedAll = allRecipes.flatMap { CookingStepAnalyzer.analyzeRecipe(it) }
+    assertEquals(240, analyzedAll.size)
+
+    val coveredActions = analyzedAll.map { it.action }.toSet()
+    assertEquals(CookingAction.entries.toSet(), coveredActions)
+
+    val firstTimer = CookingStepAnalyzer.extractTimer("Áp chảo 4 phút cho vàng giòn.")
+    assertEquals(240, firstTimer?.totalSeconds)
+    assertEquals("4 phút", firstTimer?.displayLabel)
+
+    val rangeTimer = CookingStepAnalyzer.extractTimer("Đảo đều khoảng 3–4 phút trên lửa vừa.")
+    assertEquals(240, rangeTimer?.totalSeconds)
+    assertEquals("4 phút", rangeTimer?.displayLabel)
+
+    val decimalTimer = CookingStepAnalyzer.extractTimer("Hấp cách thủy 2,5 phút nữa.")
+    assertEquals(150, decimalTimer?.totalSeconds)
+    assertEquals("2,5 phút", decimalTimer?.displayLabel)
+
+    val secondTimer = CookingStepAnalyzer.extractTimer("Chần nhanh 30 giây rồi vớt ra.")
+    assertEquals(30, secondTimer?.totalSeconds)
+    assertEquals("30 giây", secondTimer?.displayLabel)
+
+    val hourTimer = CookingStepAnalyzer.extractTimer("Ủ lạnh ngăn mát 1 giờ trước khi dùng.")
+    assertEquals(3600, hourTimer?.totalSeconds)
+    assertEquals("1 giờ", hourTimer?.displayLabel)
+
+    assertNull(CookingStepAnalyzer.extractTimer("Rắc tiêu xay và thưởng thức ngay."))
+
+    assertEquals("00:00", CookingStepAnalyzer.formatCountdown(0))
+    assertEquals("00:00", CookingStepAnalyzer.formatCountdown(-5))
+    assertEquals("02:30", CookingStepAnalyzer.formatCountdown(150))
+    assertEquals("1:01:05", CookingStepAnalyzer.formatCountdown(3665))
+
+    val sampleRecipe = CulinaryRecipe(
+      id = "step_mention_test",
+      title = "Bò áp chảo bơ tỏi",
+      emoji = "🥩",
+      summary = "Test",
+      prepMinutes = 5,
+      cookMinutes = 10,
+      categories = setOf(CulinaryFilter.WESTERN),
+      fridgeIngredients = listOf(
+        RecipeIngredient("Thịt thăn bò", listOf("meat"), listOf("thịt bò", "bò"), FoodGroup.THIT, "200g"),
+        RecipeIngredient("Bơ lạt", listOf("butter"), listOf("bơ lạt", "bơ"), FoodGroup.SUA_TRUNG, "15g"),
+        RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "50g")
+      ),
+      seasonings = listOf(SeasoningSpec("Muối", "1/2 muỗng cà phê")),
+      steps = listOf(
+        "Thấm khô thịt bò và cắt cà rốt lát mỏng.",
+        "Đun chảy bo lat trên chảo nóng rồi áp chảo thit bo."
+      ),
+      sourceName = "Savoury Days",
+      sourceUrl = "https://www.savourydays.com/"
+    )
+    val mentionedStep1 = CookingStepAnalyzer.extractMentionedIngredients(sampleRecipe.steps[0], sampleRecipe)
+    assertEquals(listOf("Thịt thăn bò", "Cà rốt"), mentionedStep1.map { it.name })
+
+    val mentionedStep2 = CookingStepAnalyzer.extractMentionedIngredients(sampleRecipe.steps[1], sampleRecipe)
+    assertEquals(listOf("Bơ lạt", "Thịt thăn bò"), mentionedStep2.map { it.name })
   }
 }

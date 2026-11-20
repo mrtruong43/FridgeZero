@@ -8,11 +8,12 @@ import java.util.Locale
 
 enum class CulinaryFilter(val labelVi: String) {
   ALL("Tất cả"),
-  READY_NOW("Đủ đồ nấu ngay"),
-  RESCUE_URGENT("Cứu đồ sắp hết hạn"),
-  QUICK_15("Nhanh ≤ 15p"),
   VIET_HOME("Cơm nhà Việt"),
-  EAT_CLEAN("Eat-Clean")
+  ASIAN_FUSION("Món Á"),
+  WESTERN("Món Âu"),
+  EAT_CLEAN("Eat-Clean"),
+  VEGETARIAN("Món Chay"),
+  BREAKFAST_DRINK("Sáng & Đồ uống")
 }
 
 typealias RecipeCategory = CulinaryFilter
@@ -113,21 +114,23 @@ object CulinaryGuideEngine {
   fun recommend(
     fridgeItems: List<DisplayItem>,
     filter: CulinaryFilter = CulinaryFilter.ALL,
-    recipes: List<CulinaryRecipe> = CulinaryGuideRepository.recipes
+    recipes: List<CulinaryRecipe> = CulinaryGuideRepository.recipes,
+    query: String = ""
   ): List<RecipeRecommendation> {
     val sorted = recipes
       .map { evaluate(it, fridgeItems) }
       .filter { rec ->
         when (filter) {
           CulinaryFilter.ALL -> true
-          CulinaryFilter.READY_NOW -> rec.isReadyToCook
-          CulinaryFilter.RESCUE_URGENT -> rec.hasUrgentMatch
-          CulinaryFilter.QUICK_15 ->
-            rec.recipe.cookMinutes <= 15 || CulinaryFilter.QUICK_15 in rec.recipe.categories
           CulinaryFilter.VIET_HOME -> CulinaryFilter.VIET_HOME in rec.recipe.categories
+          CulinaryFilter.ASIAN_FUSION -> CulinaryFilter.ASIAN_FUSION in rec.recipe.categories
+          CulinaryFilter.WESTERN -> CulinaryFilter.WESTERN in rec.recipe.categories
           CulinaryFilter.EAT_CLEAN -> CulinaryFilter.EAT_CLEAN in rec.recipe.categories
+          CulinaryFilter.VEGETARIAN -> CulinaryFilter.VEGETARIAN in rec.recipe.categories
+          CulinaryFilter.BREAKFAST_DRINK -> CulinaryFilter.BREAKFAST_DRINK in rec.recipe.categories
         }
       }
+      .filter { rec -> matchesSearchQuery(rec, query) }
       .sortedWith(
         compareByDescending<RecipeRecommendation> { it.score }
           .thenByDescending { it.isReadyToCook }
@@ -141,10 +144,47 @@ object CulinaryGuideEngine {
           .thenBy { it.recipe.cookMinutes }
           .thenBy { it.recipe.id }
       )
-    return if (filter == CulinaryFilter.ALL) {
+    return if (filter == CulinaryFilter.ALL && query.isBlank()) {
       applyTopWindowDiversityCap(sorted)
     } else {
       sorted
+    }
+  }
+
+  private fun matchesSearchQuery(rec: RecipeRecommendation, rawQuery: String): Boolean {
+    val trimmed = rawQuery.trim()
+    if (trimmed.isEmpty()) return true
+    val normalizedPhrase = stripVietnameseAccents(trimmed).trim()
+    if (normalizedPhrase.isEmpty()) return true
+    val tokens = normalizedPhrase.split(NON_WORD_REGEX).filter { it.isNotEmpty() }
+    if (tokens.isEmpty()) return true
+
+    val recipe = rec.recipe
+    val structuredText = buildString {
+      append(recipe.title).append(' ')
+      recipe.categories.forEach { append(it.labelVi).append(' ') }
+      recipe.fridgeIngredients.forEach { ing ->
+        append(ing.name).append(' ')
+        ing.keywords.forEach { append(it).append(' ') }
+      }
+      recipe.seasonings.forEach { append(it.name).append(' ') }
+    }
+    val fullText = buildString {
+      append(structuredText).append(' ')
+      append(recipe.summary).append(' ')
+      append(recipe.sourceName)
+    }
+
+    val fullStripped = stripVietnameseAccents(fullText)
+    if (fullStripped.contains(" $normalizedPhrase")) return true
+
+    val structuredStripped = stripVietnameseAccents(structuredText)
+    return tokens.all { token ->
+      if (token.length <= 3) {
+        structuredStripped.contains(" $token ")
+      } else {
+        structuredStripped.contains(" $token")
+      }
     }
   }
 
@@ -373,12 +413,12 @@ object CulinaryGuideEngine {
     }
   }
 
-  private fun normalizeAccented(text: String): String {
+  internal fun normalizeAccented(text: String): String {
     val cleaned = text.lowercase(VI_LOCALE).replace(NON_WORD_REGEX, " ").trim()
     return if (cleaned.isEmpty()) "" else " $cleaned "
   }
 
-  private fun stripVietnameseAccents(text: String): String {
+  internal fun stripVietnameseAccents(text: String): String {
     val nfd = Normalizer.normalize(text, Normalizer.Form.NFD)
     val withoutMarks = DIACRITICS_REGEX.replace(nfd, "")
       .replace('đ', 'd')
@@ -667,7 +707,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingSalmon("300g"), ingButter("20g"), ingLettuce("100g")),
       seasonings = listOf(
         sp("Tỏi đập dập / băm", "3 tép (1 muỗng canh)"),
@@ -696,7 +736,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingSalmon("300g"), ingOrangeJuice("120ml"), ingButter("15g")),
       seasonings = listOf(
         sp("Mật ong nguyên chất", "1 muỗng canh"),
@@ -726,7 +766,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingSalmon("250g"), ingLettuce("150g"), ingCarrot("80g (1/2 củ)")),
       seasonings = listOf(
         sp("Dầu ô liu", "2 muỗng canh"),
@@ -788,7 +828,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingChicken("300g", "Ức gà phi lê"), ingBellPepper("1 quả (150g)"), ingCarrot("1/2 củ (60g)")),
       seasonings = listOf(
         sp("Dầu hào", "1,5 muỗng canh"),
@@ -818,7 +858,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingChicken("250g", "Ức gà"), ingLettuce("150g"), ingYogurt("1 hũ (100g)"), ingCarrot("1/2 củ (50g)")),
       seasonings = listOf(
         sp("Nước cốt chanh tươi", "1 muỗng canh"),
@@ -939,7 +979,7 @@ object CulinaryGuideRepository {
       prepMinutes = 12,
       cookMinutes = 10,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingMeat("250g", "Thịt thăn bò"), ingBroccoli("1 bông (250g)"), ingCarrot("1/2 củ (60g)")),
       seasonings = listOf(
         sp("Tỏi băm", "4 tép (1 muỗng canh)"),
@@ -969,7 +1009,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(ingMeat("250g", "Thịt bò thăn"), ingPickle("200g")),
       seasonings = listOf(
         sp("Tỏi băm", "3 tép (1 muỗng canh)"),
@@ -1000,7 +1040,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "3–4 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingMushroom("150g"), ingMeat("150g", "Thịt heo bằm"), ingCarrot("1/2 củ (60g)"), ingBroccoli("150g")),
       seasonings = listOf(
         sp("Hành tím băm", "2 củ"),
@@ -1030,7 +1070,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(ingShrimp("350g (tôm sú tươi)")),
       seasonings = listOf(
         sp("Nước mắm ngon", "2 muỗng canh"),
@@ -1060,7 +1100,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingShrimp("250g"), ingBroccoli("200g"), ingBellPepper("1/2 quả (80g)")),
       seasonings = listOf(
         sp("Tỏi băm", "3 tép (1 muỗng canh)"),
@@ -1090,7 +1130,7 @@ object CulinaryGuideRepository {
       prepMinutes = 12,
       cookMinutes = 12,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingSquid("300g"), ingBellPepper("1 quả (140g)"), ingCarrot("1/2 củ (60g)")),
       seasonings = listOf(
         sp("Gừng tươi đập dập", "15g"),
@@ -1121,7 +1161,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 10,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingSquid("350g"), ingLettuce("150g")),
       seasonings = listOf(
         sp("Gừng tươi (sợi hấp + giã làm mắm)", "35g"),
@@ -1181,7 +1221,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(ingEgg("3 quả"), ingMeat("100g", "Thịt heo bằm"), ingTomatoSauce("60g (4 muỗng canh)")),
       seasonings = listOf(
         sp("Hành tím băm", "2 củ"),
@@ -1211,7 +1251,7 @@ object CulinaryGuideRepository {
       prepMinutes = 5,
       cookMinutes = 8,
       servingsLabel = "1–2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingEgg("3 quả"), ingMilk("45ml"), ingButter("15g"), ingCheese("30g")),
       seasonings = listOf(
         sp("Muối mịn", "1/3 muỗng cà phê"),
@@ -1238,7 +1278,7 @@ object CulinaryGuideRepository {
       prepMinutes = 5,
       cookMinutes = 12,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN),
       fridgeIngredients = listOf(ingTomatoSauce("45g (3 muỗng canh)"), ingEgg("2 quả"), ingCorn("1/2 trái (80g hạt)"), ingWater("750ml")),
       seasonings = listOf(
         sp("Hành tím băm", "1 củ"),
@@ -1268,7 +1308,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.ASIAN_FUSION),
       fridgeIngredients = listOf(ingRice("350g (2 chén cơm nguội)"), ingShrimp("150g"), ingEgg("2 quả"), ingCarrot("1/2 củ (50g)")),
       seasonings = listOf(
         sp("Tỏi băm", "2 tép"),
@@ -1298,7 +1338,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(ingRice("350g (2 chén cơm nguội)"), ingMeat("150g", "Thịt bò thăn"), ingPickle("120g"), ingEgg("2 quả")),
       seasonings = listOf(
         sp("Tỏi băm", "3 tép"),
@@ -1328,7 +1368,7 @@ object CulinaryGuideRepository {
       prepMinutes = 5,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingBread("2 ổ (160g)"), ingEgg("2 quả"), ingTomatoSauce("60g (4 muỗng canh)"), ingButter("15g")),
       seasonings = listOf(
         sp("Tỏi băm", "2 tép"),
@@ -1357,7 +1397,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingBread("2 ổ nhỏ (150g)"), ingButter("25g"), ingMushroom("120g"), ingCheese("50g")),
       seasonings = listOf(
         sp("Tỏi băm thật nhuyễn", "4 tép (1 muỗng canh)"),
@@ -1385,7 +1425,7 @@ object CulinaryGuideRepository {
       prepMinutes = 8,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingBread("4 lát sandwich (120g)"), ingBanana("1 quả (100g)"), ingMilk("80ml"), ingEgg("2 quả")),
       seasonings = listOf(
         sp("Mật ong", "1,5 muỗng canh"),
@@ -1413,7 +1453,7 @@ object CulinaryGuideRepository {
       prepMinutes = 3,
       cookMinutes = 12,
       servingsLabel = "1–2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingDumpling("3 cái (270g)"), ingMilk("200ml")),
       seasonings = listOf(
         sp("Giấm trắng (nhỏ vào nước hấp)", "1 muỗng cà phê"),
@@ -1439,7 +1479,7 @@ object CulinaryGuideRepository {
       prepMinutes = 15,
       cookMinutes = 15,
       servingsLabel = "3–4 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingMango("1 quả xoài xanh (300g)", "Xoài keo xanh"), ingShrimp("150g"), ingBacon("120g"), ingCarrot("1/2 củ (50g)")),
       seasonings = listOf(
         sp("Nước mắm ngon", "2,5 muỗng canh"),
@@ -1469,7 +1509,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingApple("1 quả (150g)"), ingGrape("100g"), ingChicken("200g", "Ức gà"), ingLettuce("120g")),
       seasonings = listOf(
         sp("Dầu ô liu", "2 muỗng canh"),
@@ -1498,7 +1538,7 @@ object CulinaryGuideRepository {
       prepMinutes = 5,
       cookMinutes = 3,
       servingsLabel = "1–2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingBanana("1 quả (120g)"), ingStrawberry("100g"), ingYogurt("1 hũ (100g)"), ingMilk("100ml")),
       seasonings = listOf(
         sp("Mật ong (tùy khẩu vị)", "1 muỗng cà phê"),
@@ -1525,7 +1565,7 @@ object CulinaryGuideRepository {
       prepMinutes = 8,
       cookMinutes = 2,
       servingsLabel = "1–2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingYogurt("2 hũ (200g)"), ingApple("1/2 quả (80g)"), ingGrape("80g"), ingStrawberry("80g")),
       seasonings = listOf(
         sp("Mật ong nguyên chất", "1 muỗng canh"),
@@ -1552,7 +1592,7 @@ object CulinaryGuideRepository {
       prepMinutes = 7,
       cookMinutes = 3,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15),
+      categories = setOf(CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingIceCream("2 viên (120g)"), ingMango("1 quả xoài chín (250g)", "Xoài cát chín"), ingMilk("100ml")),
       seasonings = listOf(
         sp("Sữa đặc có đường (hoặc mật ong)", "1,5 muỗng canh"),
@@ -1579,7 +1619,7 @@ object CulinaryGuideRepository {
       prepMinutes = 7,
       cookMinutes = 3,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingWatermelon("350g ruột"), ingOrangeJuice("120ml"), ingWater("100ml")),
       seasonings = listOf(
         sp("Lá bạc hà tươi", "6–8 lá"),
@@ -1596,6 +1636,453 @@ object CulinaryGuideRepository {
       ),
       sourceName = SRC_COOKY,
       sourceUrl = "https://www.cooky.vn/tim-kiem?q=nuoc+ep+dua+hau+cam+bac+ha"
+    ),
+
+    // 33. Trứng cuộn Nhật Bản (Tamagoyaki) — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "trung_cuon_nhat_tamagoyaki",
+      title = "Trứng cuộn Nhật Bản (Tamagoyaki)",
+      emoji = "🥚",
+      summary = "Món trứng cuộn nhiều lớp mềm mịn chuẩn vị Nhật từ trứng gà, nước dùng thanh nhẹ, đường và nước tương.",
+      prepMinutes = 5,
+      cookMinutes = 10,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
+      fridgeIngredients = listOf(ingEgg("4 quả"), ingWater("30ml (thay nước Dashi)")),
+      seasonings = listOf(
+        sp("Đường", "1 muỗng canh"),
+        sp("Nước tương (xì dầu)", "1 muỗng cà phê"),
+        sp("Muối", "1 nhúm nhỏ"),
+        sp("Dầu ăn (thoa chảo)", "1 muỗng canh")
+      ),
+      steps = listOf(
+        "Đập 4 quả trứng gà vào tô, cho 1 muỗng canh nước lọc (hoặc nước dùng Dashi), 1 muỗng canh đường, 1 muỗng cà phê nước tương và chút muối vào đánh kiểu cắt lòng trắng cho hòa quyện.",
+        "Lọc hỗn hợp trứng qua rây để loại bỏ phần dây trắng giúp mặt trứng chín mịn màng hoàn toàn.",
+        "Đặt chảo chống dính lên bếp lửa nhỏ, dùng khăn giấy thấm dầu thoa một lớp thật mỏng khắp lòng và thành chảo.",
+        "Đổ khoảng 1/4 lượng trứng tráng lớp mỏng; khi mặt trứng se 70–80% thì nhẹ nhàng cuộn tròn từ xa về phía mình rồi đẩy về góc chảo.",
+        "Thoa dầu mỏng lại mặt chảo trống, đổ lớp trứng mới (nhấc nhẹ cuộn cũ cho trứng chảy xuống dưới kết dính) và cuộn lặp lại đến hết, ép nhẹ thành khối rồi cắt khoanh 2–3cm."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=trung+cuon+nhat+ban+tamagoyaki"
+    ),
+
+    // 34. Ức gà nướng sốt Teriyaki — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "uc_ga_sot_teriyaki",
+      title = "Ức gà nướng sốt Teriyaki",
+      emoji = "🍗",
+      summary = "Ức gà ướp nước ép cam, dầu hào, nước tương, đường nâu và dầu mè nướng thơm đậm vị Nhật Bản.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingChicken("400g", "Ức gà"), ingOrangeJuice("60ml")),
+      seasonings = listOf(
+        sp("Nước tương (xì dầu)", "2 muỗng canh"),
+        sp("Dầu hào", "1 muỗng canh"),
+        sp("Đường nâu", "1,5 muỗng canh"),
+        sp("Dầu mè & mè rang", "1 muỗng cà phê dầu mè, 1 muỗng mè rang"),
+        sp("Tỏi băm & gừng băm", "1 muỗng cà phê mỗi loại")
+      ),
+      steps = listOf(
+        "Rửa sạch 400g ức gà với muối và gừng để khử mùi tanh, thấm ráo rồi cắt lát dày khoảng 1,5–2cm.",
+        "Trộn đều tỏi băm, gừng băm, 60ml nước ép cam, 2 muỗng canh nước tương, 1 muỗng canh dầu hào, 1,5 muỗng canh đường nâu, dầu mè và mè rang thành sốt ướp.",
+        "Ướp ức gà trong hỗn hợp sốt ít nhất 15–20 phút cho thịt ngấm đậm gia vị.",
+        "Làm nóng bếp nướng hoặc chảo chống dính lửa vừa, đặt ức gà lên nướng/áp mỗi mặt 5–6 phút (thỉnh thoảng phết thêm nước sốt ướp).",
+        "Khi thịt gà chín vàng óng và nước sốt sánh thơm thì gắp ra thớt thái miếng vừa ăn, rắc thêm mè rang lên trên."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=uc+ga+nuong+sot+teriyaki"
+    ),
+
+    // 35. Thịt ba chỉ xào kim chi — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "ba_chi_xao_kim_chi_han_quoc",
+      title = "Thịt ba chỉ xào kim chi",
+      emoji = "🥓",
+      summary = "Thịt ba chỉ đảo cháy cạnh béo thơm xào lửa lớn cùng kim chi / dưa cải chua cay đậm vị chuẩn Hàn Quốc.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION),
+      fridgeIngredients = listOf(ingBacon("400g"), ingPickle("150g")),
+      seasonings = listOf(
+        sp("Ớt bột", "1 muỗng cà phê"),
+        sp("Đường", "1 muỗng cà phê"),
+        sp("Hành tím & tỏi băm", "1 củ hành tím, 1 tép tỏi"),
+        sp("Dầu ăn", "2 muỗng canh"),
+        sp("Đầu hành lá & ngò rí", "5 đầu hành, 1 nhánh ngò")
+      ),
+      steps = listOf(
+        "Rửa sạch 400g thịt ba chỉ với nước muối loãng rồi cắt lát vừa ăn; cắt khúc 150g kim chi hoặc dưa cải chua.",
+        "Bắc chảo với 2 muỗng canh dầu ăn phi thơm hành tím và tỏi băm.",
+        "Cho thịt ba chỉ vào đảo đều ở lửa vừa khoảng 8–10 phút đến khi thịt săn lại, ra bớt mỡ thừa và xém vàng cạnh.",
+        "Cho kim chi (kèm chút nước kim chi), 1 muỗng cà phê ớt bột và 1 muỗng cà phê đường vào đảo lửa lớn 3–5 phút cho thấm gia vị.",
+        "Múc thịt xào ra đĩa, rắc đầu hành lá và ngò rí lên trên, dùng nóng với cơm trắng."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=thit+ba+chi+xao+kim+chi"
+    ),
+
+    // 36. Canh Tom Yum hải sản / tôm — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "tom_nau_canh_chua_cay_tom_yum",
+      title = "Canh tôm chua cay Tom Yum kiểu Thái",
+      emoji = "🦐",
+      summary = "Nước canh chua cay mặn ngọt cân bằng hương sả, riềng, lá chanh đặc trưng Thái Lan cùng tôm tươi và nấm.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION),
+      fridgeIngredients = listOf(ingShrimp("250g"), ingMushroom("150g"), ingTomatoSauce("45g (3 muỗng canh)"), ingWater("800ml")),
+      seasonings = listOf(
+        sp("Sả đập dập & củ riềng thái lát", "2 cây sả, 4 lát riềng"),
+        sp("Lá chanh vò sơ", "4 lá"),
+        sp("Nước cốt chanh tươi", "2 muỗng canh"),
+        sp("Nước mắm & đường", "2 muỗng canh nước mắm, 1 muỗng cà phê đường"),
+        sp("Hành tím, tỏi & ớt hiểm", "1 củ hành, 2 tép tỏi, 1 trái ớt")
+      ),
+      steps = listOf(
+        "Rửa sạch 250g tôm, bóc vỏ rút chỉ lưng (giữ lại đầu/vỏ tôm để xào lấy vị ngọt); nấm cắt gốc ngâm nước muối loãng rồi cắt đôi.",
+        "Phi thơm hành tím, tỏi băm cùng 3 muỗng canh sốt cà chua, xào săn phần đầu/vỏ tôm rồi chế 800ml nước vào đun sôi.",
+        "Cho sả cây đập dập, riềng thái lát và lá chanh vào nấu khoảng 10 phút cho nước dùng dậy hương thảo mộc rồi vớt bỏ bã vỏ tôm.",
+        "Thả nấm và tôm tươi vào nồi nước dùng đang sôi, nêm 2 muỗng canh nước mắm và 1 muỗng cà phê đường nấu 2–3 phút tới khi tôm vừa chín đỏ.",
+        "Tắt bếp rồi thêm 2 muỗng canh nước cốt chanh tươi, ngò rí và ớt cắt lát để cân bằng vị chua cay mặn ngọt."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=canh+tom+yum+thai+lan"
+    ),
+
+    // 37. Thịt bò xào sốt Bulgogi — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "bo_xao_bulgogi_nam_ca_rot",
+      title = "Thịt bò xào sốt Bulgogi nấm",
+      emoji = "🥩",
+      summary = "Thịt thăn bò thái mỏng ướp xì dầu Hàn Quốc, đường nâu, dầu mè xào lửa lớn mềm ngọt đậm đà.",
+      prepMinutes = 15,
+      cookMinutes = 12,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingMeat("400g", "Thịt thăn bò"), ingMushroom("120g"), ingEgg("1 quả")),
+      seasonings = listOf(
+        sp("Xì dầu / nước tương Hàn Quốc", "4 muỗng canh"),
+        sp("Đường nâu", "1,5 muỗng canh"),
+        sp("Dầu mè", "1,5 muỗng canh"),
+        sp("Tỏi băm", "3 tép"),
+        sp("Mè rang", "1 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Thịt thăn bò thấm khô, thái lát mỏng vừa ăn; nấm rửa sạch xé nhỏ.",
+        "Ướp thịt bò với 4 muỗng canh xì dầu, 1,5 muỗng canh đường nâu, 1,5 muỗng canh dầu mè và tỏi băm trong 20–30 phút cho ngấm vị.",
+        "Làm nóng chảo với chút dầu ăn, cho thịt bò đã ướp vào xào nhanh trên lửa lớn để thịt săn mềm giữ được nước ngọt tự nhiên.",
+        "Cho tiếp nấm tươi vào đảo đều cùng thịt bò khoảng 2–3 phút cho nấm chín thấm phần sốt Bulgogi.",
+        "Trút bò xào ra đĩa, rắc mè rang lên trên và có thể kèm 1 quả trứng ốp la béo ngậy."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=thit+bo+xao+bulgogi"
+    ),
+
+    // 38. Cơm chiên kim chi phô mai — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "com_chien_trung_pho_mai_han_quoc",
+      title = "Cơm chiên kim chi phô mai",
+      emoji = "🍚",
+      summary = "Cơm nguội rang tơi cùng kim chi cay dịu và dầu mè, phủ trứng ốp la lòng đào và phô mai Mozzarella kéo sợi.",
+      prepMinutes = 8,
+      cookMinutes = 12,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION, CulinaryFilter.VEGETARIAN),
+      fridgeIngredients = listOf(ingRice("300g cơm nguội"), ingPickle("100g"), ingCheese("150g"), ingEgg("1 quả")),
+      seasonings = listOf(
+        sp("Tương ớt Hàn Quốc", "10g (2 muỗng cà phê)"),
+        sp("Bột ớt & đường", "1 muỗng cà phê bột ớt, 10g đường"),
+        sp("Dầu hào & dầu mè", "10ml mỗi loại"),
+        sp("Hành hoa băm nhỏ", "20g")
+      ),
+      steps = listOf(
+        "Cắt nhỏ 100g kim chi (hoặc dưa cải chua) trộn với 10g đường và chút bột ớt; chuẩn bị sẵn 150g phô mai Mozzarella.",
+        "Làm nóng chảo với 10ml dầu ăn phi thơm hành hoa, cho phần kim chi đã trộn vào đảo đều cho chín dậy mùi.",
+        "Trút 300g cơm nguội cùng 10ml dầu hào, 10g tương ớt Hàn Quốc và 10ml dầu mè vào rang lửa vừa tới khi hạt cơm săn tơi.",
+        "Đun chảy nhẹ phô mai ở lửa nhỏ trên chảo chống dính; dùng chảo khác chiên 1 quả trứng ốp la giữ nguyên lòng đỏ.",
+        "Múc cơm chiên ra đĩa, đặt trứng ốp la lên trên và rưới phô mai Mozzarella tan chảy xung quanh."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=com+chien+kim+chi+pho+mai"
+    ),
+
+    // 39. Gà sốt kem nấm kiểu Âu — Savoury Days
+    CulinaryRecipe(
+      id = "uc_ga_sot_kem_nam_kieu_au",
+      title = "Gà sốt kem nấm bơ sữa kiểu Âu",
+      emoji = "🍗",
+      summary = "Thịt gà áp chảo nấu sốt kem nấm bơ lạt, sữa tươi và phô mai sánh ngậy theo công thức của Savoury Days.",
+      prepMinutes = 10,
+      cookMinutes = 18,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.WESTERN),
+      fridgeIngredients = listOf(ingChicken("250g", "Thịt đùi / lườn gà"), ingMushroom("120g"), ingMilk("80ml"), ingCheese("15g")),
+      seasonings = listOf(
+        sp("Bơ nhạt", "2 thìa canh"),
+        sp("Dầu ô liu", "1 thìa canh"),
+        sp("Tỏi băm & hành tây băm", "2 tép tỏi, 1/4 củ hành tây"),
+        sp("Lá thơm Basil khô (tùy chọn)", "3g"),
+        sp("Muối & tiêu xay", "1/2 muỗng cà phê muối, 1/3 muỗng tiêu")
+      ),
+      steps = listOf(
+        "Lọc bỏ xương da 250g thịt gà rồi thái miếng vừa ăn; nấm rửa sạch thái lát dọc dày 3–5mm; băm nhỏ hành tây và tỏi.",
+        "Đun chảy bơ nhạt (hoặc dầu ô liu) trong chảo, cho tỏi và hành tây vào phi thơm.",
+        "Cho thịt gà vào xào đến khi thịt săn và chuyển màu trắng, tiếp tục cho nấm tươi vào đảo đều cùng chút muối tiêu.",
+        "Khi nấm và gà chín tới, hạ nhỏ lửa đổ 80ml sữa tươi vào đảo đều cho hỗn hợp sôi nhẹ.",
+        "Thêm 15g phô mai và lá Basil khô khuấy tan tạo độ sánh ngậy, nêm lại muối tiêu vừa ăn rồi dùng nóng với cơm hoặc bánh mì."
+      ),
+      sourceName = SRC_SAVOURY_DAYS,
+      sourceUrl = "https://www.savourydays.com/?s=my+y+sot+kem+ga+nam"
+    ),
+
+    // 40. Thịt bò áp chảo bơ tỏi — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "bo_ap_chao_bo_toi_tieu_den",
+      title = "Thịt bò áp chảo bơ tỏi",
+      emoji = "🥩",
+      summary = "Thăn bò áp chảo lửa lớn giữ nước ngọt bên trong, rưới bơ lạt tỏi thơm lừng chuẩn vị Âu.",
+      prepMinutes = 15,
+      cookMinutes = 10,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingMeat("350g", "Thịt thăn nội / thăn lưng bò"), ingButter("30g")),
+      seasonings = listOf(
+        sp("Dầu ô liu", "1–2 muỗng canh"),
+        sp("Tỏi đập dập", "2–3 tép"),
+        sp("Lá hương thảo Rosemary (tùy chọn)", "2 nhánh"),
+        sp("Muối & tiêu xay", "1/2 muỗng cà phê mỗi loại")
+      ),
+      steps = listOf(
+        "Thấm thật khô hai mặt miếng thăn bò dày 2–3cm; ướp đều muối, tiêu xay và chút dầu ô liu rồi để thịt nghỉ ở nhiệt độ phòng 15 phút.",
+        "Đặt chảo gang hoặc chảo chống dính lên bếp lửa lớn với 1 muỗng canh dầu ô liu cho đến khi chảo thật nóng.",
+        "Cho miếng thịt bò vào áp chảo mỗi mặt 2–3 phút (tùy mức độ chín mong muốn) để tạo lớp vỏ vàng nâu giữ độ mọng bên trong.",
+        "Ở phút cuối, hạ nhỏ lửa thả 30g bơ lạt, tỏi đập dập và lá hương thảo vào; nghiêng chảo múc bơ nóng rưới liên tục lên mặt thịt rồi tắt bếp.",
+        "Lấy thịt bò ra đĩa để nghỉ 5 phút trước khi thái lát vừa ăn, rưới phần sốt bơ tỏi trong chảo lên mặt."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=thit+bo+ap+chao+bo+toi"
+    ),
+
+    // 41. Salad tôm tươi & rau củ giòn mát — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "salad_tom_pho_mai_ot_chuong",
+      title = "Salad tôm tươi & rau củ giòn mát",
+      emoji = "🥗",
+      summary = "Salad thanh mát từ tôm luộc ngọt thịt trộn cùng xà lách, cà rốt, bắp Mỹ giòn ngọt và sốt chanh ô liu.",
+      prepMinutes = 10,
+      cookMinutes = 10,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingShrimp("200g"), ingLettuce("150g"), ingCarrot("1/2 củ (50g)"), ingCorn("80g hạt bắp")),
+      seasonings = listOf(
+        sp("Dầu ô liu (hoặc mayonnaise)", "2 muỗng canh"),
+        sp("Nước cốt chanh tươi", "1,5 muỗng canh"),
+        sp("Mật ong", "1 muỗng cà phê"),
+        sp("Muối & tiêu đen", "1/2 muỗng cà phê muối, 1/3 muỗng tiêu")
+      ),
+      steps = listOf(
+        "Rửa sạch tôm tươi, luộc chín khoảng 3 phút tới khi tôm chuyển đỏ săn rồi bóc vỏ rút chỉ lưng để nguội.",
+        "Rửa sạch 150g xà lách ngâm nước muối loãng rồi quay ráo, cắt khúc vừa ăn.",
+        "Gọt vỏ 50g cà rốt thái sợi; luộc chín 80g hạt bắp ngọt rồi vớt ráo nước.",
+        "Khuấy đều 2 muỗng canh dầu ô liu, 1,5 muỗng canh nước cốt chanh, 1 muỗng cà phê mật ong và nhúm muối tiêu thành nước trộn salad.",
+        "Cho xà lách, cà rốt, bắp ngọt và tôm vào âu lớn, rưới sốt trộn nhẹ tay rồi bày ra đĩa."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=salad+tom"
+    ),
+
+    // 42. Sandwich trứng phô mai & thịt xông khói — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "sandwich_ba_chi_trung_pho_mai",
+      title = "Sandwich áp chảo ba chỉ trứng phô mai",
+      emoji = "🥪",
+      summary = "Bữa sáng sandwich áp chảo nhanh gọn với vỏ bánh vàng giòn, thịt xông khói/ba chỉ giòn thơm, trứng và phô mai tan chảy.",
+      prepMinutes = 5,
+      cookMinutes = 10,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.BREAKFAST_DRINK),
+      fridgeIngredients = listOf(ingBread("4 lát sandwich"), ingBacon("100g"), ingEgg("2 quả"), ingCheese("40g")),
+      seasonings = listOf(
+        sp("Tương cà hoặc tương ớt", "1 muỗng canh"),
+        sp("Muối & tiêu xay", "1 nhúm nhỏ")
+      ),
+      steps = listOf(
+        "Áp chảo 100g thịt ba chỉ thái mỏng / thịt xông khói trên lửa vừa 3–4 phút cho vàng giòn hai mặt rồi gắp ra.",
+        "Đánh tan 2 quả trứng gà với nhúm muối tiêu, đổ vào chảo chống dính lửa nhỏ tạo lớp trứng mỏng.",
+        "Khi trứng còn hơi ướt bề mặt, đặt ngay 2 lát bánh mì sandwich lên trên rồi lật nhẹ toàn bộ mặt trứng cùng bánh mì.",
+        "Xếp phô mai và thịt ba chỉ giòn lên giữa lát bánh, rưới tương cà rồi gấp mép trứng và úp lát bánh mì vào nhau.",
+        "Áp thêm 1 phút mỗi mặt cho phô mai tan chảy và vỏ bánh giòn rụm, cắt đôi dùng nóng."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=sandwich+trung+pho+mai+bacon"
+    ),
+
+    // 43. Bông cải xanh xào nấm chay — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "bong_cai_xao_nam_dau_hao_chay",
+      title = "Bông cải xanh xào nấm chay",
+      emoji = "🥦",
+      summary = "Món xào chay thanh đạm từ bông cải xanh chần giòn xào lửa lớn cùng nấm tươi, nước tương và dầu hào chay.",
+      prepMinutes = 8,
+      cookMinutes = 10,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN),
+      fridgeIngredients = listOf(ingBroccoli("250g"), ingMushroom("150g")),
+      seasonings = listOf(
+        sp("Hạt nêm chay", "1,5 muỗng cà phê"),
+        sp("Nước tương & dầu hào chay", "1 muỗng canh mỗi loại"),
+        sp("Hành boa-rô / tỏi băm", "2 tép"),
+        sp("Dầu ăn & tiêu xay", "1,5 muỗng canh dầu, 1/3 muỗng tiêu")
+      ),
+      steps = listOf(
+        "Cắt bông cải xanh thành miếng vừa ăn, ngâm nước muối loãng rửa sạch rồi chần sơ nước sôi 1,5 phút cho giữ màu xanh giòn.",
+        "Nấm cắt gốc, ngâm rửa sạch để ráo rồi xé nhỏ hoặc thái lát vừa ăn.",
+        "Phi thơm hành boa-rô (hoặc tỏi băm) với 1,5 muỗng canh dầu ăn rồi cho nấm vào xào săn khoảng 2 phút cùng chút hạt nêm chay.",
+        "Trút bông cải xanh vào đảo nhanh tay trên lửa lớn để rau chín giòn không bị nhũn.",
+        "Nêm 1 muỗng canh nước tương và 1 muỗng canh dầu hào chay cho vừa miệng, đảo thêm 2 phút rồi tắt bếp rắc tiêu xay."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=bong+cai+xao+nam+chay"
+    ),
+
+    // 44. Trứng hấp nấm mềm mịn — VnExpress & Điện máy XANH
+    CulinaryRecipe(
+      id = "trung_hap_nam_ca_rot_thanh_dam",
+      title = "Trứng hấp nấm mềm mịn",
+      emoji = "🥚",
+      summary = "Trứng gà đánh lọc qua rây hấp cách thủy lửa nhỏ cùng nấm băm tạo kết cấu mịn mướt không rỗ, thơm dầu mè.",
+      prepMinutes = 8,
+      cookMinutes = 14,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN),
+      fridgeIngredients = listOf(ingEgg("3 quả"), ingMushroom("80g"), ingWater("180ml")),
+      seasonings = listOf(
+        sp("Nước tương (xì dầu)", "1 muỗng canh"),
+        sp("Dầu mè", "1/2 muỗng canh"),
+        sp("Muối / hạt nêm & tiêu", "1/3 muỗng cà phê muối, chút tiêu"),
+        sp("Hành lá cắt nhỏ", "1 nhánh")
+      ),
+      steps = listOf(
+        "Nấm ngâm nước muối loãng rửa sạch rồi băm nhỏ hoặc thái hạt lựu; hành lá cắt nhỏ.",
+        "Đập 3 quả trứng gà vào tô, thêm 180ml nước ấm và 1/3 muỗng cà phê muối đánh đều nhẹ tay rồi lọc qua rây cho mịn không bọt.",
+        "Cho nấm băm vào tô trứng khuấy đều nhẹ nhàng rồi đậy kín mặt tô.",
+        "Đặt vào xửng hấp cách thủy ở lửa nhỏ trong 10–14 phút; dùng tăm xăm thử giữa khối trứng không dính nước là chín.",
+        "Lấy tô trứng hấp ra, rưới dầu mè và nước tương lên trên cùng hành lá và chút tiêu xay."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=trung+hap+nam"
+    ),
+
+    // 45. Canh rau củ thập cẩm chay — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "canh_rau_cu_nam_ngot_thanh",
+      title = "Canh rau củ thập cẩm nấm chay",
+      emoji = "🥕",
+      summary = "Canh chay ngọt nước tự nhiên từ bắp Mỹ, cà rốt, bông cải xanh và nấm tươi ít dầu mỡ.",
+      prepMinutes = 10,
+      cookMinutes = 18,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN),
+      fridgeIngredients = listOf(ingCorn("1 trái (150g)"), ingCarrot("1 củ (100g)"), ingBroccoli("150g"), ingMushroom("120g")),
+      seasonings = listOf(
+        sp("Nước lọc", "900ml"),
+        sp("Hạt nêm chay", "1,5 muỗng cà phê"),
+        sp("Muối", "1 muỗng cà phê"),
+        sp("Hành boa-rô & ngò rí", "2 nhánh")
+      ),
+      steps = listOf(
+        "Cà rốt gọt vỏ tỉa khoanh vừa ăn; bắp Mỹ cắt khúc; bông cải xanh tách nhánh rửa sạch; nấm ngâm nước muối loãng để ráo.",
+        "Đun sôi 900ml nước, cho bắp Mỹ và cà rốt vào nấu trước khoảng 10 phút để lấy nước dùng ngọt thanh tự nhiên.",
+        "Nêm 1 muỗng cà phê muối và 1,5 muỗng cà phê hạt nêm chay cho vừa khẩu vị.",
+        "Cho tiếp nấm và bông cải xanh vào nấu thêm 4–5 phút tới khi rau củ chín tới vẫn giữ được độ giòn ngọt.",
+        "Tắt bếp, thêm hành boa-rô phi thơm hoặc ngò rí thái khúc rồi múc ra tô dùng nóng."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=canh+rau+cu+thap+cam+chay"
+    ),
+
+    // 46. Salad trái cây sữa chua thanh mát — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "salad_trai_cay_ngu_sac_sua_chua",
+      title = "Salad trái cây sữa chua thanh mát",
+      emoji = "🍎",
+      summary = "Salad táo, dâu tây và xà lách giòn mát trộn sốt sữa chua, nước cốt chanh và mật ong thanh nhẹ.",
+      prepMinutes = 10,
+      cookMinutes = 5,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
+      fridgeIngredients = listOf(ingApple("1 quả (150g)"), ingStrawberry("100g"), ingLettuce("100g"), ingYogurt("1 hũ (100g)")),
+      seasonings = listOf(
+        sp("Mật ong (hoặc sữa đặc)", "1,5 muỗng canh"),
+        sp("Nước cốt chanh tươi", "1 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Rửa sạch táo, dâu tây và xà lách với nước muối loãng rồi để thật ráo nước.",
+        "Thái hạt lựu táo, cắt đôi dâu tây và cắt khúc vừa ăn phần xà lách.",
+        "Pha phần sốt: trộn đều 1 hũ sữa chua không đường cùng 1,5 muỗng canh mật ong (hoặc sữa đặc) và vài giọt nước cốt chanh.",
+        "Cho toàn bộ trái cây và rau vào tô lớn, rưới sốt sữa chua lên trên rồi xóc trộn nhẹ nhàng để không bị nát.",
+        "Có thể ướp trong ngăn mát tủ lạnh khoảng 20–30 phút trước khi thưởng thức để món salad mát lạnh hơn."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=salad+trai+cay+sua+chua"
+    ),
+
+    // 47. Canh chua tôm cà chua thanh mát — VnExpress & Điện máy XANH
+    CulinaryRecipe(
+      id = "canh_chua_tom_ca_chua_bap",
+      title = "Canh chua tôm cà chua & bắp ngọt",
+      emoji = "🍲",
+      summary = "Canh chua thanh mát hài hòa vị chua ngọt từ tôm tươi, sốt cà chua và bắp Mỹ giải nhiệt cho bữa cơm Việt.",
+      prepMinutes = 8,
+      cookMinutes = 15,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingShrimp("200g"), ingTomatoSauce("60g (4 muỗng canh)"), ingCorn("1 trái (150g)"), ingWater("800ml")),
+      seasonings = listOf(
+        sp("Hành tím băm", "1 củ"),
+        sp("Nước cốt chanh hoặc me", "1,5 muỗng canh"),
+        sp("Nước mắm & đường", "1,5 muỗng canh nước mắm, 1,5 muỗng cà phê đường"),
+        sp("Ngò gai & hành lá", "3 nhánh")
+      ),
+      steps = listOf(
+        "Tôm tươi bóc vỏ rút chỉ lưng rửa sạch; bắp ngọt cắt khúc vừa ăn; hành lá và ngò gai thái nhỏ.",
+        "Phi thơm hành tím băm với chút dầu ăn, cho 4 muỗng canh sốt cà chua vào xào 1 phút cho lên màu đẹp.",
+        "Đổ 800ml nước vào nồi đun sôi rồi cho bắp ngọt vào nấu 7 phút cho ngọt nước.",
+        "Nêm nước mắm, đường và chút muối vừa ăn, thả tôm tươi vào nấu sôi 2–3 phút cho tôm chín đỏ.",
+        "Tắt bếp rồi thêm nước cốt chanh cân bằng vị chua thanh, rắc ngò gai và hành lá lên mặt."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=canh+chua+tom"
+    ),
+
+    // 48. Bánh mì nướng bơ sữa — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "banh_mi_nuong_bo_sua_gion",
+      title = "Bánh mì nướng bơ sữa",
+      emoji = "🥖",
+      summary = "Bánh mì ép dẹt phết bơ lạt và sữa tươi nướng giòn tan thơm béo bằng lò nướng hoặc nồi chiên không dầu.",
+      prepMinutes = 5,
+      cookMinutes = 8,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
+      fridgeIngredients = listOf(ingBread("2 ổ (160g)"), ingButter("25g"), ingMilk("40ml")),
+      seasonings = listOf(
+        sp("Sữa đặc hoặc đường", "1,5 muỗng canh"),
+        sp("Mè rang (tùy chọn)", "1 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Xẻ dọc 2 ổ bánh mì và dùng chày hoặc muỗng lớn ép nhẹ cho bánh hơi dẹt để dễ phết bơ thấm đều.",
+        "Làm tan chảy 25g bơ lạt rồi khuấy quyện cùng 40ml sữa tươi và 1,5 muỗng canh sữa đặc (hoặc đường).",
+        "Dùng cọ phết đều hỗn hợp bơ sữa lên cả hai mặt bánh mì.",
+        "Nướng bánh trong nồi chiên không dầu hoặc lò nướng ở 175°C khoảng 6–8 phút (lật mặt giữa giờ) đến khi vàng giòn.",
+        "Lấy bánh ra rắc thêm mè rang nếu thích và thưởng thức ngay khi còn giòn rụm."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=banh+mi+nuong+bo+sua"
     )
   )
 }

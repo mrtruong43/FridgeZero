@@ -158,20 +158,30 @@ Hiển thị khi người dùng mở app lần đầu (hoặc bấm nút `⚙️
 4. **`CameraAiPreviewSheet` (Cổng CameraX Quét Hóa đơn — Giai đoạn 2):**
    - Mở khi chạm `📷 Quét AI` trên Task Bar; hiển thị khung ngắm CameraX với 4 góc định vị hóa đơn, tia quét laser xanh `#A3E635`, nút đèn Flash, nút chụp và chọn ảnh thư viện (sẵn sàng nối luồng AI OCR ở GĐ2).
 
-### 3.5. Màn 4 — Cẩm nang Ẩm thực & Giải cứu Hạn dùng (`ui/recipes/CulinaryGuideScreen.kt`, `RecipeDetailSheet.kt`)
+### 3.5. Màn 4 — Cẩm nang Ẩm thực & Hướng dẫn Nấu Từng Bước (`ui/recipes/CulinaryGuideScreen.kt`, `RecipeDetailSheet.kt`, `RecipeCookingScreen.kt`)
 - **Bộ công thức tham khảo chuẩn (`CulinaryGuideRepository`):**
-  - Gồm **32 công thức cơm nhà Việt & Eat-Clean kinh điển** có nguồn kiểm chứng (*Điện máy XANH Vào Bếp*, *Savoury Days*, *VnExpress Ẩm Thực*, *Cooky*, *Serious Eats*) kèm URL tra cứu trực tiếp theo từng món, phủ đủ 32 `iconKey` của `EmojiIconRepository`.
-  - Mỗi công thức có đầy đủ khẩu phần (`servingsLabel`), thời gian `prepMinutes` + `cookMinutes`, định lượng gram/ml/quả cho nguyên liệu chính, bảng gia vị có định lượng muỗng/gram (`SeasoningSpec`), và **5–6 bước chế biến chi tiết**.
-  - Ở tab mặc định `Tất cả`, `CulinaryGuideEngine` áp dụng giới hạn đa dạng hóa top 6: tối đa **2 món cho cùng 1 nguyên liệu chính đầu tiên** để tránh một món sắp hết hạn làm lặp danh sách đầu trang.
-- **Top Bar:** Nút quay lại `←`, tiêu đề `CẨM NANG ẨM THỰC` và sticker `#A3E635` hiển thị số món đủ đồ nấu ngay.
-- **Lưới công thức Bento 2 cột (`LazyVerticalGrid`):**
-  - Thẻ Hero toàn chiều rộng **`🔥 MÓN CỨU TỦ HÔM NAY`** làm nổi bật công thức có điểm giải cứu cao nhất.
-  - Hàng chip lọc ngang (`Tất cả`, `Đủ đồ nấu ngay`, `Cứu đồ gấp`, `Nhanh ≤ 15p`, `Cơm nhà Việt`, `Eat-Clean`).
-  - Thẻ Bento 2 cột hiển thị emoji món, tỷ lệ khớp nguyên liệu (`#A3E635` khi đủ đồ, `#FACC15` khi còn thiếu), hàng emoji nguyên liệu tô màu theo hạn dùng, thời gian nấu và `sourceName`. Tự động mở `RecipeDetailSheet` khi điều hướng kèm `initialRecipeId`.
-- **`RecipeDetailSheet` (Màn chi tiết toàn màn hình trong `CulinaryGuideScreen`):**
-  - Render trực tiếp bên trong root `Box` của `CulinaryGuideScreen` qua `AnimatedVisibility` (~`180ms` slide/fade) trên nền `dotGridBackground()` kèm `BackHandler` để mở/đóng tức thì không độ trễ `Dialog` window hay giật kéo.
-  - Top bar Neo-Brutalist gồm nút quay lại vuông `44.dp` `←`, tên món và nhãn nguồn; phần thân cuộn độc lập (`weight(1f)`) hiển thị `prepMinutes` + `cookMinutes`, khẩu phần `servingsLabel`, độ khó (`Dễ` / `Vừa`), tỷ lệ khớp và phân tách rõ **`✓ Nguyên liệu tương tự đang có trong tủ`** (tô màu `#FB7185` / `#FACC15` cho món sắp hết hạn), **`🛒 Nguyên liệu chính cần chuẩn bị thêm`**, **`🧂 Gia vị & định lượng chuẩn`** (dạng bảng 2 cột tên gia vị — định lượng) cùng **5–6 bước nấu** đánh số trong `NeoBrutalistCard`.
-  - Thanh hành động đáy ghim cố định với 2 nút: **`🔗 Xem bài gốc`** (`LocalUriHandler.openUri` bọc `runCatching`) và **`🎉 Đã nấu xong`** — khi có nguyên liệu khớp trong tủ sẽ mở hộp thoại Neo-Brutalist cho phép chọn **`✓ Dùng hết`** (mặc định) hoặc **`🥡 Dùng dở`** cho từng nguyên liệu trước khi gọi `FridgeViewModel.completeRecipeCook` (trừ hết món cân nặng `g`/`kg` hoặc đếm đơn vị với `usedUp`; giữ `ACTIVE`, đặt `isOpened = true` và giới hạn hạn dùng $\le 2$ ngày với `leftovers`).
+  - Gồm **48 công thức đa trường phái** (*Cơm nhà Việt*, *Món Á*, *Món Âu*, *Eat-Clean*, *Món Chay*, *Sáng & Đồ uống*) có nguồn kiểm chứng (*Điện máy XANH Vào Bếp*, *Savoury Days*, *VnExpress Ẩm Thực*, *Cooky*, *Serious Eats*) kèm URL tra cứu trực tiếp theo từng món, phủ đủ 32 `iconKey` của `EmojiIconRepository`.
+  - Mỗi công thức có đầy đủ khẩu phần (`servingsLabel`), thời gian `prepMinutes` + `cookMinutes`, định lượng gram/ml/quả cho nguyên liệu chính, bảng gia vị có định lượng muỗng/gram (`SeasoningSpec`), và **5 bước chế biến chi tiết** (tổng 240 bước).
+  - Ở tab mặc định `Tất cả` (khi không nhập từ khóa), `CulinaryGuideEngine` áp dụng giới hạn đa dạng hóa top 6: tối đa **2 món cho cùng 1 nguyên liệu chính đầu tiên** để tránh một món sắp hết hạn làm lặp danh sách đầu trang.
+- **Top Bar:** Nút quay lại `←`, tiêu đề `CẨM NANG ẨM THỰC` và sticker `#FEF08A` hiển thị tổng số công thức.
+- **Tìm kiếm & Danh mục thẻ ngang 1 cột (`LazyColumn`):**
+  - Thanh tìm kiếm từ khóa không phân biệt dấu (`RecipeSearchBar`) kết hợp dải chip lọc 7 nhóm món thuần túy (`Tất cả`, `Cơm nhà Việt`, `Món Á`, `Món Âu`, `Eat-Clean`, `Món Chay`, `Sáng & Đồ uống`) kèm số lượng món từng nhóm.
+  - Danh sách thẻ ngang toàn chiều rộng (`RecipeHorizontalCard`) đồng bộ bố cục 3 vùng với Màn 3: dải màu trạng thái mép trái, ô emoji món `50.dp`, tiêu đề + sticker tỷ lệ khớp nguyên liệu (`LimeFresh`/`LemonWarn`), mô tả tóm tắt, tối đa 4 icon nguyên liệu tô màu theo hạn dùng, thời gian nấu và tên nguồn. Tự động mở `RecipeDetailSheet` khi điều hướng kèm `initialRecipeId`.
+- **`RecipeDetailSheet` (Màn A — Tổng quan Chuẩn bị Gọn trong `CulinaryGuideScreen`):**
+  - Render trực tiếp bên trong root `Box` của `CulinaryGuideScreen` qua `AnimatedVisibility` (~`180ms` slide/fade) trên nền `dotGridBackground()` kèm `BackHandler` để mở/đóng tức thì không độ trễ `Dialog`.
+  - Top bar Neo-Brutalist gồm nút quay lại vuông `44.dp` `←`, tiêu đề `CHI TIẾT CÔNG THỨC` và nhãn nguồn; phần thân tối giản chỉ còn **3 khối rõ ràng**:
+    1. **Thẻ Tổng quan món ăn:** Emoji + tên món + tóm tắt sạch sẽ, kèm dải thông số 4 cột liền mạch (`Tổng thời gian & Sơ chế`, `Khẩu phần`, `Độ khó`, `Tỷ lệ có sẵn`).
+    2. **1 Bảng Chuẩn bị Hợp nhất (`UnifiedPrepTableCard`):** Gom chung trong 1 `NeoBrutalistCard` dạng bảng phân đường kẻ mảnh gồm **Nguyên liệu chính** (hiển thị trạng thái *Trong tủ / Gợi ý thay / Cần chuẩn bị thêm* kèm nhãn hạn dùng nổi bật cho đồ gấp $\le 1$ ngày) và **Gia vị định lượng** 2 cột xen kẽ.
+    3. **Thẻ Lộ trình thực hiện:** Tóm tắt 5 chặng thao tác theo `CookingStepAnalyzer`.
+  - Thanh hành động đáy ghim cố định với 2 nút: **`🔗 Xem bài gốc`** (`LocalUriHandler.openUri` bọc `runCatching`) và **`👩‍🍳 Bắt đầu nấu →`** (hoặc **`▶ Tiếp tục nấu (BX/5)`** khi quay lại giữa chừng).
+- **`RecipeCookingScreen` (Màn B — Flashcard Hướng dẫn Từng Bước Toàn Màn hình):**
+  - Render trên nền `dotGridBackground()` bằng `AnimatedVisibility` (slide ngang `180ms`) + `BackHandler` (đóng bảng tra cứu nhanh nguyên liệu trước, rồi mới quay lại `RecipeDetailSheet`); tự động giữ sáng màn hình (`view.keepScreenOn = true`) trong lúc đang nấu.
+  - **Top Bar:** Nút quay lại `←`, tên món + chỉ số `BƯỚC X / Y`, thanh tiến độ phân đoạn chạm-nhảy-bước và nút **`📋 Đồ`** mở overlay tra nhanh `UnifiedPrepTableCard` giữa chừng mà không mất vị trí bước.
+  - **1 Thẻ Flashcard lớn liền khối / 1 bước (`HorizontalPager` hỗ trợ vuốt ngang & bấm nút):**
+    - Nửa trên (`45%` chiều cao): Tranh minh họa Neo-Brutalist offline (`drawable-nodpi/ill_step_*.jpg`) tương ứng 8 nhóm thao tác `CookingAction` (`PREP_CUT`, `MARINATE_MIX`, `PAN_SEAR_STIR`, `BOIL_SIMMER`, `STEAM`, `BAKE_AIRFRY`, `BLEND_CHILL`, `PLATE_SERVE`) kết hợp badge số bước và pill nguyên liệu xuất hiện trong bước đó.
+    - Thanh phân cách giữa: Tên chặng thao tác + **nút Hẹn giờ nhỏ gọn tích hợp sẵn** (tự nhận diện mốc thời gian như `⏱ 4 phút` từ câu bước qua `CookingStepAnalyzer.extractTimer`, hoặc chọn nhanh `1p / 3p / 5p / 10p` trên bước không có giờ; bấm chạy đếm ngược, hỗ trợ tạm dừng `⏸` / `+1p` / đặt lại `↺` và rung haptic khi hết giờ).
+    - Nửa dưới (`55%` chiều cao): Nội dung hướng dẫn cỡ chữ lớn (`18.sp`, `lineHeight = 28.sp`) dễ đọc từ xa trên bàn bếp, tô sáng tự động định lượng, thời gian và nhiệt độ.
+  - **Thanh đáy cố định:** Nút **`← Trước`** và **`Tiếp theo →`**; riêng tại bước cuối (bước `5/5`) đổi thành **`🎉 Hoàn tất nấu`** để mở `CookCompletionConfirmDialog` chọn **`✓ Dùng hết`** hoặc **`🥡 Dùng dở`** cho từng nguyên liệu trước khi cập nhật kho qua `FridgeViewModel.completeRecipeCook` (trừ món cân nặng `g`/`kg` hoặc đơn vị với `usedUp`; giữ `ACTIVE`, đặt `isOpened = true` và giới hạn hạn dùng $\le 2$ ngày với `leftovers`).
 
 ---
 
@@ -201,10 +211,10 @@ app/src/main/
     │   ├── designer/   # FridgeDesignerScreen.kt, FridgeLayoutEditor.kt (Màn 1)
     │   ├── home/       # HomeScreen.kt, HomeDashboardHeader.kt (Màn 2)
     │   ├── bento/      # CompartmentBentoScreen.kt, ItemSheets.kt (Màn 3)
-    │   ├── recipes/    # CulinaryGuideScreen.kt, RecipeDetailSheet.kt (Màn 4)
+    │   ├── recipes/    # CulinaryGuideScreen.kt, RecipeDetailSheet.kt, RecipeCookingScreen.kt (Màn 4)
     │   └── aiscan/     # AiScanPlaceholderScreen.kt (Cổng CameraX GĐ2)
     ├── data/           # Entities.kt, Dao.kt, Db.kt, Repository.kt, Seed.kt, AppConfig.kt
-    ├── domain/         # Freshness.kt, ShelfLife.kt, Models.kt, CulinaryGuide.kt
+    ├── domain/         # Freshness.kt, ShelfLife.kt, Models.kt, CulinaryGuide.kt, CookingStepAnalyzer.kt
     ├── notifications/  # ExpiryReminderWorker.kt, ContextualNotificationPrompt.kt
     └── vm/             # FridgeViewModel.kt
 ```

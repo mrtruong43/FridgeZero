@@ -1,6 +1,6 @@
 # FridgeZero — Complete Source Code & Architecture Summary
 
-> **Generated:** 2026-11-20 17:35:59 +07:00
+> **Generated:** 2026-11-21 00:20:20 +07:00
 > **Architecture:** Jetpack Compose + Room + WorkManager + CameraX 1.4.2 + Offline Three.js r128 WebGL Stage (Single Shared WebView Host at MainActivity Root + v3 Neo-Brutalist)
 > **Excluded:** `local.properties` (machine-specific paths/sensitive config), binary files (`.apk`, `.jar`, `.ttf`, `.webp`), build outputs (`build/`, `.gradle/`), and third-party minified vendor bundle `app/src/main/assets/fridge3d/three.min.js` (603,451 bytes).
 
@@ -28,6 +28,7 @@ FridgeZero/
         │   │   └── data/Entities.kt
         │   │   └── data/Repository.kt
         │   │   └── data/Seed.kt
+        │   │   └── domain/CookingStepAnalyzer.kt
         │   │   └── domain/CulinaryGuide.kt
         │   │   └── domain/Freshness.kt
         │   │   └── domain/Models.kt
@@ -47,6 +48,7 @@ FridgeZero/
         │   │   └── ui/home/HomeScreen.kt
         │   │   └── ui/icons/FoodIcon.kt
         │   │   └── ui/recipes/CulinaryGuideScreen.kt
+        │   │   └── ui/recipes/RecipeCookingScreen.kt
         │   │   └── ui/recipes/RecipeDetailSheet.kt
         │   │   └── ui/theme/BrutalistComponents.kt
         │   │   └── ui/theme/Color.kt
@@ -62,7 +64,7 @@ FridgeZero/
 
 ## 2. File Contents
 
-### `docs/spec.md` (215 lines)
+### `docs/spec.md` (225 lines)
 
 ````markdown
 # FridgeZero — Đặc tả Kỹ thuật & UI/UX v3
@@ -225,20 +227,30 @@ Hiển thị khi người dùng mở app lần đầu (hoặc bấm nút `⚙️
 4. **`CameraAiPreviewSheet` (Cổng CameraX Quét Hóa đơn — Giai đoạn 2):**
    - Mở khi chạm `📷 Quét AI` trên Task Bar; hiển thị khung ngắm CameraX với 4 góc định vị hóa đơn, tia quét laser xanh `#A3E635`, nút đèn Flash, nút chụp và chọn ảnh thư viện (sẵn sàng nối luồng AI OCR ở GĐ2).
 
-### 3.5. Màn 4 — Cẩm nang Ẩm thực & Giải cứu Hạn dùng (`ui/recipes/CulinaryGuideScreen.kt`, `RecipeDetailSheet.kt`)
+### 3.5. Màn 4 — Cẩm nang Ẩm thực & Hướng dẫn Nấu Từng Bước (`ui/recipes/CulinaryGuideScreen.kt`, `RecipeDetailSheet.kt`, `RecipeCookingScreen.kt`)
 - **Bộ công thức tham khảo chuẩn (`CulinaryGuideRepository`):**
-  - Gồm **32 công thức cơm nhà Việt & Eat-Clean kinh điển** có nguồn kiểm chứng (*Điện máy XANH Vào Bếp*, *Savoury Days*, *VnExpress Ẩm Thực*, *Cooky*, *Serious Eats*) kèm URL tra cứu trực tiếp theo từng món, phủ đủ 32 `iconKey` của `EmojiIconRepository`.
-  - Mỗi công thức có đầy đủ khẩu phần (`servingsLabel`), thời gian `prepMinutes` + `cookMinutes`, định lượng gram/ml/quả cho nguyên liệu chính, bảng gia vị có định lượng muỗng/gram (`SeasoningSpec`), và **5–6 bước chế biến chi tiết**.
-  - Ở tab mặc định `Tất cả`, `CulinaryGuideEngine` áp dụng giới hạn đa dạng hóa top 6: tối đa **2 món cho cùng 1 nguyên liệu chính đầu tiên** để tránh một món sắp hết hạn làm lặp danh sách đầu trang.
-- **Top Bar:** Nút quay lại `←`, tiêu đề `CẨM NANG ẨM THỰC` và sticker `#A3E635` hiển thị số món đủ đồ nấu ngay.
-- **Lưới công thức Bento 2 cột (`LazyVerticalGrid`):**
-  - Thẻ Hero toàn chiều rộng **`🔥 MÓN CỨU TỦ HÔM NAY`** làm nổi bật công thức có điểm giải cứu cao nhất.
-  - Hàng chip lọc ngang (`Tất cả`, `Đủ đồ nấu ngay`, `Cứu đồ gấp`, `Nhanh ≤ 15p`, `Cơm nhà Việt`, `Eat-Clean`).
-  - Thẻ Bento 2 cột hiển thị emoji món, tỷ lệ khớp nguyên liệu (`#A3E635` khi đủ đồ, `#FACC15` khi còn thiếu), hàng emoji nguyên liệu tô màu theo hạn dùng, thời gian nấu và `sourceName`. Tự động mở `RecipeDetailSheet` khi điều hướng kèm `initialRecipeId`.
-- **`RecipeDetailSheet` (Màn chi tiết toàn màn hình trong `CulinaryGuideScreen`):**
-  - Render trực tiếp bên trong root `Box` của `CulinaryGuideScreen` qua `AnimatedVisibility` (~`180ms` slide/fade) trên nền `dotGridBackground()` kèm `BackHandler` để mở/đóng tức thì không độ trễ `Dialog` window hay giật kéo.
-  - Top bar Neo-Brutalist gồm nút quay lại vuông `44.dp` `←`, tên món và nhãn nguồn; phần thân cuộn độc lập (`weight(1f)`) hiển thị `prepMinutes` + `cookMinutes`, khẩu phần `servingsLabel`, độ khó (`Dễ` / `Vừa`), tỷ lệ khớp và phân tách rõ **`✓ Nguyên liệu tương tự đang có trong tủ`** (tô màu `#FB7185` / `#FACC15` cho món sắp hết hạn), **`🛒 Nguyên liệu chính cần chuẩn bị thêm`**, **`🧂 Gia vị & định lượng chuẩn`** (dạng bảng 2 cột tên gia vị — định lượng) cùng **5–6 bước nấu** đánh số trong `NeoBrutalistCard`.
-  - Thanh hành động đáy ghim cố định với 2 nút: **`🔗 Xem bài gốc`** (`LocalUriHandler.openUri` bọc `runCatching`) và **`🎉 Đã nấu xong`** — khi có nguyên liệu khớp trong tủ sẽ mở hộp thoại Neo-Brutalist cho phép chọn **`✓ Dùng hết`** (mặc định) hoặc **`🥡 Dùng dở`** cho từng nguyên liệu trước khi gọi `FridgeViewModel.completeRecipeCook` (trừ hết món cân nặng `g`/`kg` hoặc đếm đơn vị với `usedUp`; giữ `ACTIVE`, đặt `isOpened = true` và giới hạn hạn dùng $\le 2$ ngày với `leftovers`).
+  - Gồm **48 công thức đa trường phái** (*Cơm nhà Việt*, *Món Á*, *Món Âu*, *Eat-Clean*, *Món Chay*, *Sáng & Đồ uống*) có nguồn kiểm chứng (*Điện máy XANH Vào Bếp*, *Savoury Days*, *VnExpress Ẩm Thực*, *Cooky*, *Serious Eats*) kèm URL tra cứu trực tiếp theo từng món, phủ đủ 32 `iconKey` của `EmojiIconRepository`.
+  - Mỗi công thức có đầy đủ khẩu phần (`servingsLabel`), thời gian `prepMinutes` + `cookMinutes`, định lượng gram/ml/quả cho nguyên liệu chính, bảng gia vị có định lượng muỗng/gram (`SeasoningSpec`), và **5 bước chế biến chi tiết** (tổng 240 bước).
+  - Ở tab mặc định `Tất cả` (khi không nhập từ khóa), `CulinaryGuideEngine` áp dụng giới hạn đa dạng hóa top 6: tối đa **2 món cho cùng 1 nguyên liệu chính đầu tiên** để tránh một món sắp hết hạn làm lặp danh sách đầu trang.
+- **Top Bar:** Nút quay lại `←`, tiêu đề `CẨM NANG ẨM THỰC` và sticker `#FEF08A` hiển thị tổng số công thức.
+- **Tìm kiếm & Danh mục thẻ ngang 1 cột (`LazyColumn`):**
+  - Thanh tìm kiếm từ khóa không phân biệt dấu (`RecipeSearchBar`) kết hợp dải chip lọc 7 nhóm món thuần túy (`Tất cả`, `Cơm nhà Việt`, `Món Á`, `Món Âu`, `Eat-Clean`, `Món Chay`, `Sáng & Đồ uống`) kèm số lượng món từng nhóm.
+  - Danh sách thẻ ngang toàn chiều rộng (`RecipeHorizontalCard`) đồng bộ bố cục 3 vùng với Màn 3: dải màu trạng thái mép trái, ô emoji món `50.dp`, tiêu đề + sticker tỷ lệ khớp nguyên liệu (`LimeFresh`/`LemonWarn`), mô tả tóm tắt, tối đa 4 icon nguyên liệu tô màu theo hạn dùng, thời gian nấu và tên nguồn. Tự động mở `RecipeDetailSheet` khi điều hướng kèm `initialRecipeId`.
+- **`RecipeDetailSheet` (Màn A — Tổng quan Chuẩn bị Gọn trong `CulinaryGuideScreen`):**
+  - Render trực tiếp bên trong root `Box` của `CulinaryGuideScreen` qua `AnimatedVisibility` (~`180ms` slide/fade) trên nền `dotGridBackground()` kèm `BackHandler` để mở/đóng tức thì không độ trễ `Dialog`.
+  - Top bar Neo-Brutalist gồm nút quay lại vuông `44.dp` `←`, tiêu đề `CHI TIẾT CÔNG THỨC` và nhãn nguồn; phần thân tối giản chỉ còn **3 khối rõ ràng**:
+    1. **Thẻ Tổng quan món ăn:** Emoji + tên món + tóm tắt sạch sẽ, kèm dải thông số 4 cột liền mạch (`Tổng thời gian & Sơ chế`, `Khẩu phần`, `Độ khó`, `Tỷ lệ có sẵn`).
+    2. **1 Bảng Chuẩn bị Hợp nhất (`UnifiedPrepTableCard`):** Gom chung trong 1 `NeoBrutalistCard` dạng bảng phân đường kẻ mảnh gồm **Nguyên liệu chính** (hiển thị trạng thái *Trong tủ / Gợi ý thay / Cần chuẩn bị thêm* kèm nhãn hạn dùng nổi bật cho đồ gấp $\le 1$ ngày) và **Gia vị định lượng** 2 cột xen kẽ.
+    3. **Thẻ Lộ trình thực hiện:** Tóm tắt 5 chặng thao tác theo `CookingStepAnalyzer`.
+  - Thanh hành động đáy ghim cố định với 2 nút: **`🔗 Xem bài gốc`** (`LocalUriHandler.openUri` bọc `runCatching`) và **`👩‍🍳 Bắt đầu nấu →`** (hoặc **`▶ Tiếp tục nấu (BX/5)`** khi quay lại giữa chừng).
+- **`RecipeCookingScreen` (Màn B — Flashcard Hướng dẫn Từng Bước Toàn Màn hình):**
+  - Render trên nền `dotGridBackground()` bằng `AnimatedVisibility` (slide ngang `180ms`) + `BackHandler` (đóng bảng tra cứu nhanh nguyên liệu trước, rồi mới quay lại `RecipeDetailSheet`); tự động giữ sáng màn hình (`view.keepScreenOn = true`) trong lúc đang nấu.
+  - **Top Bar:** Nút quay lại `←`, tên món + chỉ số `BƯỚC X / Y`, thanh tiến độ phân đoạn chạm-nhảy-bước và nút **`📋 Đồ`** mở overlay tra nhanh `UnifiedPrepTableCard` giữa chừng mà không mất vị trí bước.
+  - **1 Thẻ Flashcard lớn liền khối / 1 bước (`HorizontalPager` hỗ trợ vuốt ngang & bấm nút):**
+    - Nửa trên (`45%` chiều cao): Tranh minh họa Neo-Brutalist offline (`drawable-nodpi/ill_step_*.jpg`) tương ứng 8 nhóm thao tác `CookingAction` (`PREP_CUT`, `MARINATE_MIX`, `PAN_SEAR_STIR`, `BOIL_SIMMER`, `STEAM`, `BAKE_AIRFRY`, `BLEND_CHILL`, `PLATE_SERVE`) kết hợp badge số bước và pill nguyên liệu xuất hiện trong bước đó.
+    - Thanh phân cách giữa: Tên chặng thao tác + **nút Hẹn giờ nhỏ gọn tích hợp sẵn** (tự nhận diện mốc thời gian như `⏱ 4 phút` từ câu bước qua `CookingStepAnalyzer.extractTimer`, hoặc chọn nhanh `1p / 3p / 5p / 10p` trên bước không có giờ; bấm chạy đếm ngược, hỗ trợ tạm dừng `⏸` / `+1p` / đặt lại `↺` và rung haptic khi hết giờ).
+    - Nửa dưới (`55%` chiều cao): Nội dung hướng dẫn cỡ chữ lớn (`18.sp`, `lineHeight = 28.sp`) dễ đọc từ xa trên bàn bếp, tô sáng tự động định lượng, thời gian và nhiệt độ.
+  - **Thanh đáy cố định:** Nút **`← Trước`** và **`Tiếp theo →`**; riêng tại bước cuối (bước `5/5`) đổi thành **`🎉 Hoàn tất nấu`** để mở `CookCompletionConfirmDialog` chọn **`✓ Dùng hết`** hoặc **`🥡 Dùng dở`** cho từng nguyên liệu trước khi cập nhật kho qua `FridgeViewModel.completeRecipeCook` (trừ món cân nặng `g`/`kg` hoặc đơn vị với `usedUp`; giữ `ACTIVE`, đặt `isOpened = true` và giới hạn hạn dùng $\le 2$ ngày với `leftovers`).
 
 ---
 
@@ -268,10 +280,10 @@ app/src/main/
     │   ├── designer/   # FridgeDesignerScreen.kt, FridgeLayoutEditor.kt (Màn 1)
     │   ├── home/       # HomeScreen.kt, HomeDashboardHeader.kt (Màn 2)
     │   ├── bento/      # CompartmentBentoScreen.kt, ItemSheets.kt (Màn 3)
-    │   ├── recipes/    # CulinaryGuideScreen.kt, RecipeDetailSheet.kt (Màn 4)
+    │   ├── recipes/    # CulinaryGuideScreen.kt, RecipeDetailSheet.kt, RecipeCookingScreen.kt (Màn 4)
     │   └── aiscan/     # AiScanPlaceholderScreen.kt (Cổng CameraX GĐ2)
     ├── data/           # Entities.kt, Dao.kt, Db.kt, Repository.kt, Seed.kt, AppConfig.kt
-    ├── domain/         # Freshness.kt, ShelfLife.kt, Models.kt, CulinaryGuide.kt
+    ├── domain/         # Freshness.kt, ShelfLife.kt, Models.kt, CulinaryGuide.kt, CookingStepAnalyzer.kt
     ├── notifications/  # ExpiryReminderWorker.kt, ContextualNotificationPrompt.kt
     └── vm/             # FridgeViewModel.kt
 ```
@@ -545,10 +557,10 @@ dependencies {
 </manifest>
 ```
 
-### `app/src/main/res/values/strings.xml` (217 lines)
+### `app/src/main/res/values/strings.xml` (282 lines)
 
 ```xml
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">FridgeZero</string>
     <string name="days_left_fmt">còn %1$d ngày</string>
@@ -713,18 +725,29 @@ dependencies {
     <string name="recipe_screen_title">CẨM NANG ẨM THỰC</string>
     <string name="recipe_back_cd">Quay lại tủ 3D</string>
     <string name="recipe_detail_back_cd">Quay lại cẩm nang</string>
-    <string name="recipe_ready_badge_fmt">%1$d SẴN SÀNG</string>
-    <string name="recipe_hero_badge">🔥 MÓN CỨU TỦ HÔM NAY</string>
-    <string name="recipe_hero_all_fresh_badge">🔥 GỢI Ý NẤU NGAY HÔM NAY</string>
-    <string name="recipe_hero_rescue_fmt">Cứu %1$d món gấp</string>
+    <string name="recipe_detail_topbar_title">CHI TIẾT CÔNG THỨC</string>
+    <string name="recipe_count_items_fmt">%1$d MÓN</string>
+    <string name="recipe_count_seasonings_fmt">%1$d LOẠI</string>
+    <string name="recipe_steps_progress_fmt">%1$d/%2$d BƯỚC</string>
+    <string name="recipe_step_label_fmt">BƯỚC %1$02d</string>
+    <string name="recipe_step_done_label">✓ XONG</string>
+    <string name="recipe_step_active_label">TIẾP THEO</string>
+    <string name="recipe_steps_tap_hint">Chạm vào từng bước để đánh dấu tiến độ khi đang nấu</string>
+    <string name="recipe_total_badge_fmt">%1$d MÓN</string>
     <string name="recipe_hero_cta">Xem công thức →</string>
     <string name="recipe_filter_all">Tất cả</string>
-    <string name="recipe_filter_ready">Đủ đồ nấu ngay</string>
-    <string name="recipe_filter_rescue">Cứu đồ gấp</string>
-    <string name="recipe_filter_quick">Nhanh ≤ 15p</string>
     <string name="recipe_filter_viet">Cơm nhà Việt</string>
+    <string name="recipe_filter_asian">Món Á</string>
+    <string name="recipe_filter_western">Món Âu</string>
     <string name="recipe_filter_eat_clean">Eat-Clean</string>
+    <string name="recipe_filter_vegetarian">Món Chay</string>
+    <string name="recipe_filter_breakfast_drink">Sáng &amp; Đồ uống</string>
+    <string name="recipe_search_placeholder">Tìm món ăn, nguyên liệu (vd: cá hồi, trứng, nhật)...</string>
+    <string name="recipe_search_clear_cd">Xóa từ khóa tìm kiếm</string>
+    <string name="recipe_result_count_fmt">%1$d công thức phù hợp</string>
+    <string name="recipe_filter_reset">Đặt lại</string>
     <string name="recipe_empty_filter">Chưa có món nào khớp bộ lọc này. Thử chuyển sang "Tất cả" nhé!</string>
+    <string name="recipe_empty_search_fmt">Không tìm thấy công thức khớp "%1$s". Thử từ khóa khác hoặc chọn "Tất cả" nhé!</string>
     <string name="recipe_prep_time_short_fmt">⏱ %1$dp</string>
     <string name="recipe_prep_time_long_fmt">⏱ %1$d phút</string>
     <string name="recipe_prep_cook_time_fmt">⏱ Sơ chế %1$dp · Nấu %2$dp</string>
@@ -763,6 +786,60 @@ dependencies {
     <string name="expiry_with_date_fmt">%1$s · %2$s</string>
     <string name="storage_age_today">Cất hôm nay</string>
     <string name="storage_age_days_fmt">Cất %1$dd trước</string>
+
+    <string name="recipe_prep_board_title">📋 BẢNG CHUẨN BỊ</string>
+    <string name="recipe_prep_board_badge_fmt">%1$d/%2$d CÓ SẴN</string>
+    <string name="recipe_prep_main_header">NGUYÊN LIỆU CHÍNH</string>
+    <string name="recipe_prep_amount_header">ĐỊNH LƯỢNG</string>
+    <string name="recipe_prep_seasonings_header">🧂 GIA VỊ ĐỊNH LƯỢNG</string>
+    <string name="recipe_prep_missing_status">Cần chuẩn bị thêm</string>
+    <string name="recipe_prep_missing_tag">Thiếu</string>
+    <string name="recipe_meta_total_time_fmt">⏱ %1$dp</string>
+    <string name="recipe_meta_prep_sub_fmt">Sơ chế %1$dp</string>
+    <string name="recipe_meta_ready_sub">Có sẵn</string>
+    <string name="recipe_meta_servings_sub">Khẩu phần</string>
+    <string name="recipe_meta_difficulty_sub">Độ khó</string>
+    <string name="recipe_difficulty_easy_short">⚡ Dễ</string>
+    <string name="recipe_difficulty_medium_short">⚡ Vừa</string>
+    <string name="recipe_roadmap_title">👩‍🍳 LỘ TRÌNH THỰC HIỆN</string>
+    <string name="recipe_roadmap_badge_fmt">%1$d BƯỚC · ~%2$dp</string>
+    <string name="recipe_roadmap_step_fmt">%1$d. %2$s</string>
+    <string name="recipe_roadmap_hint">Bấm "Bắt đầu nấu" để mở từng bước kèm hình minh họa &amp; hẹn giờ</string>
+    <string name="recipe_action_start_cooking">👩‍🍳 Bắt đầu nấu →</string>
+    <string name="recipe_action_resume_cooking_fmt">▶ Tiếp tục nấu (B%1$d/%2$d)</string>
+
+    <string name="cooking_back_cd">Quay lại chi tiết món</string>
+    <string name="cooking_step_counter_fmt">BƯỚC %1$d / %2$d</string>
+    <string name="cooking_ingredients_btn">📋 Đồ</string>
+    <string name="cooking_ingredients_sheet_title">BẢNG NGUYÊN LIỆU &amp; GIA VỊ</string>
+    <string name="cooking_ingredients_sheet_close">Đóng</string>
+    <string name="cooking_prev_step">← Trước</string>
+    <string name="cooking_next_step">Tiếp theo →</string>
+    <string name="cooking_finish_cook">🎉 Hoàn tất nấu</string>
+    <string name="cooking_swipe_hint">Vuốt ngang hoặc bấm Tiếp theo để chuyển bước</string>
+    <string name="cooking_timer_idle_default">Hẹn giờ</string>
+    <string name="cooking_timer_done">Hết giờ!</string>
+    <string name="cooking_timer_preset_fmt">%1$dp</string>
+    <string name="cooking_timer_reset_cd">Đặt lại hẹn giờ</string>
+    <string name="cooking_timer_add_min">+1p</string>
+    <string name="cooking_timer_pause_cd">Tạm dừng hoặc tiếp tục hẹn giờ</string>
+
+    <string name="cooking_action_prep_cut">🔪 SƠ CHẾ · CẮT THÁI</string>
+    <string name="cooking_action_prep_cut_short">Sơ chế</string>
+    <string name="cooking_action_marinate_mix">🥣 ƯỚP · TRỘN · PHA SỐT</string>
+    <string name="cooking_action_marinate_mix_short">Ướp trộn</string>
+    <string name="cooking_action_pan_sear_stir">🔥 ÁP CHẢO · XÀO · RIM</string>
+    <string name="cooking_action_pan_sear_stir_short">Áp chảo</string>
+    <string name="cooking_action_boil_simmer">🍲 LUỘC · NẤU CANH · KHO</string>
+    <string name="cooking_action_boil_simmer_short">Nấu hầm</string>
+    <string name="cooking_action_steam">💨 HẤP CÁCH THỦY</string>
+    <string name="cooking_action_steam_short">Hấp</string>
+    <string name="cooking_action_bake_airfry">♨️ NƯỚNG · NỒI CHIÊN</string>
+    <string name="cooking_action_bake_airfry_short">Nướng</string>
+    <string name="cooking_action_blend_chill">🧊 XAY · PHA CHẾ · Ủ LẠNH</string>
+    <string name="cooking_action_blend_chill_short">Xay / Lạnh</string>
+    <string name="cooking_action_plate_serve">🍽️ TRÌNH BÀY · THƯỞNG THỨC</string>
+    <string name="cooking_action_plate_serve_short">Trình bày</string>
 </resources>
 ```
 
@@ -2520,7 +2597,201 @@ object Seed {
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/domain/CulinaryGuide.kt` (1602 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/domain/CookingStepAnalyzer.kt` (190 lines)
+
+```kotlin
+package com.truong.fridgezero.domain
+
+import java.util.Locale
+import kotlin.math.roundToInt
+
+/**
+ * Eight standardized culinary action phases covering all steps in [CulinaryGuideRepository].
+ */
+enum class CookingAction {
+  PREP_CUT,
+  MARINATE_MIX,
+  PAN_SEAR_STIR,
+  BOIL_SIMMER,
+  STEAM,
+  BAKE_AIRFRY,
+  BLEND_CHILL,
+  PLATE_SERVE
+}
+
+/**
+ * Parsed countdown specification extracted from a recipe step instruction.
+ */
+data class StepTimerSpec(
+  val totalSeconds: Int,
+  val displayLabel: String
+)
+
+/**
+ * Structured representation of a single recipe cooking step for Flashcard walkthrough UI.
+ */
+data class AnalyzedCookingStep(
+  val index: Int,
+  val text: String,
+  val action: CookingAction,
+  val timer: StepTimerSpec?,
+  val mentionedIngredients: List<RecipeIngredient>
+)
+
+/**
+ * Classifies cooking steps into visual action categories, parses countdown timers,
+ * and identifies recipe ingredients mentioned in each step.
+ */
+object CookingStepAnalyzer {
+
+  private val VI_LOCALE = Locale.forLanguageTag("vi-VN")
+
+  private val FINAL_SERVING_REGEX = Regex(
+    """thưởng thức|tắt bếp|tắt lửa|múc ra|dọn ra|trình bày|rắc .* lên|rưới .* lên|ăn nóng|ăn kèm|cho ra đĩa|cho ra tô|ra ly|ra đĩa|ra tô|cắt miếng vừa ăn|bày ra"""
+  )
+  private val EXCLUDE_FINAL_COOK_REGEX = Regex("""nướng|hấp|hầm \d|kho \d""")
+
+  private val ACTION_RULES: List<Pair<CookingAction, Regex>> = listOf(
+    CookingAction.BAKE_AIRFRY to Regex("""nồi chiên|lò nướng|đút lò|nướng|160°c|170°c|180°c|190°c|200°c"""),
+    CookingAction.STEAM to Regex("""hấp|xửng"""),
+    CookingAction.BLEND_CHILL to Regex("""máy xay|xay\b|ướp lạnh|ngăn mát|ủ lạnh|ngâm đá|bỏ tủ lạnh|đá viên|để lạnh|ngăn đông|tủ lạnh"""),
+    CookingAction.BOIL_SIMMER to Regex("""đun sôi|luộc|hầm|kho\b|om\b|nấu canh|ninh|trần|chần|nấu chín|nấu nhỏ lửa|đun liu riu|nấu lửa nhỏ|đun lửa nhỏ|đun sủi|sôi lăn tăn|thắng lửa nhỏ|bắc nồi|nước dùng|nấu sôi"""),
+    CookingAction.PAN_SEAR_STIR to Regex("""áp chảo|xào|chiên|rán|phi thơm|đảo đều|đảo nhanh|đảo lửa|cháy cạnh|rim\b|đun sệt|rang\b|bắc chảo|làm nóng chảo|đun chảy bơ|đổ hỗn hợp|đổ trứng|đổ bột|ốp la|chảo|sốt cà|lật nhẹ"""),
+    CookingAction.MARINATE_MIX to Regex("""ướp|trộn|đánh tan|đánh nhẹ|đánh hòa|khuấy|pha sốt|pha nước|nhào|lăn bột|nhồi|phết|quết|đánh đều|xoa đều|nhúng từng|tán tơi|đập \d+ quả trứng|nêm """),
+    CookingAction.PREP_CUT to Regex("""rửa|cắt|thái|băm|gọt|nhặt|lột|bóc|ngâm|đập dập|chặt|rã đông|lọc|tách|bào|cạo|khía|sơ chế|thấm khô|thấm ráo|để ráo|xé sợi|xé nhỏ|chắt bớt"""),
+    CookingAction.PLATE_SERVE to Regex("""dọn|trình bày|múc |xếp ra|rắc|rưới|chan|thưởng thức|tắt bếp|tắt lửa|cho ra đĩa|cho ra tô|ra đĩa|ra tô|ăn kèm|ăn nóng|bày ra|xếp lên|kẹp bánh|cuốn|dàn đều""")
+  )
+
+  private val TIMER_REGEX = Regex(
+    """(\d+(?:[.,]\d+)?)\s*(?:[–-]\s*(\d+(?:[.,]\d+)?)\s*)?(phút|giây|giờ|tiếng)""",
+    RegexOption.IGNORE_CASE
+  )
+
+  private val TERM_SPLIT_REGEX = Regex("""[/()]""")
+
+  fun analyzeRecipe(recipe: CulinaryRecipe): List<AnalyzedCookingStep> {
+    val totalSteps = recipe.steps.size
+    return recipe.steps.mapIndexed { index, text ->
+      AnalyzedCookingStep(
+        index = index,
+        text = text,
+        action = classifyAction(stepText = text, stepIndex = index, totalSteps = totalSteps),
+        timer = extractTimer(text),
+        mentionedIngredients = extractMentionedIngredients(text, recipe)
+      )
+    }
+  }
+
+  fun classifyAction(stepText: String, stepIndex: Int, totalSteps: Int): CookingAction {
+    val low = stepText.lowercase(VI_LOCALE)
+    if (
+      totalSteps > 0 &&
+      stepIndex == totalSteps - 1 &&
+      FINAL_SERVING_REGEX.containsMatchIn(low) &&
+      !EXCLUDE_FINAL_COOK_REGEX.containsMatchIn(low)
+    ) {
+      return CookingAction.PLATE_SERVE
+    }
+    for ((action, regex) in ACTION_RULES) {
+      if (regex.containsMatchIn(low)) return action
+    }
+    return when {
+      stepIndex == 0 -> CookingAction.PREP_CUT
+      totalSteps > 0 && stepIndex == totalSteps - 1 -> CookingAction.PLATE_SERVE
+      else -> CookingAction.PAN_SEAR_STIR
+    }
+  }
+
+  fun extractTimer(stepText: String): StepTimerSpec? {
+    val match = TIMER_REGEX.find(stepText) ?: return null
+    val rawFirst = match.groupValues[1]
+    val rawSecond = match.groupValues[2]
+    val rawUnit = match.groupValues[3]
+    val selectedRaw = rawSecond.ifBlank { rawFirst }
+    val numericValue = selectedRaw.replace(',', '.').toDoubleOrNull() ?: return null
+    if (numericValue <= 0.0) return null
+
+    val unitLower = rawUnit.lowercase(VI_LOCALE)
+    val multiplier = when (unitLower) {
+      "giây" -> 1
+      "phút" -> 60
+      "giờ", "tiếng" -> 3600
+      else -> return null
+    }
+    val totalSeconds = (numericValue * multiplier).roundToInt().coerceAtLeast(5)
+    val label = "$selectedRaw $unitLower"
+    return StepTimerSpec(totalSeconds = totalSeconds, displayLabel = label)
+  }
+
+  fun formatCountdown(totalSeconds: Int): String {
+    val clamped = totalSeconds.coerceAtLeast(0)
+    val hours = clamped / 3600
+    val minutes = (clamped % 3600) / 60
+    val seconds = clamped % 60
+    return if (hours > 0) {
+      String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+      String.format(Locale.US, "%02d:%02d", minutes, seconds)
+    }
+  }
+
+  fun extractMentionedIngredients(
+    stepText: String,
+    recipe: CulinaryRecipe,
+    limit: Int = 3
+  ): List<RecipeIngredient> {
+    val normAccentedStep = CulinaryGuideEngine.normalizeAccented(stepText)
+    if (normAccentedStep.isEmpty()) return emptyList()
+    val normStrippedStep = CulinaryGuideEngine.stripVietnameseAccents(stepText)
+
+    val matchedWithOrder = mutableListOf<Pair<Int, RecipeIngredient>>()
+    recipe.fridgeIngredients.forEachIndexed { originalIdx, ingredient ->
+      val terms = buildList {
+        ingredient.name.split(TERM_SPLIT_REGEX).forEach { part ->
+          val trimmed = part.trim()
+          if (trimmed.isNotEmpty()) add(trimmed)
+        }
+        addAll(ingredient.keywords)
+      }.distinct()
+
+      var earliestPos = Int.MAX_VALUE
+      for (rawTerm in terms) {
+        val accTerm = CulinaryGuideEngine.normalizeAccented(rawTerm)
+        val cleanAcc = accTerm.trim()
+        if (cleanAcc.length < 2) continue
+
+        val accPos = normAccentedStep.indexOf(accTerm)
+        if (accPos >= 0) {
+          if (accPos < earliestPos) earliestPos = accPos
+          continue
+        }
+
+        // Unaccented fallback only for multi-word or >= 4-char phrases to avoid Vietnamese tonal collisions.
+        if (' ' in cleanAcc || cleanAcc.length >= 4) {
+          val strippedTerm = CulinaryGuideEngine.stripVietnameseAccents(rawTerm)
+          if (strippedTerm.isNotEmpty()) {
+            val strPos = normStrippedStep.indexOf(strippedTerm)
+            if (strPos >= 0 && strPos < earliestPos) {
+              earliestPos = strPos
+            }
+          }
+        }
+      }
+
+      if (earliestPos < Int.MAX_VALUE) {
+        matchedWithOrder.add(earliestPos * 100 + originalIdx to ingredient)
+      }
+    }
+
+    return matchedWithOrder
+      .sortedBy { it.first }
+      .map { it.second }
+      .take(limit)
+  }
+}
+```
+
+### `app/src/main/kotlin/com/truong/fridgezero/domain/CulinaryGuide.kt` (2089 lines)
 
 ```kotlin
 package com.truong.fridgezero.domain
@@ -2533,11 +2804,12 @@ import java.util.Locale
 
 enum class CulinaryFilter(val labelVi: String) {
   ALL("Tất cả"),
-  READY_NOW("Đủ đồ nấu ngay"),
-  RESCUE_URGENT("Cứu đồ sắp hết hạn"),
-  QUICK_15("Nhanh ≤ 15p"),
   VIET_HOME("Cơm nhà Việt"),
-  EAT_CLEAN("Eat-Clean")
+  ASIAN_FUSION("Món Á"),
+  WESTERN("Món Âu"),
+  EAT_CLEAN("Eat-Clean"),
+  VEGETARIAN("Món Chay"),
+  BREAKFAST_DRINK("Sáng & Đồ uống")
 }
 
 typealias RecipeCategory = CulinaryFilter
@@ -2638,21 +2910,23 @@ object CulinaryGuideEngine {
   fun recommend(
     fridgeItems: List<DisplayItem>,
     filter: CulinaryFilter = CulinaryFilter.ALL,
-    recipes: List<CulinaryRecipe> = CulinaryGuideRepository.recipes
+    recipes: List<CulinaryRecipe> = CulinaryGuideRepository.recipes,
+    query: String = ""
   ): List<RecipeRecommendation> {
     val sorted = recipes
       .map { evaluate(it, fridgeItems) }
       .filter { rec ->
         when (filter) {
           CulinaryFilter.ALL -> true
-          CulinaryFilter.READY_NOW -> rec.isReadyToCook
-          CulinaryFilter.RESCUE_URGENT -> rec.hasUrgentMatch
-          CulinaryFilter.QUICK_15 ->
-            rec.recipe.cookMinutes <= 15 || CulinaryFilter.QUICK_15 in rec.recipe.categories
           CulinaryFilter.VIET_HOME -> CulinaryFilter.VIET_HOME in rec.recipe.categories
+          CulinaryFilter.ASIAN_FUSION -> CulinaryFilter.ASIAN_FUSION in rec.recipe.categories
+          CulinaryFilter.WESTERN -> CulinaryFilter.WESTERN in rec.recipe.categories
           CulinaryFilter.EAT_CLEAN -> CulinaryFilter.EAT_CLEAN in rec.recipe.categories
+          CulinaryFilter.VEGETARIAN -> CulinaryFilter.VEGETARIAN in rec.recipe.categories
+          CulinaryFilter.BREAKFAST_DRINK -> CulinaryFilter.BREAKFAST_DRINK in rec.recipe.categories
         }
       }
+      .filter { rec -> matchesSearchQuery(rec, query) }
       .sortedWith(
         compareByDescending<RecipeRecommendation> { it.score }
           .thenByDescending { it.isReadyToCook }
@@ -2666,10 +2940,47 @@ object CulinaryGuideEngine {
           .thenBy { it.recipe.cookMinutes }
           .thenBy { it.recipe.id }
       )
-    return if (filter == CulinaryFilter.ALL) {
+    return if (filter == CulinaryFilter.ALL && query.isBlank()) {
       applyTopWindowDiversityCap(sorted)
     } else {
       sorted
+    }
+  }
+
+  private fun matchesSearchQuery(rec: RecipeRecommendation, rawQuery: String): Boolean {
+    val trimmed = rawQuery.trim()
+    if (trimmed.isEmpty()) return true
+    val normalizedPhrase = stripVietnameseAccents(trimmed).trim()
+    if (normalizedPhrase.isEmpty()) return true
+    val tokens = normalizedPhrase.split(NON_WORD_REGEX).filter { it.isNotEmpty() }
+    if (tokens.isEmpty()) return true
+
+    val recipe = rec.recipe
+    val structuredText = buildString {
+      append(recipe.title).append(' ')
+      recipe.categories.forEach { append(it.labelVi).append(' ') }
+      recipe.fridgeIngredients.forEach { ing ->
+        append(ing.name).append(' ')
+        ing.keywords.forEach { append(it).append(' ') }
+      }
+      recipe.seasonings.forEach { append(it.name).append(' ') }
+    }
+    val fullText = buildString {
+      append(structuredText).append(' ')
+      append(recipe.summary).append(' ')
+      append(recipe.sourceName)
+    }
+
+    val fullStripped = stripVietnameseAccents(fullText)
+    if (fullStripped.contains(" $normalizedPhrase")) return true
+
+    val structuredStripped = stripVietnameseAccents(structuredText)
+    return tokens.all { token ->
+      if (token.length <= 3) {
+        structuredStripped.contains(" $token ")
+      } else {
+        structuredStripped.contains(" $token")
+      }
     }
   }
 
@@ -2898,12 +3209,12 @@ object CulinaryGuideEngine {
     }
   }
 
-  private fun normalizeAccented(text: String): String {
+  internal fun normalizeAccented(text: String): String {
     val cleaned = text.lowercase(VI_LOCALE).replace(NON_WORD_REGEX, " ").trim()
     return if (cleaned.isEmpty()) "" else " $cleaned "
   }
 
-  private fun stripVietnameseAccents(text: String): String {
+  internal fun stripVietnameseAccents(text: String): String {
     val nfd = Normalizer.normalize(text, Normalizer.Form.NFD)
     val withoutMarks = DIACRITICS_REGEX.replace(nfd, "")
       .replace('đ', 'd')
@@ -3192,7 +3503,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingSalmon("300g"), ingButter("20g"), ingLettuce("100g")),
       seasonings = listOf(
         sp("Tỏi đập dập / băm", "3 tép (1 muỗng canh)"),
@@ -3221,7 +3532,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingSalmon("300g"), ingOrangeJuice("120ml"), ingButter("15g")),
       seasonings = listOf(
         sp("Mật ong nguyên chất", "1 muỗng canh"),
@@ -3251,7 +3562,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingSalmon("250g"), ingLettuce("150g"), ingCarrot("80g (1/2 củ)")),
       seasonings = listOf(
         sp("Dầu ô liu", "2 muỗng canh"),
@@ -3313,7 +3624,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingChicken("300g", "Ức gà phi lê"), ingBellPepper("1 quả (150g)"), ingCarrot("1/2 củ (60g)")),
       seasonings = listOf(
         sp("Dầu hào", "1,5 muỗng canh"),
@@ -3343,7 +3654,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingChicken("250g", "Ức gà"), ingLettuce("150g"), ingYogurt("1 hũ (100g)"), ingCarrot("1/2 củ (50g)")),
       seasonings = listOf(
         sp("Nước cốt chanh tươi", "1 muỗng canh"),
@@ -3464,7 +3775,7 @@ object CulinaryGuideRepository {
       prepMinutes = 12,
       cookMinutes = 10,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingMeat("250g", "Thịt thăn bò"), ingBroccoli("1 bông (250g)"), ingCarrot("1/2 củ (60g)")),
       seasonings = listOf(
         sp("Tỏi băm", "4 tép (1 muỗng canh)"),
@@ -3494,7 +3805,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(ingMeat("250g", "Thịt bò thăn"), ingPickle("200g")),
       seasonings = listOf(
         sp("Tỏi băm", "3 tép (1 muỗng canh)"),
@@ -3525,7 +3836,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "3–4 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingMushroom("150g"), ingMeat("150g", "Thịt heo bằm"), ingCarrot("1/2 củ (60g)"), ingBroccoli("150g")),
       seasonings = listOf(
         sp("Hành tím băm", "2 củ"),
@@ -3555,7 +3866,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(ingShrimp("350g (tôm sú tươi)")),
       seasonings = listOf(
         sp("Nước mắm ngon", "2 muỗng canh"),
@@ -3585,7 +3896,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingShrimp("250g"), ingBroccoli("200g"), ingBellPepper("1/2 quả (80g)")),
       seasonings = listOf(
         sp("Tỏi băm", "3 tép (1 muỗng canh)"),
@@ -3615,7 +3926,7 @@ object CulinaryGuideRepository {
       prepMinutes = 12,
       cookMinutes = 12,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingSquid("300g"), ingBellPepper("1 quả (140g)"), ingCarrot("1/2 củ (60g)")),
       seasonings = listOf(
         sp("Gừng tươi đập dập", "15g"),
@@ -3646,7 +3957,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 10,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingSquid("350g"), ingLettuce("150g")),
       seasonings = listOf(
         sp("Gừng tươi (sợi hấp + giã làm mắm)", "35g"),
@@ -3706,7 +4017,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(ingEgg("3 quả"), ingMeat("100g", "Thịt heo bằm"), ingTomatoSauce("60g (4 muỗng canh)")),
       seasonings = listOf(
         sp("Hành tím băm", "2 củ"),
@@ -3736,7 +4047,7 @@ object CulinaryGuideRepository {
       prepMinutes = 5,
       cookMinutes = 8,
       servingsLabel = "1–2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingEgg("3 quả"), ingMilk("45ml"), ingButter("15g"), ingCheese("30g")),
       seasonings = listOf(
         sp("Muối mịn", "1/3 muỗng cà phê"),
@@ -3763,7 +4074,7 @@ object CulinaryGuideRepository {
       prepMinutes = 5,
       cookMinutes = 12,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN),
       fridgeIngredients = listOf(ingTomatoSauce("45g (3 muỗng canh)"), ingEgg("2 quả"), ingCorn("1/2 trái (80g hạt)"), ingWater("750ml")),
       seasonings = listOf(
         sp("Hành tím băm", "1 củ"),
@@ -3793,7 +4104,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.ASIAN_FUSION),
       fridgeIngredients = listOf(ingRice("350g (2 chén cơm nguội)"), ingShrimp("150g"), ingEgg("2 quả"), ingCarrot("1/2 củ (50g)")),
       seasonings = listOf(
         sp("Tỏi băm", "2 tép"),
@@ -3823,7 +4134,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 15,
       servingsLabel = "2–3 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(ingRice("350g (2 chén cơm nguội)"), ingMeat("150g", "Thịt bò thăn"), ingPickle("120g"), ingEgg("2 quả")),
       seasonings = listOf(
         sp("Tỏi băm", "3 tép"),
@@ -3853,7 +4164,7 @@ object CulinaryGuideRepository {
       prepMinutes = 5,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingBread("2 ổ (160g)"), ingEgg("2 quả"), ingTomatoSauce("60g (4 muỗng canh)"), ingButter("15g")),
       seasonings = listOf(
         sp("Tỏi băm", "2 tép"),
@@ -3882,7 +4193,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingBread("2 ổ nhỏ (150g)"), ingButter("25g"), ingMushroom("120g"), ingCheese("50g")),
       seasonings = listOf(
         sp("Tỏi băm thật nhuyễn", "4 tép (1 muỗng canh)"),
@@ -3910,7 +4221,7 @@ object CulinaryGuideRepository {
       prepMinutes = 8,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingBread("4 lát sandwich (120g)"), ingBanana("1 quả (100g)"), ingMilk("80ml"), ingEgg("2 quả")),
       seasonings = listOf(
         sp("Mật ong", "1,5 muỗng canh"),
@@ -3938,7 +4249,7 @@ object CulinaryGuideRepository {
       prepMinutes = 3,
       cookMinutes = 12,
       servingsLabel = "1–2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingDumpling("3 cái (270g)"), ingMilk("200ml")),
       seasonings = listOf(
         sp("Giấm trắng (nhỏ vào nước hấp)", "1 muỗng cà phê"),
@@ -3964,7 +4275,7 @@ object CulinaryGuideRepository {
       prepMinutes = 15,
       cookMinutes = 15,
       servingsLabel = "3–4 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingMango("1 quả xoài xanh (300g)", "Xoài keo xanh"), ingShrimp("150g"), ingBacon("120g"), ingCarrot("1/2 củ (50g)")),
       seasonings = listOf(
         sp("Nước mắm ngon", "2,5 muỗng canh"),
@@ -3994,7 +4305,7 @@ object CulinaryGuideRepository {
       prepMinutes = 10,
       cookMinutes = 12,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
       fridgeIngredients = listOf(ingApple("1 quả (150g)"), ingGrape("100g"), ingChicken("200g", "Ức gà"), ingLettuce("120g")),
       seasonings = listOf(
         sp("Dầu ô liu", "2 muỗng canh"),
@@ -4023,7 +4334,7 @@ object CulinaryGuideRepository {
       prepMinutes = 5,
       cookMinutes = 3,
       servingsLabel = "1–2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingBanana("1 quả (120g)"), ingStrawberry("100g"), ingYogurt("1 hũ (100g)"), ingMilk("100ml")),
       seasonings = listOf(
         sp("Mật ong (tùy khẩu vị)", "1 muỗng cà phê"),
@@ -4050,7 +4361,7 @@ object CulinaryGuideRepository {
       prepMinutes = 8,
       cookMinutes = 2,
       servingsLabel = "1–2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingYogurt("2 hũ (200g)"), ingApple("1/2 quả (80g)"), ingGrape("80g"), ingStrawberry("80g")),
       seasonings = listOf(
         sp("Mật ong nguyên chất", "1 muỗng canh"),
@@ -4077,7 +4388,7 @@ object CulinaryGuideRepository {
       prepMinutes = 7,
       cookMinutes = 3,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15),
+      categories = setOf(CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingIceCream("2 viên (120g)"), ingMango("1 quả xoài chín (250g)", "Xoài cát chín"), ingMilk("100ml")),
       seasonings = listOf(
         sp("Sữa đặc có đường (hoặc mật ong)", "1,5 muỗng canh"),
@@ -4104,7 +4415,7 @@ object CulinaryGuideRepository {
       prepMinutes = 7,
       cookMinutes = 3,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      categories = setOf(CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
       fridgeIngredients = listOf(ingWatermelon("350g ruột"), ingOrangeJuice("120ml"), ingWater("100ml")),
       seasonings = listOf(
         sp("Lá bạc hà tươi", "6–8 lá"),
@@ -4121,6 +4432,453 @@ object CulinaryGuideRepository {
       ),
       sourceName = SRC_COOKY,
       sourceUrl = "https://www.cooky.vn/tim-kiem?q=nuoc+ep+dua+hau+cam+bac+ha"
+    ),
+
+    // 33. Trứng cuộn Nhật Bản (Tamagoyaki) — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "trung_cuon_nhat_tamagoyaki",
+      title = "Trứng cuộn Nhật Bản (Tamagoyaki)",
+      emoji = "🥚",
+      summary = "Món trứng cuộn nhiều lớp mềm mịn chuẩn vị Nhật từ trứng gà, nước dùng thanh nhẹ, đường và nước tương.",
+      prepMinutes = 5,
+      cookMinutes = 10,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
+      fridgeIngredients = listOf(ingEgg("4 quả"), ingWater("30ml (thay nước Dashi)")),
+      seasonings = listOf(
+        sp("Đường", "1 muỗng canh"),
+        sp("Nước tương (xì dầu)", "1 muỗng cà phê"),
+        sp("Muối", "1 nhúm nhỏ"),
+        sp("Dầu ăn (thoa chảo)", "1 muỗng canh")
+      ),
+      steps = listOf(
+        "Đập 4 quả trứng gà vào tô, cho 1 muỗng canh nước lọc (hoặc nước dùng Dashi), 1 muỗng canh đường, 1 muỗng cà phê nước tương và chút muối vào đánh kiểu cắt lòng trắng cho hòa quyện.",
+        "Lọc hỗn hợp trứng qua rây để loại bỏ phần dây trắng giúp mặt trứng chín mịn màng hoàn toàn.",
+        "Đặt chảo chống dính lên bếp lửa nhỏ, dùng khăn giấy thấm dầu thoa một lớp thật mỏng khắp lòng và thành chảo.",
+        "Đổ khoảng 1/4 lượng trứng tráng lớp mỏng; khi mặt trứng se 70–80% thì nhẹ nhàng cuộn tròn từ xa về phía mình rồi đẩy về góc chảo.",
+        "Thoa dầu mỏng lại mặt chảo trống, đổ lớp trứng mới (nhấc nhẹ cuộn cũ cho trứng chảy xuống dưới kết dính) và cuộn lặp lại đến hết, ép nhẹ thành khối rồi cắt khoanh 2–3cm."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=trung+cuon+nhat+ban+tamagoyaki"
+    ),
+
+    // 34. Ức gà nướng sốt Teriyaki — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "uc_ga_sot_teriyaki",
+      title = "Ức gà nướng sốt Teriyaki",
+      emoji = "🍗",
+      summary = "Ức gà ướp nước ép cam, dầu hào, nước tương, đường nâu và dầu mè nướng thơm đậm vị Nhật Bản.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingChicken("400g", "Ức gà"), ingOrangeJuice("60ml")),
+      seasonings = listOf(
+        sp("Nước tương (xì dầu)", "2 muỗng canh"),
+        sp("Dầu hào", "1 muỗng canh"),
+        sp("Đường nâu", "1,5 muỗng canh"),
+        sp("Dầu mè & mè rang", "1 muỗng cà phê dầu mè, 1 muỗng mè rang"),
+        sp("Tỏi băm & gừng băm", "1 muỗng cà phê mỗi loại")
+      ),
+      steps = listOf(
+        "Rửa sạch 400g ức gà với muối và gừng để khử mùi tanh, thấm ráo rồi cắt lát dày khoảng 1,5–2cm.",
+        "Trộn đều tỏi băm, gừng băm, 60ml nước ép cam, 2 muỗng canh nước tương, 1 muỗng canh dầu hào, 1,5 muỗng canh đường nâu, dầu mè và mè rang thành sốt ướp.",
+        "Ướp ức gà trong hỗn hợp sốt ít nhất 15–20 phút cho thịt ngấm đậm gia vị.",
+        "Làm nóng bếp nướng hoặc chảo chống dính lửa vừa, đặt ức gà lên nướng/áp mỗi mặt 5–6 phút (thỉnh thoảng phết thêm nước sốt ướp).",
+        "Khi thịt gà chín vàng óng và nước sốt sánh thơm thì gắp ra thớt thái miếng vừa ăn, rắc thêm mè rang lên trên."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=uc+ga+nuong+sot+teriyaki"
+    ),
+
+    // 35. Thịt ba chỉ xào kim chi — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "ba_chi_xao_kim_chi_han_quoc",
+      title = "Thịt ba chỉ xào kim chi",
+      emoji = "🥓",
+      summary = "Thịt ba chỉ đảo cháy cạnh béo thơm xào lửa lớn cùng kim chi / dưa cải chua cay đậm vị chuẩn Hàn Quốc.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION),
+      fridgeIngredients = listOf(ingBacon("400g"), ingPickle("150g")),
+      seasonings = listOf(
+        sp("Ớt bột", "1 muỗng cà phê"),
+        sp("Đường", "1 muỗng cà phê"),
+        sp("Hành tím & tỏi băm", "1 củ hành tím, 1 tép tỏi"),
+        sp("Dầu ăn", "2 muỗng canh"),
+        sp("Đầu hành lá & ngò rí", "5 đầu hành, 1 nhánh ngò")
+      ),
+      steps = listOf(
+        "Rửa sạch 400g thịt ba chỉ với nước muối loãng rồi cắt lát vừa ăn; cắt khúc 150g kim chi hoặc dưa cải chua.",
+        "Bắc chảo với 2 muỗng canh dầu ăn phi thơm hành tím và tỏi băm.",
+        "Cho thịt ba chỉ vào đảo đều ở lửa vừa khoảng 8–10 phút đến khi thịt săn lại, ra bớt mỡ thừa và xém vàng cạnh.",
+        "Cho kim chi (kèm chút nước kim chi), 1 muỗng cà phê ớt bột và 1 muỗng cà phê đường vào đảo lửa lớn 3–5 phút cho thấm gia vị.",
+        "Múc thịt xào ra đĩa, rắc đầu hành lá và ngò rí lên trên, dùng nóng với cơm trắng."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=thit+ba+chi+xao+kim+chi"
+    ),
+
+    // 36. Canh Tom Yum hải sản / tôm — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "tom_nau_canh_chua_cay_tom_yum",
+      title = "Canh tôm chua cay Tom Yum kiểu Thái",
+      emoji = "🦐",
+      summary = "Nước canh chua cay mặn ngọt cân bằng hương sả, riềng, lá chanh đặc trưng Thái Lan cùng tôm tươi và nấm.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION),
+      fridgeIngredients = listOf(ingShrimp("250g"), ingMushroom("150g"), ingTomatoSauce("45g (3 muỗng canh)"), ingWater("800ml")),
+      seasonings = listOf(
+        sp("Sả đập dập & củ riềng thái lát", "2 cây sả, 4 lát riềng"),
+        sp("Lá chanh vò sơ", "4 lá"),
+        sp("Nước cốt chanh tươi", "2 muỗng canh"),
+        sp("Nước mắm & đường", "2 muỗng canh nước mắm, 1 muỗng cà phê đường"),
+        sp("Hành tím, tỏi & ớt hiểm", "1 củ hành, 2 tép tỏi, 1 trái ớt")
+      ),
+      steps = listOf(
+        "Rửa sạch 250g tôm, bóc vỏ rút chỉ lưng (giữ lại đầu/vỏ tôm để xào lấy vị ngọt); nấm cắt gốc ngâm nước muối loãng rồi cắt đôi.",
+        "Phi thơm hành tím, tỏi băm cùng 3 muỗng canh sốt cà chua, xào săn phần đầu/vỏ tôm rồi chế 800ml nước vào đun sôi.",
+        "Cho sả cây đập dập, riềng thái lát và lá chanh vào nấu khoảng 10 phút cho nước dùng dậy hương thảo mộc rồi vớt bỏ bã vỏ tôm.",
+        "Thả nấm và tôm tươi vào nồi nước dùng đang sôi, nêm 2 muỗng canh nước mắm và 1 muỗng cà phê đường nấu 2–3 phút tới khi tôm vừa chín đỏ.",
+        "Tắt bếp rồi thêm 2 muỗng canh nước cốt chanh tươi, ngò rí và ớt cắt lát để cân bằng vị chua cay mặn ngọt."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=canh+tom+yum+thai+lan"
+    ),
+
+    // 37. Thịt bò xào sốt Bulgogi — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "bo_xao_bulgogi_nam_ca_rot",
+      title = "Thịt bò xào sốt Bulgogi nấm",
+      emoji = "🥩",
+      summary = "Thịt thăn bò thái mỏng ướp xì dầu Hàn Quốc, đường nâu, dầu mè xào lửa lớn mềm ngọt đậm đà.",
+      prepMinutes = 15,
+      cookMinutes = 12,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingMeat("400g", "Thịt thăn bò"), ingMushroom("120g"), ingEgg("1 quả")),
+      seasonings = listOf(
+        sp("Xì dầu / nước tương Hàn Quốc", "4 muỗng canh"),
+        sp("Đường nâu", "1,5 muỗng canh"),
+        sp("Dầu mè", "1,5 muỗng canh"),
+        sp("Tỏi băm", "3 tép"),
+        sp("Mè rang", "1 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Thịt thăn bò thấm khô, thái lát mỏng vừa ăn; nấm rửa sạch xé nhỏ.",
+        "Ướp thịt bò với 4 muỗng canh xì dầu, 1,5 muỗng canh đường nâu, 1,5 muỗng canh dầu mè và tỏi băm trong 20–30 phút cho ngấm vị.",
+        "Làm nóng chảo với chút dầu ăn, cho thịt bò đã ướp vào xào nhanh trên lửa lớn để thịt săn mềm giữ được nước ngọt tự nhiên.",
+        "Cho tiếp nấm tươi vào đảo đều cùng thịt bò khoảng 2–3 phút cho nấm chín thấm phần sốt Bulgogi.",
+        "Trút bò xào ra đĩa, rắc mè rang lên trên và có thể kèm 1 quả trứng ốp la béo ngậy."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=thit+bo+xao+bulgogi"
+    ),
+
+    // 38. Cơm chiên kim chi phô mai — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "com_chien_trung_pho_mai_han_quoc",
+      title = "Cơm chiên kim chi phô mai",
+      emoji = "🍚",
+      summary = "Cơm nguội rang tơi cùng kim chi cay dịu và dầu mè, phủ trứng ốp la lòng đào và phô mai Mozzarella kéo sợi.",
+      prepMinutes = 8,
+      cookMinutes = 12,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.ASIAN_FUSION, CulinaryFilter.VEGETARIAN),
+      fridgeIngredients = listOf(ingRice("300g cơm nguội"), ingPickle("100g"), ingCheese("150g"), ingEgg("1 quả")),
+      seasonings = listOf(
+        sp("Tương ớt Hàn Quốc", "10g (2 muỗng cà phê)"),
+        sp("Bột ớt & đường", "1 muỗng cà phê bột ớt, 10g đường"),
+        sp("Dầu hào & dầu mè", "10ml mỗi loại"),
+        sp("Hành hoa băm nhỏ", "20g")
+      ),
+      steps = listOf(
+        "Cắt nhỏ 100g kim chi (hoặc dưa cải chua) trộn với 10g đường và chút bột ớt; chuẩn bị sẵn 150g phô mai Mozzarella.",
+        "Làm nóng chảo với 10ml dầu ăn phi thơm hành hoa, cho phần kim chi đã trộn vào đảo đều cho chín dậy mùi.",
+        "Trút 300g cơm nguội cùng 10ml dầu hào, 10g tương ớt Hàn Quốc và 10ml dầu mè vào rang lửa vừa tới khi hạt cơm săn tơi.",
+        "Đun chảy nhẹ phô mai ở lửa nhỏ trên chảo chống dính; dùng chảo khác chiên 1 quả trứng ốp la giữ nguyên lòng đỏ.",
+        "Múc cơm chiên ra đĩa, đặt trứng ốp la lên trên và rưới phô mai Mozzarella tan chảy xung quanh."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=com+chien+kim+chi+pho+mai"
+    ),
+
+    // 39. Gà sốt kem nấm kiểu Âu — Savoury Days
+    CulinaryRecipe(
+      id = "uc_ga_sot_kem_nam_kieu_au",
+      title = "Gà sốt kem nấm bơ sữa kiểu Âu",
+      emoji = "🍗",
+      summary = "Thịt gà áp chảo nấu sốt kem nấm bơ lạt, sữa tươi và phô mai sánh ngậy theo công thức của Savoury Days.",
+      prepMinutes = 10,
+      cookMinutes = 18,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.WESTERN),
+      fridgeIngredients = listOf(ingChicken("250g", "Thịt đùi / lườn gà"), ingMushroom("120g"), ingMilk("80ml"), ingCheese("15g")),
+      seasonings = listOf(
+        sp("Bơ nhạt", "2 thìa canh"),
+        sp("Dầu ô liu", "1 thìa canh"),
+        sp("Tỏi băm & hành tây băm", "2 tép tỏi, 1/4 củ hành tây"),
+        sp("Lá thơm Basil khô (tùy chọn)", "3g"),
+        sp("Muối & tiêu xay", "1/2 muỗng cà phê muối, 1/3 muỗng tiêu")
+      ),
+      steps = listOf(
+        "Lọc bỏ xương da 250g thịt gà rồi thái miếng vừa ăn; nấm rửa sạch thái lát dọc dày 3–5mm; băm nhỏ hành tây và tỏi.",
+        "Đun chảy bơ nhạt (hoặc dầu ô liu) trong chảo, cho tỏi và hành tây vào phi thơm.",
+        "Cho thịt gà vào xào đến khi thịt săn và chuyển màu trắng, tiếp tục cho nấm tươi vào đảo đều cùng chút muối tiêu.",
+        "Khi nấm và gà chín tới, hạ nhỏ lửa đổ 80ml sữa tươi vào đảo đều cho hỗn hợp sôi nhẹ.",
+        "Thêm 15g phô mai và lá Basil khô khuấy tan tạo độ sánh ngậy, nêm lại muối tiêu vừa ăn rồi dùng nóng với cơm hoặc bánh mì."
+      ),
+      sourceName = SRC_SAVOURY_DAYS,
+      sourceUrl = "https://www.savourydays.com/?s=my+y+sot+kem+ga+nam"
+    ),
+
+    // 40. Thịt bò áp chảo bơ tỏi — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "bo_ap_chao_bo_toi_tieu_den",
+      title = "Thịt bò áp chảo bơ tỏi",
+      emoji = "🥩",
+      summary = "Thăn bò áp chảo lửa lớn giữ nước ngọt bên trong, rưới bơ lạt tỏi thơm lừng chuẩn vị Âu.",
+      prepMinutes = 15,
+      cookMinutes = 10,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingMeat("350g", "Thịt thăn nội / thăn lưng bò"), ingButter("30g")),
+      seasonings = listOf(
+        sp("Dầu ô liu", "1–2 muỗng canh"),
+        sp("Tỏi đập dập", "2–3 tép"),
+        sp("Lá hương thảo Rosemary (tùy chọn)", "2 nhánh"),
+        sp("Muối & tiêu xay", "1/2 muỗng cà phê mỗi loại")
+      ),
+      steps = listOf(
+        "Thấm thật khô hai mặt miếng thăn bò dày 2–3cm; ướp đều muối, tiêu xay và chút dầu ô liu rồi để thịt nghỉ ở nhiệt độ phòng 15 phút.",
+        "Đặt chảo gang hoặc chảo chống dính lên bếp lửa lớn với 1 muỗng canh dầu ô liu cho đến khi chảo thật nóng.",
+        "Cho miếng thịt bò vào áp chảo mỗi mặt 2–3 phút (tùy mức độ chín mong muốn) để tạo lớp vỏ vàng nâu giữ độ mọng bên trong.",
+        "Ở phút cuối, hạ nhỏ lửa thả 30g bơ lạt, tỏi đập dập và lá hương thảo vào; nghiêng chảo múc bơ nóng rưới liên tục lên mặt thịt rồi tắt bếp.",
+        "Lấy thịt bò ra đĩa để nghỉ 5 phút trước khi thái lát vừa ăn, rưới phần sốt bơ tỏi trong chảo lên mặt."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=thit+bo+ap+chao+bo+toi"
+    ),
+
+    // 41. Salad tôm tươi & rau củ giòn mát — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "salad_tom_pho_mai_ot_chuong",
+      title = "Salad tôm tươi & rau củ giòn mát",
+      emoji = "🥗",
+      summary = "Salad thanh mát từ tôm luộc ngọt thịt trộn cùng xà lách, cà rốt, bắp Mỹ giòn ngọt và sốt chanh ô liu.",
+      prepMinutes = 10,
+      cookMinutes = 10,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingShrimp("200g"), ingLettuce("150g"), ingCarrot("1/2 củ (50g)"), ingCorn("80g hạt bắp")),
+      seasonings = listOf(
+        sp("Dầu ô liu (hoặc mayonnaise)", "2 muỗng canh"),
+        sp("Nước cốt chanh tươi", "1,5 muỗng canh"),
+        sp("Mật ong", "1 muỗng cà phê"),
+        sp("Muối & tiêu đen", "1/2 muỗng cà phê muối, 1/3 muỗng tiêu")
+      ),
+      steps = listOf(
+        "Rửa sạch tôm tươi, luộc chín khoảng 3 phút tới khi tôm chuyển đỏ săn rồi bóc vỏ rút chỉ lưng để nguội.",
+        "Rửa sạch 150g xà lách ngâm nước muối loãng rồi quay ráo, cắt khúc vừa ăn.",
+        "Gọt vỏ 50g cà rốt thái sợi; luộc chín 80g hạt bắp ngọt rồi vớt ráo nước.",
+        "Khuấy đều 2 muỗng canh dầu ô liu, 1,5 muỗng canh nước cốt chanh, 1 muỗng cà phê mật ong và nhúm muối tiêu thành nước trộn salad.",
+        "Cho xà lách, cà rốt, bắp ngọt và tôm vào âu lớn, rưới sốt trộn nhẹ tay rồi bày ra đĩa."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=salad+tom"
+    ),
+
+    // 42. Sandwich trứng phô mai & thịt xông khói — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "sandwich_ba_chi_trung_pho_mai",
+      title = "Sandwich áp chảo ba chỉ trứng phô mai",
+      emoji = "🥪",
+      summary = "Bữa sáng sandwich áp chảo nhanh gọn với vỏ bánh vàng giòn, thịt xông khói/ba chỉ giòn thơm, trứng và phô mai tan chảy.",
+      prepMinutes = 5,
+      cookMinutes = 10,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.WESTERN, CulinaryFilter.BREAKFAST_DRINK),
+      fridgeIngredients = listOf(ingBread("4 lát sandwich"), ingBacon("100g"), ingEgg("2 quả"), ingCheese("40g")),
+      seasonings = listOf(
+        sp("Tương cà hoặc tương ớt", "1 muỗng canh"),
+        sp("Muối & tiêu xay", "1 nhúm nhỏ")
+      ),
+      steps = listOf(
+        "Áp chảo 100g thịt ba chỉ thái mỏng / thịt xông khói trên lửa vừa 3–4 phút cho vàng giòn hai mặt rồi gắp ra.",
+        "Đánh tan 2 quả trứng gà với nhúm muối tiêu, đổ vào chảo chống dính lửa nhỏ tạo lớp trứng mỏng.",
+        "Khi trứng còn hơi ướt bề mặt, đặt ngay 2 lát bánh mì sandwich lên trên rồi lật nhẹ toàn bộ mặt trứng cùng bánh mì.",
+        "Xếp phô mai và thịt ba chỉ giòn lên giữa lát bánh, rưới tương cà rồi gấp mép trứng và úp lát bánh mì vào nhau.",
+        "Áp thêm 1 phút mỗi mặt cho phô mai tan chảy và vỏ bánh giòn rụm, cắt đôi dùng nóng."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=sandwich+trung+pho+mai+bacon"
+    ),
+
+    // 43. Bông cải xanh xào nấm chay — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "bong_cai_xao_nam_dau_hao_chay",
+      title = "Bông cải xanh xào nấm chay",
+      emoji = "🥦",
+      summary = "Món xào chay thanh đạm từ bông cải xanh chần giòn xào lửa lớn cùng nấm tươi, nước tương và dầu hào chay.",
+      prepMinutes = 8,
+      cookMinutes = 10,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN),
+      fridgeIngredients = listOf(ingBroccoli("250g"), ingMushroom("150g")),
+      seasonings = listOf(
+        sp("Hạt nêm chay", "1,5 muỗng cà phê"),
+        sp("Nước tương & dầu hào chay", "1 muỗng canh mỗi loại"),
+        sp("Hành boa-rô / tỏi băm", "2 tép"),
+        sp("Dầu ăn & tiêu xay", "1,5 muỗng canh dầu, 1/3 muỗng tiêu")
+      ),
+      steps = listOf(
+        "Cắt bông cải xanh thành miếng vừa ăn, ngâm nước muối loãng rửa sạch rồi chần sơ nước sôi 1,5 phút cho giữ màu xanh giòn.",
+        "Nấm cắt gốc, ngâm rửa sạch để ráo rồi xé nhỏ hoặc thái lát vừa ăn.",
+        "Phi thơm hành boa-rô (hoặc tỏi băm) với 1,5 muỗng canh dầu ăn rồi cho nấm vào xào săn khoảng 2 phút cùng chút hạt nêm chay.",
+        "Trút bông cải xanh vào đảo nhanh tay trên lửa lớn để rau chín giòn không bị nhũn.",
+        "Nêm 1 muỗng canh nước tương và 1 muỗng canh dầu hào chay cho vừa miệng, đảo thêm 2 phút rồi tắt bếp rắc tiêu xay."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=bong+cai+xao+nam+chay"
+    ),
+
+    // 44. Trứng hấp nấm mềm mịn — VnExpress & Điện máy XANH
+    CulinaryRecipe(
+      id = "trung_hap_nam_ca_rot_thanh_dam",
+      title = "Trứng hấp nấm mềm mịn",
+      emoji = "🥚",
+      summary = "Trứng gà đánh lọc qua rây hấp cách thủy lửa nhỏ cùng nấm băm tạo kết cấu mịn mướt không rỗ, thơm dầu mè.",
+      prepMinutes = 8,
+      cookMinutes = 14,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN),
+      fridgeIngredients = listOf(ingEgg("3 quả"), ingMushroom("80g"), ingWater("180ml")),
+      seasonings = listOf(
+        sp("Nước tương (xì dầu)", "1 muỗng canh"),
+        sp("Dầu mè", "1/2 muỗng canh"),
+        sp("Muối / hạt nêm & tiêu", "1/3 muỗng cà phê muối, chút tiêu"),
+        sp("Hành lá cắt nhỏ", "1 nhánh")
+      ),
+      steps = listOf(
+        "Nấm ngâm nước muối loãng rửa sạch rồi băm nhỏ hoặc thái hạt lựu; hành lá cắt nhỏ.",
+        "Đập 3 quả trứng gà vào tô, thêm 180ml nước ấm và 1/3 muỗng cà phê muối đánh đều nhẹ tay rồi lọc qua rây cho mịn không bọt.",
+        "Cho nấm băm vào tô trứng khuấy đều nhẹ nhàng rồi đậy kín mặt tô.",
+        "Đặt vào xửng hấp cách thủy ở lửa nhỏ trong 10–14 phút; dùng tăm xăm thử giữa khối trứng không dính nước là chín.",
+        "Lấy tô trứng hấp ra, rưới dầu mè và nước tương lên trên cùng hành lá và chút tiêu xay."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=trung+hap+nam"
+    ),
+
+    // 45. Canh rau củ thập cẩm chay — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "canh_rau_cu_nam_ngot_thanh",
+      title = "Canh rau củ thập cẩm nấm chay",
+      emoji = "🥕",
+      summary = "Canh chay ngọt nước tự nhiên từ bắp Mỹ, cà rốt, bông cải xanh và nấm tươi ít dầu mỡ.",
+      prepMinutes = 10,
+      cookMinutes = 18,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN),
+      fridgeIngredients = listOf(ingCorn("1 trái (150g)"), ingCarrot("1 củ (100g)"), ingBroccoli("150g"), ingMushroom("120g")),
+      seasonings = listOf(
+        sp("Nước lọc", "900ml"),
+        sp("Hạt nêm chay", "1,5 muỗng cà phê"),
+        sp("Muối", "1 muỗng cà phê"),
+        sp("Hành boa-rô & ngò rí", "2 nhánh")
+      ),
+      steps = listOf(
+        "Cà rốt gọt vỏ tỉa khoanh vừa ăn; bắp Mỹ cắt khúc; bông cải xanh tách nhánh rửa sạch; nấm ngâm nước muối loãng để ráo.",
+        "Đun sôi 900ml nước, cho bắp Mỹ và cà rốt vào nấu trước khoảng 10 phút để lấy nước dùng ngọt thanh tự nhiên.",
+        "Nêm 1 muỗng cà phê muối và 1,5 muỗng cà phê hạt nêm chay cho vừa khẩu vị.",
+        "Cho tiếp nấm và bông cải xanh vào nấu thêm 4–5 phút tới khi rau củ chín tới vẫn giữ được độ giòn ngọt.",
+        "Tắt bếp, thêm hành boa-rô phi thơm hoặc ngò rí thái khúc rồi múc ra tô dùng nóng."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=canh+rau+cu+thap+cam+chay"
+    ),
+
+    // 46. Salad trái cây sữa chua thanh mát — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "salad_trai_cay_ngu_sac_sua_chua",
+      title = "Salad trái cây sữa chua thanh mát",
+      emoji = "🍎",
+      summary = "Salad táo, dâu tây và xà lách giòn mát trộn sốt sữa chua, nước cốt chanh và mật ong thanh nhẹ.",
+      prepMinutes = 10,
+      cookMinutes = 5,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.EAT_CLEAN, CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
+      fridgeIngredients = listOf(ingApple("1 quả (150g)"), ingStrawberry("100g"), ingLettuce("100g"), ingYogurt("1 hũ (100g)")),
+      seasonings = listOf(
+        sp("Mật ong (hoặc sữa đặc)", "1,5 muỗng canh"),
+        sp("Nước cốt chanh tươi", "1 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Rửa sạch táo, dâu tây và xà lách với nước muối loãng rồi để thật ráo nước.",
+        "Thái hạt lựu táo, cắt đôi dâu tây và cắt khúc vừa ăn phần xà lách.",
+        "Pha phần sốt: trộn đều 1 hũ sữa chua không đường cùng 1,5 muỗng canh mật ong (hoặc sữa đặc) và vài giọt nước cốt chanh.",
+        "Cho toàn bộ trái cây và rau vào tô lớn, rưới sốt sữa chua lên trên rồi xóc trộn nhẹ nhàng để không bị nát.",
+        "Có thể ướp trong ngăn mát tủ lạnh khoảng 20–30 phút trước khi thưởng thức để món salad mát lạnh hơn."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=salad+trai+cay+sua+chua"
+    ),
+
+    // 47. Canh chua tôm cà chua thanh mát — VnExpress & Điện máy XANH
+    CulinaryRecipe(
+      id = "canh_chua_tom_ca_chua_bap",
+      title = "Canh chua tôm cà chua & bắp ngọt",
+      emoji = "🍲",
+      summary = "Canh chua thanh mát hài hòa vị chua ngọt từ tôm tươi, sốt cà chua và bắp Mỹ giải nhiệt cho bữa cơm Việt.",
+      prepMinutes = 8,
+      cookMinutes = 15,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingShrimp("200g"), ingTomatoSauce("60g (4 muỗng canh)"), ingCorn("1 trái (150g)"), ingWater("800ml")),
+      seasonings = listOf(
+        sp("Hành tím băm", "1 củ"),
+        sp("Nước cốt chanh hoặc me", "1,5 muỗng canh"),
+        sp("Nước mắm & đường", "1,5 muỗng canh nước mắm, 1,5 muỗng cà phê đường"),
+        sp("Ngò gai & hành lá", "3 nhánh")
+      ),
+      steps = listOf(
+        "Tôm tươi bóc vỏ rút chỉ lưng rửa sạch; bắp ngọt cắt khúc vừa ăn; hành lá và ngò gai thái nhỏ.",
+        "Phi thơm hành tím băm với chút dầu ăn, cho 4 muỗng canh sốt cà chua vào xào 1 phút cho lên màu đẹp.",
+        "Đổ 800ml nước vào nồi đun sôi rồi cho bắp ngọt vào nấu 7 phút cho ngọt nước.",
+        "Nêm nước mắm, đường và chút muối vừa ăn, thả tôm tươi vào nấu sôi 2–3 phút cho tôm chín đỏ.",
+        "Tắt bếp rồi thêm nước cốt chanh cân bằng vị chua thanh, rắc ngò gai và hành lá lên mặt."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=canh+chua+tom"
+    ),
+
+    // 48. Bánh mì nướng bơ sữa — Điện máy XANH Vào Bếp
+    CulinaryRecipe(
+      id = "banh_mi_nuong_bo_sua_gion",
+      title = "Bánh mì nướng bơ sữa",
+      emoji = "🥖",
+      summary = "Bánh mì ép dẹt phết bơ lạt và sữa tươi nướng giòn tan thơm béo bằng lò nướng hoặc nồi chiên không dầu.",
+      prepMinutes = 5,
+      cookMinutes = 8,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.VEGETARIAN, CulinaryFilter.BREAKFAST_DRINK),
+      fridgeIngredients = listOf(ingBread("2 ổ (160g)"), ingButter("25g"), ingMilk("40ml")),
+      seasonings = listOf(
+        sp("Sữa đặc hoặc đường", "1,5 muỗng canh"),
+        sp("Mè rang (tùy chọn)", "1 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Xẻ dọc 2 ổ bánh mì và dùng chày hoặc muỗng lớn ép nhẹ cho bánh hơi dẹt để dễ phết bơ thấm đều.",
+        "Làm tan chảy 25g bơ lạt rồi khuấy quyện cùng 40ml sữa tươi và 1,5 muỗng canh sữa đặc (hoặc đường).",
+        "Dùng cọ phết đều hỗn hợp bơ sữa lên cả hai mặt bánh mì.",
+        "Nướng bánh trong nồi chiên không dầu hoặc lò nướng ở 175°C khoảng 6–8 phút (lật mặt giữa giờ) đến khi vàng giòn.",
+        "Lấy bánh ra rắc thêm mè rang nếu thích và thưởng thức ngay khi còn giòn rụm."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=banh+mi+nuong+bo+sua"
     )
   )
 }
@@ -9935,7 +10693,7 @@ object EmojiIconRepository : IconRepository {
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/CulinaryGuideScreen.kt` (546 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/CulinaryGuideScreen.kt` (693 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.recipes
@@ -9947,7 +10705,9 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -9955,6 +10715,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9965,16 +10727,17 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -9982,11 +10745,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -10002,6 +10772,7 @@ import com.truong.fridgezero.domain.RecipeRecommendation
 import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodIcon
 import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.ButterPale
 import com.truong.fridgezero.ui.theme.ButterSoft
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
@@ -10012,13 +10783,14 @@ import com.truong.fridgezero.ui.theme.MonoFont
 import com.truong.fridgezero.ui.theme.NeoBrutalistButton
 import com.truong.fridgezero.ui.theme.NeoBrutalistCard
 import com.truong.fridgezero.ui.theme.PaperCream
+import com.truong.fridgezero.ui.theme.SkyPale
 import com.truong.fridgezero.ui.theme.StickerBadge
 import com.truong.fridgezero.ui.theme.SurfaceWhite
 import com.truong.fridgezero.ui.theme.dotGridBackground
 
 /**
- * Screen 4 — Neo-Brutalist Culinary Guide with top rescue hero card, category chips,
- * and 2-column Bento recipe grid.
+ * Screen 4 — Neo-Brutalist Culinary Guide with keyword search bar, dish-style category chips,
+ * and single-column horizontal recipe cards matching the compartment food list.
  */
 @Composable
 fun CulinaryGuideScreen(
@@ -10032,20 +10804,29 @@ fun CulinaryGuideScreen(
   val allRecommendations = remember(allItems) {
     CulinaryGuideEngine.recommend(allItems, CulinaryFilter.ALL)
   }
-  val readyCount = remember(allRecommendations) {
-    allRecommendations.count { it.isReadyToCook }
-  }
-  val heroRecommendation = remember(allRecommendations) {
-    allRecommendations.firstOrNull { it.hasUrgentMatch }
-      ?: allRecommendations.firstOrNull { it.matchedCount > 0 }
-      ?: allRecommendations.firstOrNull()
-  }
 
   var selectedFilter by remember { mutableStateOf(RecipeCategory.ALL) }
+  var searchQuery by remember { mutableStateOf("") }
   var selectedRecipeId by remember(initialRecipeId) { mutableStateOf(initialRecipeId) }
+  var isCookingMode by remember(selectedRecipeId) { mutableStateOf(false) }
+  var savedCookingStep by remember(selectedRecipeId) { mutableIntStateOf(0) }
+  val focusManager = LocalFocusManager.current
 
-  val filteredRecommendations = remember(allItems, selectedFilter) {
-    CulinaryGuideEngine.recommend(allItems, selectedFilter)
+  val filteredRecommendations = remember(allItems, selectedFilter, searchQuery) {
+    CulinaryGuideEngine.recommend(
+      fridgeItems = allItems,
+      filter = selectedFilter,
+      query = searchQuery
+    )
+  }
+  val categoryCounts = remember(allItems, searchQuery) {
+    RecipeCategory.entries.associateWith { cat ->
+      CulinaryGuideEngine.recommend(
+        fridgeItems = allItems,
+        filter = cat,
+        query = searchQuery
+      ).size
+    }
   }
   val activeDetail = remember(allRecommendations, selectedRecipeId) {
     selectedRecipeId?.let { id -> allRecommendations.firstOrNull { it.recipe.id == id } }
@@ -10057,7 +10838,11 @@ fun CulinaryGuideScreen(
   val displayedDetail = activeDetail ?: lastDetailRef.value
 
   BackHandler(enabled = activeDetail != null) {
-    selectedRecipeId = null
+    if (isCookingMode) {
+      isCookingMode = false
+    } else {
+      selectedRecipeId = null
+    }
   }
 
   Box(modifier = modifier.fillMaxSize()) {
@@ -10109,49 +10894,63 @@ fun CulinaryGuideScreen(
       )
 
       StickerBadge(
-        text = stringResource(R.string.recipe_ready_badge_fmt, readyCount),
-        containerColor = if (readyCount > 0) LimeFresh else LemonWarn,
+        text = stringResource(R.string.recipe_total_badge_fmt, allRecommendations.size),
+        containerColor = ButterSoft,
         mono = true
       )
     }
 
-    LazyVerticalGrid(
-      columns = GridCells.Fixed(2),
-      modifier = Modifier.fillMaxSize(),
-      contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 20.dp),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
-      horizontalArrangement = Arrangement.spacedBy(12.dp)
+    // Pinned Keyword Search Bar + Category Filter Strip
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-      if (heroRecommendation != null) {
-        item(span = { GridItemSpan(maxLineSpan) }, key = "hero_rescue_card") {
-          HeroRescueRecipeCard(
-            recommendation = heroRecommendation,
-            onClick = { selectedRecipeId = heroRecommendation.recipe.id }
-          )
-        }
-      }
+      RecipeSearchBar(
+        query = searchQuery,
+        onQueryChange = { searchQuery = it },
+        onSearchDone = { focusManager.clearFocus() }
+      )
 
-      item(span = { GridItemSpan(maxLineSpan) }, key = "category_chips") {
-        LazyRow(
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-          contentPadding = PaddingValues(vertical = 2.dp)
-        ) {
-          items(RecipeCategory.entries, key = { it.name }) { category ->
-            val selected = selectedFilter == category
-            NeoBrutalistButton(
-              onClick = { selectedFilter = category },
-              containerColor = if (selected) LimeFresh else SurfaceWhite,
-              cornerRadius = 10.dp,
-              borderWidth = 2.dp,
-              shadowOffset = if (selected) 3.dp else 2.dp,
-              contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+      LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(vertical = 2.dp)
+      ) {
+        items(RecipeCategory.entries, key = { it.name }) { category ->
+          val selected = selectedFilter == category
+          val count = categoryCounts[category] ?: 0
+          val chipColor = if (selected) LimeFresh else SurfaceWhite
+          NeoBrutalistButton(
+            onClick = { selectedFilter = category },
+            containerColor = chipColor,
+            cornerRadius = 10.dp,
+            borderWidth = 2.dp,
+            shadowOffset = if (selected) 3.dp else 2.dp,
+            contentPadding = PaddingValues(horizontal = 11.dp, vertical = 6.dp)
+          ) {
+            Text(
+              text = categoryLabel(category),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 12.sp,
+              color = InkBlack,
+              softWrap = false,
+              maxLines = 1
+            )
+            Box(
+              modifier = Modifier
+                .clip(RoundedCornerShape(5.dp))
+                .background(if (selected) InkBlack else ButterPale)
+                .border(1.dp, InkBlack, RoundedCornerShape(5.dp))
+                .padding(horizontal = 5.dp, vertical = 1.dp)
             ) {
               Text(
-                text = categoryLabel(category),
-                fontFamily = BodyFont,
+                text = "$count",
+                fontFamily = MonoFont,
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = 12.sp,
-                color = InkBlack,
+                fontSize = 10.sp,
+                color = if (selected) SurfaceWhite else InkBlack,
                 softWrap = false,
                 maxLines = 1
               )
@@ -10160,24 +10959,85 @@ fun CulinaryGuideScreen(
         }
       }
 
+      if (searchQuery.isNotBlank() || selectedFilter != RecipeCategory.ALL) {
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 2.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+          Box(
+            modifier = Modifier
+              .clip(RoundedCornerShape(7.dp))
+              .background(ButterPale)
+              .border(1.5.dp, InkBlack, RoundedCornerShape(7.dp))
+              .padding(horizontal = 8.dp, vertical = 3.dp)
+          ) {
+            Text(
+              text = stringResource(R.string.recipe_result_count_fmt, filteredRecommendations.size),
+              fontFamily = MonoFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 11.sp,
+              color = InkBlack
+            )
+          }
+          Box(
+            modifier = Modifier
+              .clip(RoundedCornerShape(7.dp))
+              .background(SurfaceWhite)
+              .border(1.5.dp, InkBlack, RoundedCornerShape(7.dp))
+              .clickable(role = Role.Button) {
+                searchQuery = ""
+                selectedFilter = RecipeCategory.ALL
+                focusManager.clearFocus()
+              }
+              .padding(horizontal = 9.dp, vertical = 3.dp)
+          ) {
+            Text(
+              text = stringResource(R.string.recipe_filter_reset),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 11.sp,
+              color = InkBlack
+            )
+          }
+        }
+      }
+    }
+
+    LazyColumn(
+      modifier = Modifier
+        .weight(1f)
+        .fillMaxWidth(),
+      contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
       if (filteredRecommendations.isEmpty()) {
-        item(span = { GridItemSpan(maxLineSpan) }, key = "empty_filter") {
+        item(key = "empty_filter") {
           NeoBrutalistCard(modifier = Modifier.fillMaxWidth()) {
             Text(
-              text = stringResource(R.string.recipe_empty_filter),
+              text = if (searchQuery.isNotBlank()) {
+                stringResource(R.string.recipe_empty_search_fmt, searchQuery.trim())
+              } else {
+                stringResource(R.string.recipe_empty_filter)
+              },
               modifier = Modifier.padding(20.dp),
               fontFamily = BodyFont,
               fontWeight = FontWeight.Bold,
               fontSize = 14.sp,
-              color = InkBlack.copy(alpha = 0.78f)
+              color = InkBlack
             )
           }
         }
       } else {
         items(filteredRecommendations, key = { it.recipe.id }) { rec ->
-          RecipeBentoCard(
+          RecipeHorizontalCard(
             recommendation = rec,
-            onClick = { selectedRecipeId = rec.recipe.id }
+            onClick = {
+              focusManager.clearFocus()
+              selectedRecipeId = rec.recipe.id
+            }
           )
         }
       }
@@ -10199,154 +11059,52 @@ fun CulinaryGuideScreen(
       displayedDetail?.let { detail ->
         RecipeDetailSheet(
           recommendation = detail,
+          resumeStepIndex = savedCookingStep.takeIf { it > 0 },
+          onStartCooking = { isCookingMode = true },
+          onDismiss = {
+            isCookingMode = false
+            selectedRecipeId = null
+          }
+        )
+      }
+    }
+
+    AnimatedVisibility(
+      visible = activeDetail != null && isCookingMode,
+      modifier = Modifier.fillMaxSize(),
+      enter = slideInHorizontally(
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        initialOffsetX = { it / 6 }
+      ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+      exit = slideOutHorizontally(
+        animationSpec = tween(durationMillis = 180, easing = FastOutLinearInEasing),
+        targetOffsetX = { it / 6 }
+      ) + fadeOut(animationSpec = tween(durationMillis = 180))
+    ) {
+      displayedDetail?.let { detail ->
+        RecipeCookingScreen(
+          recommendation = detail,
+          initialStepIndex = savedCookingStep,
+          onStepChanged = { stepIdx -> savedCookingStep = stepIdx },
           onCompleteCook = { usedUp, leftovers ->
             if (selectedRecipeId == detail.recipe.id) {
               onCompleteCook(usedUp, leftovers)
             }
           },
-          onDismiss = { selectedRecipeId = null }
+          onBackToDetail = { isCookingMode = false },
+          onFinishAndExit = {
+            isCookingMode = false
+            selectedRecipeId = null
+          }
         )
       }
     }
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HeroRescueRecipeCard(
-  recommendation: RecipeRecommendation,
-  onClick: () -> Unit
-) {
-  val recipe = recommendation.recipe
-  val hasUrgent = recommendation.hasUrgentMatch
-  val cardColor = if (hasUrgent) CoralUrgent else ButterSoft
-  val ratioColor = if (recommendation.isReadyToCook) LimeFresh else LemonWarn
-
-  NeoBrutalistCard(
-    modifier = Modifier
-      .fillMaxWidth()
-      .clickable(role = Role.Button, onClick = onClick),
-    containerColor = cardColor,
-    cornerRadius = 16.dp,
-    borderWidth = 2.5.dp,
-    shadowOffset = 4.dp
-  ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(14.dp),
-      verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-      ) {
-        StickerBadge(
-          text = stringResource(
-            if (hasUrgent) R.string.recipe_hero_badge else R.string.recipe_hero_all_fresh_badge
-          ),
-          containerColor = SurfaceWhite,
-          tiltDegrees = -1.2f
-        )
-        StickerBadge(
-          text = stringResource(
-            R.string.recipe_match_ratio_fmt,
-            recommendation.matchedCount,
-            recommendation.totalFridgeIngredients
-          ),
-          containerColor = ratioColor,
-          tiltDegrees = 1.5f,
-          mono = true
-        )
-      }
-
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-      ) {
-        Box(
-          modifier = Modifier
-            .size(52.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(PaperCream)
-            .border(2.dp, InkBlack, RoundedCornerShape(12.dp)),
-          contentAlignment = Alignment.Center
-        ) {
-          Text(text = recipe.emoji, fontSize = 28.sp)
-        }
-        Column(
-          modifier = Modifier.weight(1f),
-          verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-          Text(
-            text = recipe.title,
-            fontFamily = DisplayFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 16.sp,
-            lineHeight = 20.sp,
-            color = InkBlack,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-          )
-          Text(
-            text = recipe.summary,
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
-            color = InkBlack.copy(alpha = 0.85f),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-          )
-        }
-      }
-
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-      ) {
-        if (hasUrgent) {
-          StickerBadge(
-            text = stringResource(R.string.recipe_hero_rescue_fmt, recommendation.urgentMatchedCount),
-            containerColor = LemonWarn,
-            tiltDegrees = 0f
-          )
-        }
-        Text(
-          text = "${stringResource(R.string.recipe_prep_time_short_fmt, recipe.cookMinutes)} · ${recipe.sourceName}",
-          modifier = Modifier.weight(1f),
-          fontFamily = MonoFont,
-          fontWeight = FontWeight.Bold,
-          fontSize = 11.sp,
-          color = InkBlack,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis
-        )
-        Box(
-          modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(InkBlack)
-            .padding(horizontal = 9.dp, vertical = 5.dp)
-        ) {
-          Text(
-            text = stringResource(R.string.recipe_hero_cta),
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 11.sp,
-            color = LimeFresh,
-            softWrap = false,
-            maxLines = 1
-          )
-        }
-      }
-    }
-  }
-}
-
-@Composable
-private fun RecipeBentoCard(
+private fun RecipeHorizontalCard(
   recommendation: RecipeRecommendation,
   onClick: () -> Unit
 ) {
@@ -10355,114 +11113,260 @@ private fun RecipeBentoCard(
     recommendation.matchedIngredients.associateBy { it.ingredient.name }
   }
   val ratioColor = if (recommendation.isReadyToCook) LimeFresh else LemonWarn
+  val accentStripColor = when {
+    recommendation.hasUrgentMatch -> CoralUrgent
+    recommendation.isReadyToCook -> LimeFresh
+    else -> LemonWarn
+  }
 
   NeoBrutalistCard(
-    modifier = Modifier
-      .fillMaxWidth()
-      .clickable(role = Role.Button, onClick = onClick),
+    modifier = Modifier.fillMaxWidth(),
     containerColor = SurfaceWhite,
-    cornerRadius = 16.dp,
+    cornerRadius = 14.dp,
     borderWidth = 2.5.dp,
     shadowOffset = 4.dp
   ) {
-    Column(
+    Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(12.dp),
-      verticalArrangement = Arrangement.spacedBy(8.dp)
+        // 7.5dp accounts for the 2.5dp InkBlack border so a 5dp status strip stays flush on the left edge.
+        .drawBehind {
+          drawRect(
+            color = accentStripColor,
+            topLeft = Offset.Zero,
+            size = Size(7.5.dp.toPx(), size.height)
+          )
+        }
+        .clickable(role = Role.Button, onClick = onClick)
+        .padding(start = 16.dp, end = 12.dp, top = 11.dp, bottom = 11.dp),
+      verticalAlignment = Alignment.Top,
+      horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
+      // Left Zone: fixed 50.dp icon box matching FoodHorizontalCard
+      Box(
+        modifier = Modifier
+          .size(50.dp)
+          .clip(RoundedCornerShape(12.dp))
+          .background(PaperCream)
+          .border(2.dp, InkBlack, RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center
       ) {
-        Box(
-          modifier = Modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(PaperCream)
-            .border(2.dp, InkBlack, RoundedCornerShape(10.dp)),
-          contentAlignment = Alignment.Center
+        Text(text = recipe.emoji, fontSize = 28.sp)
+      }
+
+      // Center & Right Zones
+      Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+      ) {
+        // Top row: recipe title (left) + match ratio pill (right)
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.Top,
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          Text(text = recipe.emoji, fontSize = 22.sp)
+          Text(
+            text = recipe.title,
+            modifier = Modifier.weight(1f),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            color = InkBlack,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+          )
+          StickerBadge(
+            text = stringResource(
+              R.string.recipe_match_ratio_fmt,
+              recommendation.matchedCount,
+              recommendation.totalFridgeIngredients
+            ),
+            containerColor = ratioColor,
+            tiltDegrees = 0f,
+            mono = true
+          )
         }
-        StickerBadge(
-          text = stringResource(
-            R.string.recipe_match_ratio_fmt,
-            recommendation.matchedCount,
-            recommendation.totalFridgeIngredients
-          ),
-          containerColor = ratioColor,
-          tiltDegrees = -2f,
-          mono = true
-        )
-      }
 
-      Text(
-        text = recipe.title,
-        fontFamily = BodyFont,
-        fontWeight = FontWeight.ExtraBold,
-        fontSize = 13.sp,
-        lineHeight = 17.sp,
-        color = InkBlack,
-        minLines = 2,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis
-      )
-
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        recipe.fridgeIngredients.take(4).forEach { ingredient ->
-          val match = matchedByIng[ingredient.name]
-          val bg = when {
-            match == null -> PaperCream
-            match.item.freshness == Freshness.BAD -> CoralUrgent
-            match.item.freshness == Freshness.SOON -> LemonWarn
-            else -> LimeFresh
-          }
-          Box(
-            modifier = Modifier
-              .size(26.dp)
-              .alpha(if (match != null) 1f else 0.45f)
-              .clip(RoundedCornerShape(7.dp))
-              .background(bg)
-              .border(1.5.dp, InkBlack, RoundedCornerShape(7.dp)),
-            contentAlignment = Alignment.Center
-          ) {
-            Text(text = ingredientGlyph(ingredient), fontSize = 14.sp)
-          }
-        }
-      }
-
-      Spacer(Modifier.height(1.dp))
-
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-      ) {
+        // Concise summary on high-contrast SurfaceWhite card
         Text(
-          text = stringResource(R.string.recipe_prep_time_short_fmt, recipe.cookMinutes),
-          fontFamily = MonoFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 10.sp,
-          color = InkBlack,
-          softWrap = false,
-          maxLines = 1
-        )
-        Text(
-          text = "· ${recipe.sourceName}",
-          modifier = Modifier.weight(1f),
+          text = recipe.summary,
           fontFamily = BodyFont,
-          fontWeight = FontWeight.SemiBold,
-          fontSize = 10.sp,
-          color = InkBlack.copy(alpha = 0.68f),
-          maxLines = 1,
+          fontWeight = FontWeight.Medium,
+          fontSize = 12.sp,
+          lineHeight = 16.sp,
+          color = InkBlack.copy(alpha = 0.84f),
+          maxLines = 2,
           overflow = TextOverflow.Ellipsis
         )
+
+        // Bottom row: ingredient icons + metadata chips (left) & action badge (right)
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.Bottom,
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          FlowRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+          ) {
+            recipe.fridgeIngredients.take(4).forEach { ingredient ->
+              val match = matchedByIng[ingredient.name]
+              val bg = when {
+                match == null -> PaperCream
+                match.item.freshness == Freshness.BAD -> CoralUrgent
+                match.item.freshness == Freshness.SOON -> LemonWarn
+                else -> LimeFresh
+              }
+              Box(
+                modifier = Modifier
+                  .size(24.dp)
+                  .alpha(if (match != null) 1f else 0.45f)
+                  .clip(RoundedCornerShape(6.dp))
+                  .background(bg)
+                  .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp)),
+                contentAlignment = Alignment.Center
+              ) {
+                Text(text = ingredientGlyph(ingredient), fontSize = 13.sp)
+              }
+            }
+            Box(
+              modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(SkyPale)
+                .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 3.dp)
+            ) {
+              Text(
+                text = stringResource(R.string.recipe_prep_time_short_fmt, recipe.cookMinutes),
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 10.sp,
+                color = InkBlack,
+                softWrap = false,
+                maxLines = 1
+              )
+            }
+            Text(
+              text = recipe.sourceName,
+              modifier = Modifier.padding(vertical = 3.dp),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.SemiBold,
+              fontSize = 10.5.sp,
+              color = InkBlack.copy(alpha = 0.78f),
+              softWrap = false,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
+            )
+          }
+
+          Box(
+            modifier = Modifier
+              .clip(RoundedCornerShape(7.dp))
+              .background(ButterSoft)
+              .border(1.5.dp, InkBlack, RoundedCornerShape(7.dp))
+              .padding(horizontal = 8.dp, vertical = 4.dp)
+          ) {
+            Text(
+              text = stringResource(R.string.recipe_hero_cta),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 10.5.sp,
+              color = InkBlack,
+              softWrap = false,
+              maxLines = 1
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun RecipeSearchBar(
+  query: String,
+  onQueryChange: (String) -> Unit,
+  onSearchDone: () -> Unit
+) {
+  val clearCd = stringResource(R.string.recipe_search_clear_cd)
+  NeoBrutalistCard(
+    modifier = Modifier.fillMaxWidth(),
+    containerColor = SurfaceWhite,
+    cornerRadius = 12.dp,
+    borderWidth = 2.5.dp,
+    shadowOffset = 3.dp
+  ) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 10.dp, vertical = 8.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+      Box(
+        modifier = Modifier
+          .size(28.dp)
+          .clip(RoundedCornerShape(7.dp))
+          .background(ButterSoft)
+          .border(1.5.dp, InkBlack, RoundedCornerShape(7.dp)),
+        contentAlignment = Alignment.Center
+      ) {
+        Text(text = "🔍", fontSize = 14.sp)
+      }
+
+      Box(
+        modifier = Modifier.weight(1f),
+        contentAlignment = Alignment.CenterStart
+      ) {
+        if (query.isEmpty()) {
+          Text(
+            text = stringResource(R.string.recipe_search_placeholder),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.Medium,
+            fontSize = 13.sp,
+            color = InkBlack.copy(alpha = 0.55f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+          )
+        }
+        BasicTextField(
+          value = query,
+          onValueChange = onQueryChange,
+          singleLine = true,
+          textStyle = TextStyle(
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.5.sp,
+            color = InkBlack
+          ),
+          cursorBrush = SolidColor(InkBlack),
+          keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+          keyboardActions = KeyboardActions(onSearch = { onSearchDone() }),
+          modifier = Modifier.fillMaxWidth()
+        )
+      }
+
+      if (query.isNotEmpty()) {
+        Box(
+          modifier = Modifier
+            .size(26.dp)
+            .clip(RoundedCornerShape(7.dp))
+            .background(CoralUrgent)
+            .border(1.5.dp, InkBlack, RoundedCornerShape(7.dp))
+            .semantics { contentDescription = clearCd }
+            .clickable(role = Role.Button) { onQueryChange("") },
+          contentAlignment = Alignment.Center
+        ) {
+          Text(
+            text = "×",
+            fontFamily = DisplayFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 15.sp,
+            color = InkBlack
+          )
+        }
       }
     }
   }
@@ -10471,11 +11375,12 @@ private fun RecipeBentoCard(
 @Composable
 private fun categoryLabel(category: RecipeCategory): String = when (category) {
   CulinaryFilter.ALL -> stringResource(R.string.recipe_filter_all)
-  CulinaryFilter.READY_NOW -> stringResource(R.string.recipe_filter_ready)
-  CulinaryFilter.RESCUE_URGENT -> stringResource(R.string.recipe_filter_rescue)
-  CulinaryFilter.QUICK_15 -> stringResource(R.string.recipe_filter_quick)
   CulinaryFilter.VIET_HOME -> stringResource(R.string.recipe_filter_viet)
+  CulinaryFilter.ASIAN_FUSION -> stringResource(R.string.recipe_filter_asian)
+  CulinaryFilter.WESTERN -> stringResource(R.string.recipe_filter_western)
   CulinaryFilter.EAT_CLEAN -> stringResource(R.string.recipe_filter_eat_clean)
+  CulinaryFilter.VEGETARIAN -> stringResource(R.string.recipe_filter_vegetarian)
+  CulinaryFilter.BREAKFAST_DRINK -> stringResource(R.string.recipe_filter_breakfast_drink)
 }
 
 internal fun ingredientGlyph(ingredient: RecipeIngredient): String {
@@ -10485,14 +11390,22 @@ internal fun ingredientGlyph(ingredient: RecipeIngredient): String {
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/RecipeDetailSheet.kt` (872 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/RecipeCookingScreen.kt` (1176 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.recipes
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10509,25 +11422,34 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
@@ -10537,53 +11459,123 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.truong.fridgezero.R
+import com.truong.fridgezero.domain.AnalyzedCookingStep
+import com.truong.fridgezero.domain.CookingAction
+import com.truong.fridgezero.domain.CookingStepAnalyzer
 import com.truong.fridgezero.domain.CulinaryGuideEngine
-import com.truong.fridgezero.domain.Freshness
-import com.truong.fridgezero.domain.MatchTier
 import com.truong.fridgezero.domain.MatchedIngredient
-import com.truong.fridgezero.domain.RecipeDifficulty
-import com.truong.fridgezero.domain.RecipeIngredient
 import com.truong.fridgezero.domain.RecipeRecommendation
 import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.ButterPale
 import com.truong.fridgezero.ui.theme.ButterSoft
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
 import com.truong.fridgezero.ui.theme.InkBlack
 import com.truong.fridgezero.ui.theme.LemonWarn
+import com.truong.fridgezero.ui.theme.LilacAccent
 import com.truong.fridgezero.ui.theme.LimeFresh
 import com.truong.fridgezero.ui.theme.MonoFont
 import com.truong.fridgezero.ui.theme.NeoBrutalistButton
 import com.truong.fridgezero.ui.theme.NeoBrutalistCard
 import com.truong.fridgezero.ui.theme.PaperCream
+import com.truong.fridgezero.ui.theme.SkyInfo
 import com.truong.fridgezero.ui.theme.SkyPale
-import com.truong.fridgezero.ui.theme.StickerBadge
 import com.truong.fridgezero.ui.theme.SurfaceWhite
 import com.truong.fridgezero.ui.theme.dotGridBackground
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+private data class StepTimerState(
+  val durationSec: Int = 0,
+  val remainingSec: Int = 0,
+  val isRunning: Boolean = false,
+  val isFinished: Boolean = false,
+  val showPresets: Boolean = false
+)
+
+private val QUICK_TIMER_PRESET_MINUTES = listOf(1, 3, 5, 10)
 
 /**
- * Full-screen Neo-Brutalist recipe detail view separating in-fridge items, missing items,
- * measured seasonings, cooking steps, original culinary citation link, and post-cook confirmation.
+ * Full-screen Neo-Brutalist Flashcard walkthrough presenting one large illustrated cooking step
+ * per page, with a convenient inline countdown timer, quick ingredients peek, and final-step
+ * fridge inventory deduction confirmation.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RecipeDetailSheet(
+fun RecipeCookingScreen(
   recommendation: RecipeRecommendation,
+  initialStepIndex: Int = 0,
+  onStepChanged: (Int) -> Unit = {},
   onCompleteCook: (usedUp: List<MatchedIngredient>, leftovers: List<MatchedIngredient>) -> Unit,
-  onDismiss: () -> Unit,
+  onBackToDetail: () -> Unit,
+  onFinishAndExit: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   val recipe = recommendation.recipe
-  val uriHandler = LocalUriHandler.current
+  val analyzedSteps = remember(recipe.id) { CookingStepAnalyzer.analyzeRecipe(recipe) }
+  val totalSteps = analyzedSteps.size
+  val initialPage = initialStepIndex.coerceIn(0, maxOf(0, totalSteps - 1))
+  val pagerState = rememberPagerState(initialPage = initialPage) { totalSteps }
+  val scope = rememberCoroutineScope()
   val context = LocalContext.current
-  val openErrorText = stringResource(R.string.recipe_open_source_error)
-  val backCd = stringResource(R.string.recipe_detail_back_cd)
-  val cookedEmptyToastText = stringResource(R.string.recipe_cooked_toast_empty)
-  val scrollState = rememberScrollState()
-  LaunchedEffect(recipe.id) { scrollState.scrollTo(0) }
-  var cookedTriggered by remember(recipe.id) { mutableStateOf(false) }
-  var showCookConfirmDialog by remember(recipe.id) { mutableStateOf(false) }
+  val haptic = LocalHapticFeedback.current
+  val view = LocalView.current
 
-  Column(
+  val backCd = stringResource(R.string.cooking_back_cd)
+  val cookedEmptyToastText = stringResource(R.string.recipe_cooked_toast_empty)
+
+  var showIngredientsOverlay by remember(recipe.id) { mutableStateOf(false) }
+  var showCookConfirmDialog by remember(recipe.id) { mutableStateOf(false) }
+  var cookedTriggered by remember(recipe.id) { mutableStateOf(false) }
+  val timerStates = remember(recipe.id) { mutableStateMapOf<Int, StepTimerState>() }
+
+  LaunchedEffect(pagerState.currentPage) {
+    onStepChanged(pagerState.currentPage)
+  }
+
+  // Keep kitchen screen awake only while active in guided cooking mode.
+  DisposableEffect(view) {
+    val prevKeepScreenOn = view.keepScreenOn
+    view.keepScreenOn = true
+    onDispose {
+      view.keepScreenOn = prevKeepScreenOn
+    }
+  }
+
+  val hasRunningTimer = timerStates.values.any { it.isRunning }
+  LaunchedEffect(recipe.id, hasRunningTimer) {
+    if (!hasRunningTimer) return@LaunchedEffect
+    while (isActive) {
+      delay(1000L)
+      var finishedAny = false
+      for (stepIdx in timerStates.keys.toList()) {
+        val current = timerStates[stepIdx] ?: continue
+        if (!current.isRunning) continue
+        val next = (current.remainingSec - 1).coerceAtLeast(0)
+        if (next == 0) {
+          timerStates[stepIdx] = current.copy(
+            remainingSec = 0,
+            isRunning = false,
+            isFinished = true
+          )
+          finishedAny = true
+        } else {
+          timerStates[stepIdx] = current.copy(remainingSec = next)
+        }
+      }
+      if (finishedAny) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+      }
+    }
+  }
+
+  BackHandler(enabled = showIngredientsOverlay) {
+    showIngredientsOverlay = false
+  }
+
+  val isLastStep = totalSteps > 0 && pagerState.currentPage >= totalSteps - 1
+
+  Box(
     modifier = modifier
       .fillMaxSize()
       .dotGridBackground()
@@ -10592,390 +11584,348 @@ fun RecipeDetailSheet(
       .semantics(mergeDescendants = false) { isTraversalGroup = true }
       .pointerInput(Unit) {}
   ) {
-    // Top Bar: square ← button | recipe title | source badge
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = 10.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-      NeoBrutalistButton(
-        onClick = onDismiss,
+    Column(modifier = Modifier.fillMaxSize()) {
+      // Top Bar: Back | Dish + Step Counter + Segmented Progress | Quick Ingredients Peek
+      Column(
         modifier = Modifier
-          .size(44.dp)
-          .semantics { contentDescription = backCd },
-        containerColor = SurfaceWhite,
-        cornerRadius = 12.dp,
-        borderWidth = 2.5.dp,
-        shadowOffset = 3.dp,
-        contentPadding = PaddingValues(0.dp)
-      ) {
-        Text(
-          text = stringResource(R.string.bento_back_symbol),
-          fontFamily = DisplayFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 20.sp,
-          color = InkBlack
-        )
-      }
-
-      Text(
-        text = recipe.title,
-        modifier = Modifier.weight(1f),
-        fontFamily = DisplayFont,
-        fontWeight = FontWeight.ExtraBold,
-        fontSize = 17.sp,
-        color = InkBlack,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-      )
-
-      StickerBadge(
-        text = recipe.sourceName,
-        containerColor = SkyPale,
-        tiltDegrees = 0f
-      )
-    }
-
-    // Scrollable body
-    Column(
-      modifier = Modifier
-        .weight(1f)
-        .fillMaxWidth()
-        .verticalScroll(scrollState)
-        .padding(horizontal = 16.dp, vertical = 8.dp),
-      verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-      // Header: Emoji + Title + Summary + Meta badges
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-      ) {
-        Box(
-          modifier = Modifier
-            .size(54.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(SurfaceWhite)
-            .border(2.5.dp, InkBlack, RoundedCornerShape(14.dp)),
-          contentAlignment = Alignment.Center
-        ) {
-          Text(text = recipe.emoji, fontSize = 30.sp)
-        }
-        Column(
-          modifier = Modifier.weight(1f),
-          verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-          Text(
-            text = recipe.title,
-            fontFamily = DisplayFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 19.sp,
-            lineHeight = 23.sp,
-            color = InkBlack
-          )
-          Text(
-            text = recipe.summary,
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.Medium,
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
-            color = InkBlack.copy(alpha = 0.78f)
-          )
-        }
-      }
-
-      FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-      ) {
-        StickerBadge(
-          text = stringResource(
-            R.string.recipe_prep_cook_time_fmt,
-            recipe.prepMinutes,
-            recipe.cookMinutes
-          ),
-          containerColor = SurfaceWhite,
-          tiltDegrees = 0f,
-          mono = true
-        )
-        StickerBadge(
-          text = stringResource(R.string.recipe_servings_fmt, recipe.servingsLabel),
-          containerColor = ButterSoft,
-          tiltDegrees = 0f
-        )
-        StickerBadge(
-          text = stringResource(
-            if (recipe.difficulty == RecipeDifficulty.EASY) {
-              R.string.recipe_difficulty_easy
-            } else {
-              R.string.recipe_difficulty_medium
-            }
-          ),
-          containerColor = if (recipe.difficulty == RecipeDifficulty.EASY) LimeFresh else LemonWarn,
-          tiltDegrees = 0f
-        )
-        StickerBadge(
-          text = stringResource(
-            R.string.recipe_match_ratio_fmt,
-            recommendation.matchedCount,
-            recommendation.totalFridgeIngredients
-          ),
-          containerColor = if (recommendation.isReadyToCook) LimeFresh else LemonWarn,
-          tiltDegrees = 0f,
-          mono = true
-        )
-      }
-
-      // Section 1: Reference matches / similar items in fridge
-      Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        RecipeSectionHeader(stringResource(R.string.recipe_section_in_fridge))
-        Text(
-          text = stringResource(R.string.recipe_section_in_fridge_hint),
-          fontFamily = MonoFont,
-          fontWeight = FontWeight.Medium,
-          fontSize = 10.sp,
-          color = InkBlack.copy(alpha = 0.65f)
-        )
-      }
-      if (recommendation.matchedIngredients.isEmpty()) {
-        NeoBrutalistCard(
-          modifier = Modifier.fillMaxWidth(),
-          containerColor = SurfaceWhite,
-          cornerRadius = 12.dp,
-          borderWidth = 2.dp,
-          shadowOffset = 2.dp
-        ) {
-          Text(
-            text = stringResource(R.string.recipe_section_in_fridge_empty),
-            modifier = Modifier.padding(12.dp),
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.Medium,
-            fontSize = 13.sp,
-            color = InkBlack.copy(alpha = 0.72f)
-          )
-        }
-      } else {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          recommendation.matchedIngredients.forEach { matched ->
-            MatchedIngredientRow(matched = matched)
-          }
-        }
-      }
-
-      // Section 2: Missing Fridge Ingredients
-      RecipeSectionHeader(stringResource(R.string.recipe_section_missing))
-      if (recommendation.missingIngredients.isEmpty()) {
-        NeoBrutalistCard(
-          modifier = Modifier.fillMaxWidth(),
-          containerColor = LimeFresh,
-          cornerRadius = 12.dp,
-          borderWidth = 2.dp,
-          shadowOffset = 2.dp
-        ) {
-          Text(
-            text = stringResource(R.string.recipe_section_missing_none),
-            modifier = Modifier.padding(12.dp),
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 13.sp,
-            color = InkBlack
-          )
-        }
-      } else {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          recommendation.missingIngredients.forEach { missing ->
-            MissingIngredientRow(ingredient = missing)
-          }
-        }
-      }
-
-      // Section 3: Measured Seasonings Table
-      Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        RecipeSectionHeader(stringResource(R.string.recipe_section_pantry))
-        Text(
-          text = stringResource(R.string.recipe_section_pantry_hint),
-          fontFamily = MonoFont,
-          fontWeight = FontWeight.Medium,
-          fontSize = 10.sp,
-          color = InkBlack.copy(alpha = 0.65f)
-        )
-        NeoBrutalistCard(
-          modifier = Modifier.fillMaxWidth(),
-          containerColor = SurfaceWhite,
-          cornerRadius = 14.dp,
-          borderWidth = 2.dp,
-          shadowOffset = 3.dp
-        ) {
-          Column(
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(horizontal = 12.dp, vertical = 8.dp)
-          ) {
-            recipe.seasonings.forEachIndexed { index, spec ->
-              Row(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-              ) {
-                Text(
-                  text = spec.name,
-                  modifier = Modifier.weight(1f),
-                  fontFamily = BodyFont,
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 13.sp,
-                  color = InkBlack
-                )
-                Text(
-                  text = spec.amount,
-                  fontFamily = MonoFont,
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 12.sp,
-                  color = InkBlack.copy(alpha = 0.85f)
-                )
-              }
-              if (index < recipe.seasonings.lastIndex) {
-                Box(
-                  modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(InkBlack.copy(alpha = 0.14f))
-                )
-              }
-            }
-          }
-        }
-      }
-
-      // Section 4: Cooking Steps inside NeoBrutalistCard
-      RecipeSectionHeader(stringResource(R.string.recipe_section_steps))
-      NeoBrutalistCard(
-        modifier = Modifier.fillMaxWidth(),
-        containerColor = SurfaceWhite,
-        cornerRadius = 16.dp,
-        borderWidth = 2.5.dp,
-        shadowOffset = 3.dp
+          .fillMaxWidth()
+          .background(SurfaceWhite)
       ) {
         Column(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(14.dp),
-          verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+          verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          recipe.steps.forEachIndexed { index, stepText ->
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              verticalAlignment = Alignment.Top,
-              horizontalArrangement = Arrangement.spacedBy(10.dp)
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+          ) {
+            NeoBrutalistButton(
+              onClick = onBackToDetail,
+              modifier = Modifier
+                .size(42.dp)
+                .semantics { contentDescription = backCd },
+              containerColor = PaperCream,
+              cornerRadius = 11.dp,
+              borderWidth = 2.dp,
+              shadowOffset = 3.dp,
+              contentPadding = PaddingValues(0.dp)
             ) {
-              Box(
-                modifier = Modifier
-                  .size(24.dp)
-                  .clip(RoundedCornerShape(7.dp))
-                  .background(InkBlack),
-                contentAlignment = Alignment.Center
-              ) {
-                Text(
-                  text = "${index + 1}",
-                  fontFamily = MonoFont,
-                  fontWeight = FontWeight.ExtraBold,
-                  fontSize = 12.sp,
-                  color = LimeFresh
-                )
-              }
               Text(
-                text = stepText,
-                modifier = Modifier.weight(1f),
-                fontFamily = BodyFont,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
+                text = stringResource(R.string.bento_back_symbol),
+                fontFamily = DisplayFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 19.sp,
                 color = InkBlack
               )
             }
+
+            Column(
+              modifier = Modifier.weight(1f),
+              verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+              Text(
+                text = "${recipe.emoji} ${recipe.title}",
+                fontFamily = DisplayFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 13.5.sp,
+                color = InkBlack,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+              )
+              if (totalSteps > 0) {
+                Text(
+                  text = stringResource(
+                    R.string.cooking_step_counter_fmt,
+                    pagerState.currentPage + 1,
+                    totalSteps
+                  ),
+                  fontFamily = MonoFont,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 11.sp,
+                  color = InkBlack.copy(alpha = 0.72f),
+                  maxLines = 1
+                )
+              }
+            }
+
+            NeoBrutalistButton(
+              onClick = { showIngredientsOverlay = true },
+              modifier = Modifier.height(42.dp),
+              containerColor = ButterSoft,
+              cornerRadius = 11.dp,
+              borderWidth = 2.dp,
+              shadowOffset = 3.dp,
+              contentPadding = PaddingValues(horizontal = 11.dp, vertical = 0.dp)
+            ) {
+              Text(
+                text = stringResource(R.string.cooking_ingredients_btn),
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 12.5.sp,
+                color = InkBlack,
+                softWrap = false,
+                maxLines = 1
+              )
+            }
+          }
+
+          if (totalSteps > 1) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+              repeat(totalSteps) { idx ->
+                val segmentColor = when {
+                  idx == pagerState.currentPage -> LemonWarn
+                  idx < pagerState.currentPage -> LimeFresh
+                  else -> PaperCream
+                }
+                Box(
+                  modifier = Modifier
+                    .weight(1f)
+                    .height(9.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(segmentColor)
+                    .border(1.5.dp, InkBlack, RoundedCornerShape(4.dp))
+                    .clickable(role = Role.Tab) {
+                      scope.launch { pagerState.animateScrollToPage(idx) }
+                    }
+                )
+              }
+            }
+          }
+        }
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(2.5.dp)
+            .background(InkBlack)
+        )
+      }
+
+      // Center Flashcard Stage: 1 Unified Card per Step inside HorizontalPager
+      HorizontalPager(
+        state = pagerState,
+        modifier = Modifier
+          .weight(1f)
+          .fillMaxWidth()
+      ) { pageIndex ->
+        val step = analyzedSteps[pageIndex]
+        val timerState = timerStates[step.index] ?: StepTimerState()
+
+        CookingStepFlashcard(
+          step = step,
+          timerState = timerState,
+          showSwipeHint = pageIndex == 0 && totalSteps > 1,
+          onStartDetectedTimer = { seconds ->
+            timerStates[step.index] = StepTimerState(
+              durationSec = seconds,
+              remainingSec = seconds,
+              isRunning = true,
+              isFinished = false,
+              showPresets = false
+            )
+          },
+          onTogglePresets = {
+            timerStates[step.index] = timerState.copy(showPresets = !timerState.showPresets)
+          },
+          onSelectPresetMinutes = { minutes ->
+            val seconds = minutes * 60
+            timerStates[step.index] = StepTimerState(
+              durationSec = seconds,
+              remainingSec = seconds,
+              isRunning = true,
+              isFinished = false,
+              showPresets = false
+            )
+          },
+          onTogglePauseResume = {
+            if (timerState.durationSec > 0 && !timerState.isFinished) {
+              timerStates[step.index] = timerState.copy(isRunning = !timerState.isRunning)
+            }
+          },
+          onAddOneMinute = {
+            val baseRemaining = if (timerState.isFinished) 0 else timerState.remainingSec
+            timerStates[step.index] = timerState.copy(
+              durationSec = maxOf(timerState.durationSec + 60, baseRemaining + 60),
+              remainingSec = baseRemaining + 60,
+              isRunning = true,
+              isFinished = false,
+              showPresets = false
+            )
+          },
+          onResetTimer = {
+            timerStates.remove(step.index)
+          },
+          modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+        )
+      }
+
+      // Pinned Bottom Navigation Bar
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .background(SurfaceWhite)
+      ) {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(2.5.dp)
+            .background(InkBlack)
+        )
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+          horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+          NeoBrutalistButton(
+            onClick = {
+              if (pagerState.currentPage > 0) {
+                scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+              }
+            },
+            enabled = pagerState.currentPage > 0,
+            modifier = Modifier.weight(0.85f),
+            containerColor = SurfaceWhite,
+            cornerRadius = 12.dp,
+            borderWidth = 2.dp,
+            shadowOffset = 3.dp,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 13.dp)
+          ) {
+            Text(
+              text = stringResource(R.string.cooking_prev_step),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 14.sp,
+              color = if (pagerState.currentPage > 0) InkBlack else InkBlack.copy(alpha = 0.42f),
+              softWrap = false,
+              maxLines = 1
+            )
+          }
+
+          NeoBrutalistButton(
+            onClick = {
+              if (!isLastStep) {
+                scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+              } else {
+                if (recommendation.matchedIngredients.isEmpty()) {
+                  if (!cookedTriggered) {
+                    cookedTriggered = true
+                    Toast.makeText(context, cookedEmptyToastText, Toast.LENGTH_SHORT).show()
+                    onFinishAndExit()
+                  }
+                } else {
+                  showCookConfirmDialog = true
+                }
+              }
+            },
+            modifier = Modifier.weight(1.45f),
+            containerColor = LimeFresh,
+            cornerRadius = 12.dp,
+            borderWidth = 2.5.dp,
+            shadowOffset = 4.dp,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 13.dp)
+          ) {
+            Text(
+              text = stringResource(
+                if (isLastStep) R.string.cooking_finish_cook else R.string.cooking_next_step
+              ),
+              fontFamily = DisplayFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 15.sp,
+              color = InkBlack,
+              softWrap = false,
+              maxLines = 1
+            )
           }
         }
       }
-
-      Spacer(Modifier.height(8.dp))
     }
 
-    // Pinned Bottom Action Bar: Source Link | 1-Tap Cook Deduction
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .background(SurfaceWhite)
+    // Quick-Peek Ingredients & Seasonings Overlay
+    AnimatedVisibility(
+      visible = showIngredientsOverlay,
+      modifier = Modifier.fillMaxSize(),
+      enter = fadeIn(),
+      exit = fadeOut()
     ) {
       Box(
         modifier = Modifier
-          .fillMaxWidth()
-          .height(2.5.dp)
-          .background(InkBlack)
-      )
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+          .fillMaxSize()
+          .background(InkBlack.copy(alpha = 0.48f))
+          .clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = { showIngredientsOverlay = false }
+          )
+          .padding(16.dp),
+        contentAlignment = Alignment.Center
       ) {
-        NeoBrutalistButton(
-          onClick = {
-            runCatching { uriHandler.openUri(recipe.sourceUrl) }
-              .onFailure {
-                Toast.makeText(context, openErrorText, Toast.LENGTH_SHORT).show()
-              }
-          },
-          modifier = Modifier.weight(1f),
-          containerColor = SurfaceWhite,
-          cornerRadius = 12.dp,
-          borderWidth = 2.dp,
-          shadowOffset = 3.dp,
-          contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)
-        ) {
-          Text(
-            text = stringResource(R.string.recipe_action_source),
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 13.sp,
-            color = InkBlack,
-            softWrap = false,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-          )
-        }
-
-        NeoBrutalistButton(
-          onClick = {
-            if (recommendation.matchedIngredients.isEmpty()) {
-              if (!cookedTriggered) {
-                cookedTriggered = true
-                Toast.makeText(context, cookedEmptyToastText, Toast.LENGTH_SHORT).show()
-                onDismiss()
-              }
-            } else {
-              showCookConfirmDialog = true
-            }
-          },
-          modifier = Modifier.weight(1.15f),
-          containerColor = LimeFresh,
-          cornerRadius = 12.dp,
+        NeoBrutalistCard(
+          modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+              interactionSource = remember { MutableInteractionSource() },
+              indication = null,
+              onClick = {}
+            ),
+          containerColor = PaperCream,
+          cornerRadius = 18.dp,
           borderWidth = 2.5.dp,
-          shadowOffset = 4.dp,
-          contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)
+          shadowOffset = 4.dp
         ) {
-          Text(
-            text = stringResource(R.string.recipe_action_cooked),
-            fontFamily = BodyFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 13.sp,
-            color = InkBlack,
-            softWrap = false,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-          )
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+          ) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+              Text(
+                text = stringResource(R.string.cooking_ingredients_sheet_title),
+                modifier = Modifier.weight(1f),
+                fontFamily = DisplayFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 14.sp,
+                color = InkBlack
+              )
+              NeoBrutalistButton(
+                onClick = { showIngredientsOverlay = false },
+                containerColor = SurfaceWhite,
+                cornerRadius = 9.dp,
+                borderWidth = 2.dp,
+                shadowOffset = 2.dp,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+              ) {
+                Text(
+                  text = stringResource(R.string.cooking_ingredients_sheet_close),
+                  fontFamily = BodyFont,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 12.sp,
+                  color = InkBlack
+                )
+              }
+            }
+
+            Column(
+              modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 460.dp)
+                .verticalScroll(rememberScrollState())
+            ) {
+              UnifiedPrepTableCard(recommendation = recommendation)
+            }
+          }
         }
       }
     }
@@ -10999,11 +11949,351 @@ fun RecipeDetailSheet(
           }
           Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
           showCookConfirmDialog = false
-          onDismiss()
+          onFinishAndExit()
         }
       },
       onCancel = { showCookConfirmDialog = false }
     )
+  }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CookingStepFlashcard(
+  step: AnalyzedCookingStep,
+  timerState: StepTimerState,
+  showSwipeHint: Boolean,
+  onStartDetectedTimer: (Int) -> Unit,
+  onTogglePresets: () -> Unit,
+  onSelectPresetMinutes: (Int) -> Unit,
+  onTogglePauseResume: () -> Unit,
+  onAddOneMinute: () -> Unit,
+  onResetTimer: () -> Unit,
+  modifier: Modifier = Modifier
+) {
+  val actionTitle = cookingActionTitle(step.action)
+  val actionAccent = cookingActionColor(step.action)
+  val stepLabel = stringResource(R.string.recipe_step_label_fmt, step.index + 1)
+
+  NeoBrutalistCard(
+    modifier = modifier,
+    containerColor = SurfaceWhite,
+    cornerRadius = 18.dp,
+    borderWidth = 2.5.dp,
+    shadowOffset = 4.dp
+  ) {
+    Column(modifier = Modifier.fillMaxSize()) {
+      // Top Artwork Zone (~45% height): Full-bleed Neo-Brutalist illustration + Step badge + Ingredient tags
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .weight(0.45f)
+          .background(PaperCream)
+      ) {
+        Image(
+          painter = painterResource(actionDrawableRes(step.action)),
+          contentDescription = actionTitle,
+          contentScale = ContentScale.Crop,
+          modifier = Modifier.fillMaxSize()
+        )
+
+        Box(
+          modifier = Modifier
+            .align(Alignment.TopStart)
+            .padding(10.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(InkBlack)
+            .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+          Text(
+            text = stepLabel,
+            fontFamily = MonoFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 11.5.sp,
+            color = LimeFresh
+          )
+        }
+
+        if (step.mentionedIngredients.isNotEmpty()) {
+          FlowRow(
+            modifier = Modifier
+              .align(Alignment.BottomStart)
+              .padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+          ) {
+            step.mentionedIngredients.forEach { ingredient ->
+              Box(
+                modifier = Modifier
+                  .clip(RoundedCornerShape(8.dp))
+                  .background(SurfaceWhite.copy(alpha = 0.94f))
+                  .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
+                  .padding(horizontal = 7.dp, vertical = 3.dp)
+              ) {
+                Text(
+                  text = "${ingredientGlyph(ingredient)} ${ingredient.name}",
+                  fontFamily = BodyFont,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 11.sp,
+                  color = InkBlack,
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis
+                )
+              }
+            }
+          }
+        }
+      }
+
+      // Middle Action + Convenient Compact Timer Strip
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(2.5.dp)
+          .background(InkBlack)
+      )
+
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .background(actionAccent)
+          .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        Text(
+          text = actionTitle,
+          modifier = Modifier.weight(1f),
+          fontFamily = DisplayFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 12.5.sp,
+          color = InkBlack,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+
+        StepTimerControls(
+          step = step,
+          timerState = timerState,
+          onStartDetectedTimer = onStartDetectedTimer,
+          onTogglePresets = onTogglePresets,
+          onTogglePauseResume = onTogglePauseResume,
+          onAddOneMinute = onAddOneMinute,
+          onResetTimer = onResetTimer
+        )
+      }
+
+      if (timerState.showPresets && timerState.durationSec == 0) {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(InkBlack.copy(alpha = 0.25f))
+        )
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .background(ButterPale)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          QUICK_TIMER_PRESET_MINUTES.forEach { mins ->
+            Box(
+              modifier = Modifier
+                .clip(RoundedCornerShape(7.dp))
+                .background(SurfaceWhite)
+                .border(1.5.dp, InkBlack, RoundedCornerShape(7.dp))
+                .clickable(role = Role.Button) { onSelectPresetMinutes(mins) }
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+              Text(
+                text = stringResource(R.string.cooking_timer_preset_fmt, mins),
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 11.5.sp,
+                color = InkBlack
+              )
+            }
+          }
+          Spacer(Modifier.weight(1f))
+          Box(
+            modifier = Modifier
+              .size(26.dp)
+              .clip(RoundedCornerShape(7.dp))
+              .background(SurfaceWhite)
+              .border(1.5.dp, InkBlack, RoundedCornerShape(7.dp))
+              .clickable(role = Role.Button, onClick = onTogglePresets),
+            contentAlignment = Alignment.Center
+          ) {
+            Text(
+              text = "×",
+              fontFamily = DisplayFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 14.sp,
+              color = InkBlack
+            )
+          }
+        }
+      }
+
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(2.5.dp)
+          .background(InkBlack)
+      )
+
+      // Bottom Instruction Zone (~55% height): Large kitchen-readable copy
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .weight(0.55f)
+          .verticalScroll(rememberScrollState())
+          .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+      ) {
+        Text(
+          text = remember(step.text) { highlightStepMeasurements(step.text) },
+          fontFamily = BodyFont,
+          fontWeight = FontWeight.SemiBold,
+          fontSize = 18.sp,
+          lineHeight = 28.sp,
+          color = InkBlack
+        )
+
+        if (showSwipeHint) {
+          Text(
+            text = stringResource(R.string.cooking_swipe_hint),
+            modifier = Modifier.padding(top = 14.dp),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.Medium,
+            fontSize = 11.5.sp,
+            color = InkBlack.copy(alpha = 0.52f)
+          )
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun StepTimerControls(
+  step: AnalyzedCookingStep,
+  timerState: StepTimerState,
+  onStartDetectedTimer: (Int) -> Unit,
+  onTogglePresets: () -> Unit,
+  onTogglePauseResume: () -> Unit,
+  onAddOneMinute: () -> Unit,
+  onResetTimer: () -> Unit
+) {
+  val resetCd = stringResource(R.string.cooking_timer_reset_cd)
+  val pauseCd = stringResource(R.string.cooking_timer_pause_cd)
+
+  if (timerState.durationSec == 0) {
+    val detected = step.timer
+    val pillBg = if (detected != null) LemonWarn else SurfaceWhite
+    val pillText = if (detected != null) {
+      "⏱ ${detected.displayLabel}"
+    } else {
+      "⏱ ${stringResource(R.string.cooking_timer_idle_default)}"
+    }
+    Box(
+      modifier = Modifier
+        .clip(RoundedCornerShape(8.dp))
+        .background(pillBg)
+        .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
+        .clickable(role = Role.Button) {
+          if (detected != null) onStartDetectedTimer(detected.totalSeconds) else onTogglePresets()
+        }
+        .padding(horizontal = 9.dp, vertical = 4.dp)
+    ) {
+      Text(
+        text = pillText,
+        fontFamily = MonoFont,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 11.5.sp,
+        color = InkBlack,
+        softWrap = false,
+        maxLines = 1
+      )
+    }
+  } else {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+      val mainBg = when {
+        timerState.isFinished -> CoralUrgent
+        timerState.isRunning -> LimeFresh
+        else -> ButterSoft
+      }
+      val mainText = if (timerState.isFinished) {
+        "🔔 ${stringResource(R.string.cooking_timer_done)}"
+      } else {
+        val icon = if (timerState.isRunning) "⏸" else "▶"
+        "$icon ${CookingStepAnalyzer.formatCountdown(timerState.remainingSec)}"
+      }
+      Box(
+        modifier = Modifier
+          .clip(RoundedCornerShape(8.dp))
+          .background(mainBg)
+          .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
+          .semantics { contentDescription = pauseCd }
+          .clickable(role = Role.Button) {
+            if (timerState.isFinished) onResetTimer() else onTogglePauseResume()
+          }
+          .padding(horizontal = 8.dp, vertical = 4.dp)
+      ) {
+        Text(
+          text = mainText,
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 11.5.sp,
+          color = InkBlack,
+          softWrap = false,
+          maxLines = 1
+        )
+      }
+
+      Box(
+        modifier = Modifier
+          .clip(RoundedCornerShape(8.dp))
+          .background(SurfaceWhite)
+          .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
+          .clickable(role = Role.Button, onClick = onAddOneMinute)
+          .padding(horizontal = 6.dp, vertical = 4.dp)
+      ) {
+        Text(
+          text = stringResource(R.string.cooking_timer_add_min),
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 11.sp,
+          color = InkBlack,
+          softWrap = false,
+          maxLines = 1
+        )
+      }
+
+      Box(
+        modifier = Modifier
+          .clip(RoundedCornerShape(8.dp))
+          .background(SurfaceWhite)
+          .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
+          .semantics { contentDescription = resetCd }
+          .clickable(role = Role.Button, onClick = onResetTimer)
+          .padding(horizontal = 6.dp, vertical = 4.dp)
+      ) {
+        Text(
+          text = "↺",
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 11.5.sp,
+          color = InkBlack
+        )
+      }
+    }
   }
 }
 
@@ -11232,130 +12522,947 @@ private fun CookCompletionConfirmDialog(
   }
 }
 
-@Composable
-private fun RecipeSectionHeader(text: String) {
-  Text(
-    text = text,
-    fontFamily = DisplayFont,
-    fontWeight = FontWeight.ExtraBold,
-    fontSize = 14.sp,
-    color = InkBlack
-  )
+@DrawableRes
+private fun actionDrawableRes(action: CookingAction): Int = when (action) {
+  CookingAction.PREP_CUT -> R.drawable.ill_step_prep_cut
+  CookingAction.MARINATE_MIX -> R.drawable.ill_step_marinate_mix
+  CookingAction.PAN_SEAR_STIR -> R.drawable.ill_step_pan_sear_stir
+  CookingAction.BOIL_SIMMER -> R.drawable.ill_step_boil_simmer
+  CookingAction.STEAM -> R.drawable.ill_step_steam
+  CookingAction.BAKE_AIRFRY -> R.drawable.ill_step_bake_airfry
+  CookingAction.BLEND_CHILL -> R.drawable.ill_step_blend_chill
+  CookingAction.PLATE_SERVE -> R.drawable.ill_step_plate_serve
 }
 
 @Composable
-private fun MatchedIngredientRow(matched: MatchedIngredient) {
+private fun cookingActionTitle(action: CookingAction): String = when (action) {
+  CookingAction.PREP_CUT -> stringResource(R.string.cooking_action_prep_cut)
+  CookingAction.MARINATE_MIX -> stringResource(R.string.cooking_action_marinate_mix)
+  CookingAction.PAN_SEAR_STIR -> stringResource(R.string.cooking_action_pan_sear_stir)
+  CookingAction.BOIL_SIMMER -> stringResource(R.string.cooking_action_boil_simmer)
+  CookingAction.STEAM -> stringResource(R.string.cooking_action_steam)
+  CookingAction.BAKE_AIRFRY -> stringResource(R.string.cooking_action_bake_airfry)
+  CookingAction.BLEND_CHILL -> stringResource(R.string.cooking_action_blend_chill)
+  CookingAction.PLATE_SERVE -> stringResource(R.string.cooking_action_plate_serve)
+}
+
+@Composable
+internal fun cookingActionShortLabel(action: CookingAction): String = when (action) {
+  CookingAction.PREP_CUT -> stringResource(R.string.cooking_action_prep_cut_short)
+  CookingAction.MARINATE_MIX -> stringResource(R.string.cooking_action_marinate_mix_short)
+  CookingAction.PAN_SEAR_STIR -> stringResource(R.string.cooking_action_pan_sear_stir_short)
+  CookingAction.BOIL_SIMMER -> stringResource(R.string.cooking_action_boil_simmer_short)
+  CookingAction.STEAM -> stringResource(R.string.cooking_action_steam_short)
+  CookingAction.BAKE_AIRFRY -> stringResource(R.string.cooking_action_bake_airfry_short)
+  CookingAction.BLEND_CHILL -> stringResource(R.string.cooking_action_blend_chill_short)
+  CookingAction.PLATE_SERVE -> stringResource(R.string.cooking_action_plate_serve_short)
+}
+
+private fun cookingActionColor(action: CookingAction): Color = when (action) {
+  CookingAction.PREP_CUT -> LimeFresh.copy(alpha = 0.42f)
+  CookingAction.MARINATE_MIX -> ButterSoft
+  CookingAction.PAN_SEAR_STIR -> CoralUrgent.copy(alpha = 0.34f)
+  CookingAction.BOIL_SIMMER -> SkyPale
+  CookingAction.STEAM -> SkyInfo.copy(alpha = 0.32f)
+  CookingAction.BAKE_AIRFRY -> LemonWarn.copy(alpha = 0.55f)
+  CookingAction.BLEND_CHILL -> LilacAccent.copy(alpha = 0.32f)
+  CookingAction.PLATE_SERVE -> LimeFresh.copy(alpha = 0.52f)
+}
+```
+
+### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/RecipeDetailSheet.kt` (894 lines)
+
+```kotlin
+package com.truong.fridgezero.ui.recipes
+
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.truong.fridgezero.R
+import com.truong.fridgezero.domain.CookingStepAnalyzer
+import com.truong.fridgezero.domain.Freshness
+import com.truong.fridgezero.domain.MatchTier
+import com.truong.fridgezero.domain.MatchedIngredient
+import com.truong.fridgezero.domain.RecipeDifficulty
+import com.truong.fridgezero.domain.RecipeIngredient
+import com.truong.fridgezero.domain.RecipeRecommendation
+import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.ButterPale
+import com.truong.fridgezero.ui.theme.ButterSoft
+import com.truong.fridgezero.ui.theme.CoralUrgent
+import com.truong.fridgezero.ui.theme.DisplayFont
+import com.truong.fridgezero.ui.theme.DotGridInk
+import com.truong.fridgezero.ui.theme.InkBlack
+import com.truong.fridgezero.ui.theme.LemonWarn
+import com.truong.fridgezero.ui.theme.LimeFresh
+import com.truong.fridgezero.ui.theme.MonoFont
+import com.truong.fridgezero.ui.theme.NeoBrutalistButton
+import com.truong.fridgezero.ui.theme.NeoBrutalistCard
+import com.truong.fridgezero.ui.theme.PaperCream
+import com.truong.fridgezero.ui.theme.SkyPale
+import com.truong.fridgezero.ui.theme.StickerBadge
+import com.truong.fridgezero.ui.theme.SurfaceWhite
+import com.truong.fridgezero.ui.theme.dotGridBackground
+
+/**
+ * Full-screen Neo-Brutalist recipe preparation overview combining essential metadata,
+ * a unified Ingredients & Seasonings prep board, a compact step roadmap preview,
+ * and the primary "Bắt đầu nấu" CTA leading to [RecipeCookingScreen].
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun RecipeDetailSheet(
+  recommendation: RecipeRecommendation,
+  resumeStepIndex: Int? = null,
+  onStartCooking: () -> Unit,
+  onDismiss: () -> Unit,
+  modifier: Modifier = Modifier
+) {
+  val recipe = recommendation.recipe
+  val uriHandler = LocalUriHandler.current
+  val context = LocalContext.current
+  val openErrorText = stringResource(R.string.recipe_open_source_error)
+  val backCd = stringResource(R.string.recipe_detail_back_cd)
+  val scrollState = rememberScrollState()
+  val analyzedSteps = remember(recipe.id) { CookingStepAnalyzer.analyzeRecipe(recipe) }
+
+  LaunchedEffect(recipe.id) { scrollState.scrollTo(0) }
+
+  Column(
+    modifier = modifier
+      .fillMaxSize()
+      .dotGridBackground()
+      .statusBarsPadding()
+      .navigationBarsPadding()
+      .semantics(mergeDescendants = false) { isTraversalGroup = true }
+      .pointerInput(Unit) {}
+  ) {
+    // Top Bar on solid SurfaceWhite strip with crisp ink rule
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .background(SurfaceWhite)
+    ) {
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+      ) {
+        NeoBrutalistButton(
+          onClick = onDismiss,
+          modifier = Modifier
+            .size(44.dp)
+            .semantics { contentDescription = backCd },
+          containerColor = PaperCream,
+          cornerRadius = 12.dp,
+          borderWidth = 2.5.dp,
+          shadowOffset = 3.dp,
+          contentPadding = PaddingValues(0.dp)
+        ) {
+          Text(
+            text = stringResource(R.string.bento_back_symbol),
+            fontFamily = DisplayFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 20.sp,
+            color = InkBlack
+          )
+        }
+
+        Text(
+          text = stringResource(R.string.recipe_detail_topbar_title),
+          modifier = Modifier.weight(1f),
+          fontFamily = DisplayFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 15.sp,
+          letterSpacing = 0.4.sp,
+          color = InkBlack,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+
+        StickerBadge(
+          text = recipe.sourceName,
+          containerColor = SkyPale,
+          tiltDegrees = 0f
+        )
+      }
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(2.5.dp)
+          .background(InkBlack)
+      )
+    }
+
+    // Decluttered scrollable body: Hero Overview + 1 Unified Prep Table + Compact Roadmap
+    Column(
+      modifier = Modifier
+        .weight(1f)
+        .fillMaxWidth()
+        .verticalScroll(scrollState)
+        .padding(horizontal = 16.dp, vertical = 12.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+      // Block 1: Hero Overview (single flat card, unified 4-cell metadata bar, no nested boxes)
+      NeoBrutalistCard(
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = SurfaceWhite,
+        cornerRadius = 16.dp,
+        borderWidth = 2.5.dp,
+        shadowOffset = 4.dp
+      ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+          ) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+              Box(
+                modifier = Modifier
+                  .size(54.dp)
+                  .clip(RoundedCornerShape(12.dp))
+                  .background(ButterSoft)
+                  .border(2.dp, InkBlack, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+              ) {
+                Text(text = recipe.emoji, fontSize = 30.sp)
+              }
+              Text(
+                text = recipe.title,
+                modifier = Modifier.weight(1f),
+                fontFamily = DisplayFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp,
+                lineHeight = 25.sp,
+                color = InkBlack
+              )
+            }
+
+            Text(
+              text = recipe.summary,
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.Medium,
+              fontSize = 13.5.sp,
+              lineHeight = 19.5.sp,
+              color = InkBlack.copy(alpha = 0.86f)
+            )
+          }
+
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(2.dp)
+              .background(InkBlack)
+          )
+
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(IntrinsicSize.Min)
+          ) {
+            MetadataCell(
+              value = stringResource(R.string.recipe_meta_total_time_fmt, recipe.totalMinutes),
+              subLabel = stringResource(R.string.recipe_meta_prep_sub_fmt, recipe.prepMinutes),
+              modifier = Modifier.weight(1f),
+              containerColor = ButterPale.copy(alpha = 0.55f),
+              monoValue = true
+            )
+            MetadataDivider()
+            MetadataCell(
+              value = recipe.servingsLabel,
+              subLabel = stringResource(R.string.recipe_meta_servings_sub),
+              modifier = Modifier.weight(1.1f),
+              containerColor = SurfaceWhite,
+              monoValue = false
+            )
+            MetadataDivider()
+            MetadataCell(
+              value = stringResource(
+                if (recipe.difficulty == RecipeDifficulty.EASY) {
+                  R.string.recipe_difficulty_easy_short
+                } else {
+                  R.string.recipe_difficulty_medium_short
+                }
+              ),
+              subLabel = stringResource(R.string.recipe_meta_difficulty_sub),
+              modifier = Modifier.weight(0.85f),
+              containerColor = SurfaceWhite,
+              monoValue = false
+            )
+            MetadataDivider()
+            MetadataCell(
+              value = stringResource(
+                R.string.recipe_match_ratio_fmt,
+                recommendation.matchedCount,
+                recommendation.totalFridgeIngredients
+              ),
+              subLabel = stringResource(R.string.recipe_meta_ready_sub),
+              modifier = Modifier.weight(0.85f),
+              containerColor = if (recommendation.isReadyToCook) LimeFresh else LemonWarn,
+              monoValue = true
+            )
+          }
+        }
+      }
+
+      // Block 2: Unified Prep Board combining In-Fridge, Missing & Seasonings cleanly
+      UnifiedPrepTableCard(recommendation = recommendation)
+
+      // Block 3: Compact Cooking Roadmap Preview (tappable to launch guided mode)
+      NeoBrutalistCard(
+        modifier = Modifier
+          .fillMaxWidth()
+          .clickable(role = Role.Button, onClick = onStartCooking),
+        containerColor = SurfaceWhite,
+        cornerRadius = 16.dp,
+        borderWidth = 2.5.dp,
+        shadowOffset = 4.dp
+      ) {
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(14.dp),
+          verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+            Text(
+              text = stringResource(R.string.recipe_roadmap_title),
+              modifier = Modifier.weight(1f),
+              fontFamily = DisplayFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 13.5.sp,
+              color = InkBlack
+            )
+            Box(
+              modifier = Modifier
+                .clip(RoundedCornerShape(7.dp))
+                .background(ButterSoft)
+                .border(1.5.dp, InkBlack, RoundedCornerShape(7.dp))
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+              Text(
+                text = stringResource(
+                  R.string.recipe_roadmap_badge_fmt,
+                  recipe.steps.size,
+                  recipe.cookMinutes
+                ),
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 11.sp,
+                color = InkBlack,
+                softWrap = false,
+                maxLines = 1
+              )
+            }
+          }
+
+          FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
+            analyzedSteps.forEach { step ->
+              val shortAction = cookingActionShortLabel(step.action)
+              Box(
+                modifier = Modifier
+                  .clip(RoundedCornerShape(8.dp))
+                  .background(PaperCream.copy(alpha = 0.7f))
+                  .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
+                  .padding(horizontal = 8.dp, vertical = 4.dp)
+              ) {
+                Text(
+                  text = stringResource(
+                    R.string.recipe_roadmap_step_fmt,
+                    step.index + 1,
+                    shortAction
+                  ),
+                  fontFamily = BodyFont,
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 11.5.sp,
+                  color = InkBlack,
+                  softWrap = false,
+                  maxLines = 1
+                )
+              }
+            }
+          }
+
+          Text(
+            text = stringResource(R.string.recipe_roadmap_hint),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.Medium,
+            fontSize = 11.5.sp,
+            color = InkBlack.copy(alpha = 0.70f)
+          )
+        }
+      }
+
+      Spacer(Modifier.height(4.dp))
+    }
+
+    // Pinned Bottom Action Bar: Source Link | Start Guided Cooking Mode
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .background(SurfaceWhite)
+    ) {
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(2.5.dp)
+          .background(InkBlack)
+      )
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+      ) {
+        NeoBrutalistButton(
+          onClick = {
+            runCatching { uriHandler.openUri(recipe.sourceUrl) }
+              .onFailure {
+                Toast.makeText(context, openErrorText, Toast.LENGTH_SHORT).show()
+              }
+          },
+          modifier = Modifier.weight(0.85f),
+          containerColor = SurfaceWhite,
+          cornerRadius = 12.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 3.dp,
+          contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp)
+        ) {
+          Text(
+            text = stringResource(R.string.recipe_action_source),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 13.sp,
+            color = InkBlack,
+            softWrap = false,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+          )
+        }
+
+        val startLabel = if (resumeStepIndex != null && resumeStepIndex > 0 && recipe.steps.isNotEmpty()) {
+          stringResource(
+            R.string.recipe_action_resume_cooking_fmt,
+            (resumeStepIndex + 1).coerceAtMost(recipe.steps.size),
+            recipe.steps.size
+          )
+        } else {
+          stringResource(R.string.recipe_action_start_cooking)
+        }
+
+        NeoBrutalistButton(
+          onClick = onStartCooking,
+          modifier = Modifier.weight(1.45f),
+          containerColor = LimeFresh,
+          cornerRadius = 12.dp,
+          borderWidth = 2.5.dp,
+          shadowOffset = 4.dp,
+          contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)
+        ) {
+          Text(
+            text = startLabel,
+            fontFamily = DisplayFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 14.sp,
+            color = InkBlack,
+            softWrap = false,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+          )
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun MetadataCell(
+  value: String,
+  subLabel: String,
+  modifier: Modifier = Modifier,
+  containerColor: Color = SurfaceWhite,
+  monoValue: Boolean = false
+) {
+  Column(
+    modifier = modifier
+      .fillMaxHeight()
+      .background(containerColor)
+      .padding(horizontal = 6.dp, vertical = 9.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Center
+  ) {
+    Text(
+      text = value,
+      fontFamily = if (monoValue) MonoFont else BodyFont,
+      fontWeight = FontWeight.ExtraBold,
+      fontSize = 12.5.sp,
+      color = InkBlack,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      textAlign = TextAlign.Center
+    )
+    Spacer(Modifier.height(2.dp))
+    Text(
+      text = subLabel,
+      fontFamily = BodyFont,
+      fontWeight = FontWeight.SemiBold,
+      fontSize = 10.sp,
+      color = InkBlack.copy(alpha = 0.72f),
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      textAlign = TextAlign.Center
+    )
+  }
+}
+
+@Composable
+private fun MetadataDivider() {
+  Box(
+    modifier = Modifier
+      .fillMaxHeight()
+      .width(1.dp)
+      .background(InkBlack.copy(alpha = 0.22f))
+  )
+}
+
+/**
+ * Unified Neo-Brutalist table combining Main Ingredients (in-fridge + missing) and Measured Seasonings.
+ * Also reused inside [RecipeCookingScreen]'s quick-peek ingredients sheet.
+ */
+@Composable
+internal fun UnifiedPrepTableCard(
+  recommendation: RecipeRecommendation,
+  modifier: Modifier = Modifier
+) {
+  val recipe = recommendation.recipe
+  val sortedMatched = remember(recommendation) {
+    recommendation.matchedIngredients.sortedBy { it.item.minDaysLeft }
+  }
+  val headerColor = if (recommendation.isReadyToCook) LimeFresh else ButterSoft
+
+  NeoBrutalistCard(
+    modifier = modifier.fillMaxWidth(),
+    containerColor = SurfaceWhite,
+    cornerRadius = 16.dp,
+    borderWidth = 2.5.dp,
+    shadowOffset = 4.dp
+  ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+      // Main Header Strip
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .background(headerColor)
+          .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        Text(
+          text = stringResource(R.string.recipe_prep_board_title),
+          modifier = Modifier.weight(1f),
+          fontFamily = DisplayFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 13.5.sp,
+          color = InkBlack
+        )
+        Box(
+          modifier = Modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(InkBlack)
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+        ) {
+          Text(
+            text = stringResource(
+              R.string.recipe_prep_board_badge_fmt,
+              recommendation.matchedCount,
+              recommendation.totalFridgeIngredients
+            ),
+            fontFamily = MonoFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 11.sp,
+            color = SurfaceWhite,
+            softWrap = false,
+            maxLines = 1
+          )
+        }
+      }
+
+      TableInkDivider(thickness = 2.dp, alpha = 1f)
+
+      // Sub-header 1: Main Fridge Ingredients
+      PrepSubHeaderRow(
+        leftTitle = stringResource(R.string.recipe_prep_main_header),
+        rightTitle = stringResource(R.string.recipe_prep_amount_header),
+        backgroundColor = PaperCream.copy(alpha = 0.72f)
+      )
+      TableInkDivider(thickness = 1.dp, alpha = 0.16f)
+
+      val totalMainRows = sortedMatched.size + recommendation.missingIngredients.size
+      var rowCursor = 0
+
+      sortedMatched.forEach { matched ->
+        UnifiedMatchedRow(matched = matched)
+        rowCursor++
+        if (rowCursor < totalMainRows) {
+          TableInkDivider(thickness = 1.dp, alpha = 0.14f)
+        }
+      }
+
+      recommendation.missingIngredients.forEach { missing ->
+        UnifiedMissingRow(ingredient = missing)
+        rowCursor++
+        if (rowCursor < totalMainRows) {
+          TableInkDivider(thickness = 1.dp, alpha = 0.14f)
+        }
+      }
+
+      if (recipe.seasonings.isNotEmpty()) {
+        TableInkDivider(thickness = 1.5.dp, alpha = 1f)
+
+        // Sub-header 2: Seasonings
+        PrepSubHeaderRow(
+          leftTitle = stringResource(R.string.recipe_prep_seasonings_header),
+          rightTitle = stringResource(R.string.recipe_prep_amount_header),
+          backgroundColor = SkyPale.copy(alpha = 0.75f)
+        )
+        TableInkDivider(thickness = 1.dp, alpha = 0.16f)
+
+        recipe.seasonings.forEachIndexed { index, spec ->
+          val rowBg = if (index % 2 == 0) SurfaceWhite else ButterPale.copy(alpha = 0.42f)
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .background(rowBg)
+              .padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+          ) {
+            Text(
+              text = spec.name,
+              modifier = Modifier.weight(1f),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.Bold,
+              fontSize = 13.sp,
+              color = InkBlack
+            )
+            Text(
+              text = spec.amount,
+              fontFamily = MonoFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 12.sp,
+              color = InkBlack,
+              textAlign = TextAlign.End
+            )
+          }
+          if (index < recipe.seasonings.lastIndex) {
+            TableInkDivider(thickness = 1.dp, alpha = 0.14f)
+          }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun PrepSubHeaderRow(
+  leftTitle: String,
+  rightTitle: String,
+  backgroundColor: Color
+) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .background(backgroundColor)
+      .padding(horizontal = 14.dp, vertical = 6.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.SpaceBetween
+  ) {
+    Text(
+      text = leftTitle,
+      fontFamily = MonoFont,
+      fontWeight = FontWeight.ExtraBold,
+      fontSize = 10.5.sp,
+      letterSpacing = 0.3.sp,
+      color = InkBlack.copy(alpha = 0.78f)
+    )
+    Text(
+      text = rightTitle,
+      fontFamily = MonoFont,
+      fontWeight = FontWeight.ExtraBold,
+      fontSize = 10.5.sp,
+      letterSpacing = 0.3.sp,
+      color = InkBlack.copy(alpha = 0.78f)
+    )
+  }
+}
+
+@Composable
+private fun UnifiedMatchedRow(matched: MatchedIngredient) {
   val freshness = matched.item.freshness
-  val rowColor: Color = when (freshness) {
-    Freshness.BAD -> CoralUrgent
-    Freshness.SOON -> LemonWarn
+  val stripColor = freshness.color()
+  val isUrgent = matched.item.minDaysLeft <= 1
+  val urgentBg = when (freshness) {
+    Freshness.BAD -> CoralUrgent.copy(alpha = 0.14f)
+    Freshness.SOON -> LemonWarn.copy(alpha = 0.14f)
     Freshness.OK -> SurfaceWhite
   }
-  val expiryBadgeColor = freshness.color()
   val expiryLabel = when {
     matched.item.minDaysLeft < 0 ->
       stringResource(R.string.urgent_badge_overdue_fmt, -matched.item.minDaysLeft)
     matched.item.minDaysLeft == 0 -> stringResource(R.string.urgent_badge_today)
     else -> stringResource(R.string.urgent_badge_days_fmt, matched.item.minDaysLeft)
   }
+  val matchNote = if (matched.tier == MatchTier.GROUP_FALLBACK) {
+    stringResource(R.string.recipe_substitute_fmt, matched.item.name)
+  } else {
+    stringResource(R.string.recipe_exact_match_fmt, matched.item.name, matched.item.quantity)
+  }
 
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(10.dp))
-      .background(rowColor)
-      .border(2.dp, InkBlack, RoundedCornerShape(10.dp))
-      .padding(horizontal = 10.dp, vertical = 8.dp),
+      .background(urgentBg)
+      .drawBehind {
+        drawRect(
+          color = stripColor,
+          topLeft = Offset.Zero,
+          size = Size(4.5.dp.toPx(), size.height)
+        )
+      }
+      .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(10.dp)
   ) {
-    Box(
-      modifier = Modifier
-        .size(34.dp)
-        .clip(RoundedCornerShape(8.dp))
-        .background(PaperCream)
-        .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp)),
-      contentAlignment = Alignment.Center
-    ) {
-      Text(text = ingredientGlyph(matched.ingredient), fontSize = 18.sp)
-    }
+    Text(text = ingredientGlyph(matched.ingredient), fontSize = 20.sp)
+
     Column(
       modifier = Modifier.weight(1f),
       verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
       Text(
-        text = "${matched.ingredient.name} · ${matched.ingredient.amountText}",
+        text = matched.ingredient.name,
         fontFamily = BodyFont,
         fontWeight = FontWeight.ExtraBold,
-        fontSize = 13.sp,
+        fontSize = 13.5.sp,
         color = InkBlack,
-        maxLines = 1,
+        maxLines = 2,
         overflow = TextOverflow.Ellipsis
       )
-      val subtitle = if (matched.tier == MatchTier.GROUP_FALLBACK) {
-        stringResource(R.string.recipe_substitute_fmt, matched.item.name)
-      } else {
-        stringResource(R.string.recipe_exact_match_fmt, matched.item.name, matched.item.quantity)
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+      ) {
+        Text(
+          text = if (isUrgent) matchNote else "$matchNote · $expiryLabel",
+          modifier = Modifier.weight(1f, fill = false),
+          fontFamily = BodyFont,
+          fontWeight = FontWeight.Medium,
+          fontSize = 11.5.sp,
+          color = InkBlack.copy(alpha = 0.72f),
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+        if (isUrgent) {
+          Box(
+            modifier = Modifier
+              .clip(RoundedCornerShape(5.dp))
+              .background(stripColor)
+              .border(1.dp, InkBlack, RoundedCornerShape(5.dp))
+              .padding(horizontal = 5.dp, vertical = 1.dp)
+          ) {
+            Text(
+              text = expiryLabel,
+              fontFamily = MonoFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 10.sp,
+              color = InkBlack,
+              softWrap = false,
+              maxLines = 1
+            )
+          }
+        }
       }
-      Text(
-        text = subtitle,
-        fontFamily = BodyFont,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 11.sp,
-        color = InkBlack.copy(alpha = 0.78f),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-      )
     }
-    StickerBadge(
-      text = expiryLabel,
-      containerColor = expiryBadgeColor,
-      tiltDegrees = 0f,
-      mono = true
+
+    Text(
+      text = matched.ingredient.amountText,
+      fontFamily = MonoFont,
+      fontWeight = FontWeight.ExtraBold,
+      fontSize = 12.5.sp,
+      color = InkBlack,
+      textAlign = TextAlign.End
     )
   }
 }
 
 @Composable
-private fun MissingIngredientRow(ingredient: RecipeIngredient) {
+private fun UnifiedMissingRow(ingredient: RecipeIngredient) {
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(10.dp))
       .background(SurfaceWhite)
-      .border(2.dp, InkBlack, RoundedCornerShape(10.dp))
-      .padding(horizontal = 10.dp, vertical = 8.dp),
+      .drawBehind {
+        drawRect(
+          color = DotGridInk,
+          topLeft = Offset.Zero,
+          size = Size(4.5.dp.toPx(), size.height)
+        )
+      }
+      .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(10.dp)
   ) {
-    Box(
-      modifier = Modifier
-        .size(34.dp)
-        .clip(RoundedCornerShape(8.dp))
-        .background(PaperCream)
-        .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp)),
-      contentAlignment = Alignment.Center
-    ) {
-      Text(text = ingredientGlyph(ingredient), fontSize = 18.sp)
-    }
-    Text(
-      text = ingredient.name,
+    Text(text = ingredientGlyph(ingredient), fontSize = 20.sp)
+
+    Column(
       modifier = Modifier.weight(1f),
-      fontFamily = BodyFont,
-      fontWeight = FontWeight.Bold,
-      fontSize = 13.sp,
-      color = InkBlack,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis
-    )
+      verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+      Text(
+        text = ingredient.name,
+        fontFamily = BodyFont,
+        fontWeight = FontWeight.Bold,
+        fontSize = 13.5.sp,
+        color = InkBlack,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis
+      )
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+      ) {
+        Text(
+          text = stringResource(R.string.recipe_prep_missing_status),
+          fontFamily = BodyFont,
+          fontWeight = FontWeight.Medium,
+          fontSize = 11.5.sp,
+          color = InkBlack.copy(alpha = 0.65f),
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+        Box(
+          modifier = Modifier
+            .clip(RoundedCornerShape(5.dp))
+            .background(LemonWarn.copy(alpha = 0.72f))
+            .border(1.dp, InkBlack, RoundedCornerShape(5.dp))
+            .padding(horizontal = 5.dp, vertical = 1.dp)
+        ) {
+          Text(
+            text = stringResource(R.string.recipe_prep_missing_tag),
+            fontFamily = MonoFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 10.sp,
+            color = InkBlack,
+            softWrap = false,
+            maxLines = 1
+          )
+        }
+      }
+    }
+
     Text(
       text = ingredient.amountText,
       fontFamily = MonoFont,
-      fontWeight = FontWeight.Bold,
-      fontSize = 12.sp,
-      color = InkBlack.copy(alpha = 0.75f),
-      softWrap = false,
-      maxLines = 1
+      fontWeight = FontWeight.ExtraBold,
+      fontSize = 12.5.sp,
+      color = InkBlack,
+      textAlign = TextAlign.End
+    )
+  }
+}
+
+@Composable
+private fun TableInkDivider(
+  thickness: androidx.compose.ui.unit.Dp,
+  alpha: Float
+) {
+  Box(
+    modifier = Modifier
+      .fillMaxWidth()
+      .height(thickness)
+      .background(InkBlack.copy(alpha = alpha))
+  )
+}
+
+private val STEP_HIGHLIGHT_REGEX = Regex(
+  """\d+(?:[.,–-]\d+)?\s*(?:phút|giây|tiếng|giờ|°C|kg|g|ml|l|muỗng\s+(?:canh|cà\s+phê)|tép|quả|trái|củ|miếng)\b""",
+  RegexOption.IGNORE_CASE
+)
+
+internal fun highlightStepMeasurements(text: String): AnnotatedString = buildAnnotatedString {
+  append(text)
+  STEP_HIGHLIGHT_REGEX.findAll(text).forEach { match ->
+    addStyle(
+      style = SpanStyle(
+        fontWeight = FontWeight.ExtraBold,
+        background = ButterSoft
+      ),
+      start = match.range.first,
+      end = match.range.last + 1
     )
   }
 }
@@ -12075,7 +14182,7 @@ class FridgeViewModel(
 }
 ```
 
-### `app/src/test/kotlin/com/truong/fridgezero/domain/LodAndFreshnessTest.kt` (703 lines)
+### `app/src/test/kotlin/com/truong/fridgezero/domain/LodAndFreshnessTest.kt` (790 lines)
 
 ```kotlin
 package com.truong.fridgezero.domain
@@ -12098,6 +14205,7 @@ import com.truong.fridgezero.ui.theme.PaperCream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -12234,8 +14342,8 @@ class LodAndFreshnessTest {
   @Test
   fun culinaryCatalogCoversAll32IconKeysAndMeetsRecipeMetadataSpec() {
     val recipes = CulinaryGuideRepository.recipes
-    assertEquals(32, recipes.size)
-    assertEquals(32, recipes.map { it.id }.toSet().size)
+    assertEquals(48, recipes.size)
+    assertEquals(48, recipes.map { it.id }.toSet().size)
 
     val bannedArtificialIds = setOf(
       "salad_ca_hoi_dua_muoi",
@@ -12269,10 +14377,9 @@ class LodAndFreshnessTest {
         "${recipe.id} sourceUrl must target a dish-specific path or query",
         hostAndPath.contains('?') || hostAndPath.trimEnd('/').contains('/')
       )
-      assertEquals(
-        "${recipe.id} QUICK_15 tag must align with cookMinutes <= 15",
-        recipe.cookMinutes <= 15,
-        CulinaryFilter.QUICK_15 in recipe.categories
+      assertTrue(
+        "${recipe.id} must belong to at least one dish category",
+        recipe.categories.any { it != CulinaryFilter.ALL }
       )
       assertEquals(
         "${recipe.id} difficulty should default from cookMinutes",
@@ -12286,14 +14393,9 @@ class LodAndFreshnessTest {
     }
 
     val seedDisplay = Seed.foodItems(20_000L).toDisplay(20_000L)
-    val readyNow = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.READY_NOW)
-    assertTrue("Expected at least 8 seed-ready recipes, found ${readyNow.size}", readyNow.size >= 8)
-
-    val rescueUrgent = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.RESCUE_URGENT)
-    assertTrue(rescueUrgent.isNotEmpty())
-    assertTrue(rescueUrgent.all { it.hasUrgentMatch })
-
     val allFeed = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ALL)
+    assertTrue("Expected at least 8 seed-ready recipes", allFeed.count { it.isReadyToCook } >= 8)
+    assertTrue(allFeed.any { it.hasUrgentMatch })
     val topOverall = allFeed.first()
     assertTrue(topOverall.isReadyToCook)
     assertTrue(topOverall.hasUrgentMatch)
@@ -12320,7 +14422,7 @@ class LodAndFreshnessTest {
       prepMinutes = 8,
       cookMinutes = 15,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(
         RecipeIngredient("Thịt gà", listOf("chicken"), listOf("thịt gà", "gà"), FoodGroup.THIT, "200g"),
         RecipeIngredient("Ớt chuông", listOf("bell_pepper"), listOf("ớt chuông"), FoodGroup.RAU, "1 quả"),
@@ -12366,7 +14468,7 @@ class LodAndFreshnessTest {
       prepMinutes = 5,
       cookMinutes = 10,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(
         RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "1 củ"),
         RecipeIngredient("Xà lách", listOf("lettuce"), listOf("xà lách"), FoodGroup.RAU, "1 bó")
@@ -12427,7 +14529,7 @@ class LodAndFreshnessTest {
     )
 
     val twoUrgentReady = makeRecipe(
-      "two_urgent_ready", 12, setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      "two_urgent_ready", 12, setOf(CulinaryFilter.VIET_HOME),
       "salmon" to FoodGroup.CA_HAI_SAN, "lettuce" to FoodGroup.RAU
     ) // 15 + 15 + 8 = 38
     val twoFreshReady = makeRecipe(
@@ -12435,7 +14537,7 @@ class LodAndFreshnessTest {
       "milk" to FoodGroup.SUA_TRUNG, "carrot" to FoodGroup.RAU
     ) // 6 + 6 + 8 = 20
     val oneUrgentOneMissing = makeRecipe(
-      "one_urgent_missing", 15, setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      "one_urgent_missing", 15, setOf(CulinaryFilter.EAT_CLEAN),
       "chicken" to FoodGroup.THIT, "dumpling" to FoodGroup.AN_SAN
     ) // 15 - 3 = 12
     val twoMissing = makeRecipe(
@@ -12456,9 +14558,6 @@ class LodAndFreshnessTest {
     assertEquals(listOf("two_urgent_ready", "two_fresh_ready", "one_urgent_missing", "two_missing"), all.map { it.recipe.id })
     assertEquals(listOf(38, 20, 12, -6), all.map { it.score })
 
-    assertEquals(listOf("two_urgent_ready", "two_fresh_ready"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.READY_NOW, subset).map { it.recipe.id })
-    assertEquals(listOf("two_urgent_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.RESCUE_URGENT, subset).map { it.recipe.id })
-    assertEquals(listOf("two_urgent_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.QUICK_15, subset).map { it.recipe.id })
     assertEquals(listOf("two_urgent_ready", "two_fresh_ready", "two_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.VIET_HOME, subset).map { it.recipe.id })
     assertEquals(listOf("two_fresh_ready", "one_urgent_missing"), CulinaryGuideEngine.recommend(fridge, CulinaryFilter.EAT_CLEAN, subset).map { it.recipe.id })
   }
@@ -12474,7 +14573,7 @@ class LodAndFreshnessTest {
         prepMinutes = 5,
         cookMinutes = 10,
         servingsLabel = "2 người ăn",
-        categories = setOf(CulinaryFilter.QUICK_15),
+        categories = setOf(CulinaryFilter.EAT_CLEAN),
         fridgeIngredients = buildList {
           add(RecipeIngredient(primaryKey, listOf(primaryKey), listOf(primaryKey), primaryGroup, "200g"))
           if (secondaryKey != null) {
@@ -12514,9 +14613,12 @@ class LodAndFreshnessTest {
     assertEquals(listOf("salmon_1", "salmon_2", "chicken_1", "egg_1", "meat_1", "shrimp_1"), top6Ids)
     assertEquals(listOf("salmon_3", "salmon_4"), allFeed.drop(6).map { it.recipe.id })
 
-    // Category filters keep pure score ranking without cross-feed diversity deferrals.
-    val urgentOnly = CulinaryGuideEngine.recommend(fridge, CulinaryFilter.RESCUE_URGENT, subset)
-    assertEquals(listOf("salmon_1", "salmon_2", "salmon_3", "salmon_4"), urgentOnly.map { it.recipe.id })
+    // Dish category filters keep pure score ranking without cross-feed diversity deferrals.
+    val eatCleanOnly = CulinaryGuideEngine.recommend(fridge, CulinaryFilter.EAT_CLEAN, subset)
+    assertEquals(
+      listOf("salmon_1", "salmon_2", "salmon_3", "salmon_4", "chicken_1", "egg_1", "meat_1", "shrimp_1"),
+      eatCleanOnly.map { it.recipe.id }
+    )
   }
 
   @Test
@@ -12529,7 +14631,7 @@ class LodAndFreshnessTest {
       prepMinutes = 5,
       cookMinutes = 10,
       servingsLabel = "2 người ăn",
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      categories = setOf(CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(
         RecipeIngredient("Trứng gà", listOf("egg"), listOf("trứng"), FoodGroup.SUA_TRUNG, "3 quả")
       ),
@@ -12778,6 +14880,98 @@ class LodAndFreshnessTest {
 
     assertEquals(0, deductions[301L]?.remainingQuantity)
     assertEquals(3, deductions[302L]?.remainingQuantity)
+  }
+
+  @Test
+  fun culinaryCatalogIncludesExpandedStylesAndSupportsKeywordSearch() {
+    val seedDisplay = Seed.foodItems(20_000L).toDisplay(20_000L)
+
+    assertTrue(CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ASIAN_FUSION).size >= 6)
+    assertTrue(CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.WESTERN).size >= 8)
+    assertTrue(CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.VEGETARIAN).size >= 8)
+    assertTrue(CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.BREAKFAST_DRINK).size >= 8)
+
+    // Accent-insensitive keyword search across dish title and ingredients
+    val salmonResults = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ALL, query = "ca hoi")
+    assertTrue(salmonResults.isNotEmpty())
+    assertTrue(salmonResults.all {
+      it.recipe.title.contains("cá hồi", ignoreCase = true) ||
+        it.recipe.summary.contains("cá hồi", ignoreCase = true)
+    })
+
+    // Combined category + keyword search
+    val japaneseEgg = CulinaryGuideEngine.recommend(
+      fridgeItems = seedDisplay,
+      filter = CulinaryFilter.ASIAN_FUSION,
+      query = "tamagoyaki"
+    )
+    assertEquals(listOf("trung_cuon_nhat_tamagoyaki"), japaneseEgg.map { it.recipe.id })
+  }
+
+  @Test
+  fun cookingStepAnalyzerCoversAllRecipesTimersAndMentionedIngredients() {
+    val allRecipes = CulinaryGuideRepository.recipes
+    assertEquals(48, allRecipes.size)
+
+    val analyzedAll = allRecipes.flatMap { CookingStepAnalyzer.analyzeRecipe(it) }
+    assertEquals(240, analyzedAll.size)
+
+    val coveredActions = analyzedAll.map { it.action }.toSet()
+    assertEquals(CookingAction.entries.toSet(), coveredActions)
+
+    val firstTimer = CookingStepAnalyzer.extractTimer("Áp chảo 4 phút cho vàng giòn.")
+    assertEquals(240, firstTimer?.totalSeconds)
+    assertEquals("4 phút", firstTimer?.displayLabel)
+
+    val rangeTimer = CookingStepAnalyzer.extractTimer("Đảo đều khoảng 3–4 phút trên lửa vừa.")
+    assertEquals(240, rangeTimer?.totalSeconds)
+    assertEquals("4 phút", rangeTimer?.displayLabel)
+
+    val decimalTimer = CookingStepAnalyzer.extractTimer("Hấp cách thủy 2,5 phút nữa.")
+    assertEquals(150, decimalTimer?.totalSeconds)
+    assertEquals("2,5 phút", decimalTimer?.displayLabel)
+
+    val secondTimer = CookingStepAnalyzer.extractTimer("Chần nhanh 30 giây rồi vớt ra.")
+    assertEquals(30, secondTimer?.totalSeconds)
+    assertEquals("30 giây", secondTimer?.displayLabel)
+
+    val hourTimer = CookingStepAnalyzer.extractTimer("Ủ lạnh ngăn mát 1 giờ trước khi dùng.")
+    assertEquals(3600, hourTimer?.totalSeconds)
+    assertEquals("1 giờ", hourTimer?.displayLabel)
+
+    assertNull(CookingStepAnalyzer.extractTimer("Rắc tiêu xay và thưởng thức ngay."))
+
+    assertEquals("00:00", CookingStepAnalyzer.formatCountdown(0))
+    assertEquals("00:00", CookingStepAnalyzer.formatCountdown(-5))
+    assertEquals("02:30", CookingStepAnalyzer.formatCountdown(150))
+    assertEquals("1:01:05", CookingStepAnalyzer.formatCountdown(3665))
+
+    val sampleRecipe = CulinaryRecipe(
+      id = "step_mention_test",
+      title = "Bò áp chảo bơ tỏi",
+      emoji = "🥩",
+      summary = "Test",
+      prepMinutes = 5,
+      cookMinutes = 10,
+      categories = setOf(CulinaryFilter.WESTERN),
+      fridgeIngredients = listOf(
+        RecipeIngredient("Thịt thăn bò", listOf("meat"), listOf("thịt bò", "bò"), FoodGroup.THIT, "200g"),
+        RecipeIngredient("Bơ lạt", listOf("butter"), listOf("bơ lạt", "bơ"), FoodGroup.SUA_TRUNG, "15g"),
+        RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "50g")
+      ),
+      seasonings = listOf(SeasoningSpec("Muối", "1/2 muỗng cà phê")),
+      steps = listOf(
+        "Thấm khô thịt bò và cắt cà rốt lát mỏng.",
+        "Đun chảy bo lat trên chảo nóng rồi áp chảo thit bo."
+      ),
+      sourceName = "Savoury Days",
+      sourceUrl = "https://www.savourydays.com/"
+    )
+    val mentionedStep1 = CookingStepAnalyzer.extractMentionedIngredients(sampleRecipe.steps[0], sampleRecipe)
+    assertEquals(listOf("Thịt thăn bò", "Cà rốt"), mentionedStep1.map { it.name })
+
+    val mentionedStep2 = CookingStepAnalyzer.extractMentionedIngredients(sampleRecipe.steps[1], sampleRecipe)
+    assertEquals(listOf("Bơ lạt", "Thịt thăn bò"), mentionedStep2.map { it.name })
   }
 }
 ```
