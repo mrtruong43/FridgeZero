@@ -5,6 +5,10 @@ import com.truong.fridgezero.data.FoodItemEntity
 import com.truong.fridgezero.data.FridgeEntity
 import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodGroup
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
+private val DD_MM_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
 
 data class NRect(val x: Float, val y: Float, val w: Float, val h: Float) {
   val cx: Float get() = x + w / 2f
@@ -21,9 +25,21 @@ data class DisplayItem(
   val quantity: Int,
   val unit: String? = null,
   val minDaysLeft: Int,
-  val isOpened: Boolean = false
+  val isOpened: Boolean = false,
+  val earliestExpiryEpochDay: Long = 0L,
+  val earliestAddedEpochDay: Long = 0L
 ) {
   val freshness: Freshness get() = freshnessOf(minDaysLeft)
+}
+
+fun DisplayItem.formattedExpiryDate(todayEpochDay: Long = LocalDate.now().toEpochDay()): String {
+  val epochDay = if (earliestExpiryEpochDay > 0L) earliestExpiryEpochDay else todayEpochDay + minDaysLeft.toLong()
+  return LocalDate.ofEpochDay(epochDay).format(DD_MM_FORMATTER)
+}
+
+fun DisplayItem.daysSinceAdded(todayEpochDay: Long = LocalDate.now().toEpochDay()): Int {
+  if (earliestAddedEpochDay <= 0L) return 0
+  return (todayEpochDay - earliestAddedEpochDay).toInt().coerceAtLeast(0)
 }
 
 fun List<FoodItemEntity>.toDisplay(todayEpochDay: Long): List<DisplayItem> =
@@ -41,7 +57,9 @@ fun List<FoodItemEntity>.toDisplay(todayEpochDay: Long): List<DisplayItem> =
         quantity = xs.sumOf { it.quantity },
         unit = earliest.unit,
         minDaysLeft = xs.minOf { (it.expiresAtEpochDay - todayEpochDay).toInt() },
-        isOpened = xs.any { it.isOpened }
+        isOpened = xs.any { it.isOpened },
+        earliestExpiryEpochDay = earliest.expiresAtEpochDay,
+        earliestAddedEpochDay = xs.minOf { it.addedAtEpochDay }
       )
     }
     .sortedWith(compareBy({ it.freshness.ordinal * -1 }, { it.minDaysLeft }))

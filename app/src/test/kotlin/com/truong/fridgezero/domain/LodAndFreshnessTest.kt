@@ -44,7 +44,7 @@ class LodAndFreshnessTest {
 
   @Test
   fun toDisplayAggregatesDuplicatesTracksAllIdsAndSortsByExpiry() {
-    val today = 20_000L
+    val today = java.time.LocalDate.of(2026, 11, 20).toEpochDay()
     val items = listOf(
       FoodItemEntity(
         id = 1L,
@@ -53,7 +53,7 @@ class LodAndFreshnessTest {
         iconKey = "milk",
         group = "SUA_TRUNG",
         quantity = 1,
-        addedAtEpochDay = today,
+        addedAtEpochDay = today - 3,
         expiresAtEpochDay = today + 5
       ),
       FoodItemEntity(
@@ -63,7 +63,7 @@ class LodAndFreshnessTest {
         iconKey = "milk",
         group = "SUA_TRUNG",
         quantity = 2,
-        addedAtEpochDay = today,
+        addedAtEpochDay = today - 1,
         expiresAtEpochDay = today + 2
       ),
       FoodItemEntity(
@@ -82,11 +82,19 @@ class LodAndFreshnessTest {
     assertEquals("Thịt gà", display[0].name)
     assertEquals(1, display[0].minDaysLeft)
     assertEquals(listOf(3L), display[0].itemIds)
+    assertEquals(today + 1, display[0].earliestExpiryEpochDay)
+    assertEquals(today, display[0].earliestAddedEpochDay)
+    assertEquals("21/11", display[0].formattedExpiryDate(today))
+    assertEquals(0, display[0].daysSinceAdded(today))
 
     assertEquals(2L, display[1].primaryId)
     assertEquals(listOf(1L, 2L), display[1].itemIds)
     assertEquals(3, display[1].quantity)
     assertEquals(2, display[1].minDaysLeft)
+    assertEquals(today + 2, display[1].earliestExpiryEpochDay)
+    assertEquals(today - 3, display[1].earliestAddedEpochDay)
+    assertEquals("22/11", display[1].formattedExpiryDate(today))
+    assertEquals(3, display[1].daysSinceAdded(today))
   }
 
   @Test
@@ -146,8 +154,15 @@ class LodAndFreshnessTest {
   @Test
   fun culinaryCatalogCoversAll32IconKeysAndMeetsRecipeMetadataSpec() {
     val recipes = CulinaryGuideRepository.recipes
-    assertEquals(36, recipes.size)
-    assertEquals(36, recipes.map { it.id }.toSet().size)
+    assertEquals(32, recipes.size)
+    assertEquals(32, recipes.map { it.id }.toSet().size)
+
+    val bannedArtificialIds = setOf(
+      "salad_ca_hoi_dua_muoi",
+      "banh_bao_chien_sot_ca_dua_muoi",
+      "kem_sua_chua_cam_tuoi"
+    )
+    assertTrue(recipes.none { it.id in bannedArtificialIds })
 
     val coveredKeys = recipes
       .flatMap { it.fridgeIngredients }
@@ -157,11 +172,23 @@ class LodAndFreshnessTest {
     assertTrue("Missing icon keys: ${allIconKeys - coveredKeys}", coveredKeys.containsAll(allIconKeys))
 
     recipes.forEach { recipe ->
+      assertTrue("${recipe.id} must have prepMinutes > 0", recipe.prepMinutes > 0)
+      assertTrue("${recipe.id} must have cookMinutes > 0", recipe.cookMinutes > 0)
+      assertTrue("${recipe.id} must declare servingsLabel", recipe.servingsLabel.isNotBlank())
       assertTrue("${recipe.id} must have 1..4 fridge ingredients", recipe.fridgeIngredients.size in 1..4)
-      assertTrue("${recipe.id} must declare pantry staples", recipe.pantryStaples.isNotEmpty())
-      assertTrue("${recipe.id} must have 4..5 steps", recipe.steps.size in 4..5)
+      assertTrue("${recipe.id} must declare measured seasonings", recipe.seasonings.isNotEmpty())
+      recipe.seasonings.forEach { spec ->
+        assertTrue("${recipe.id} seasoning name blank", spec.name.isNotBlank())
+        assertTrue("${recipe.id} seasoning amount blank", spec.amount.isNotBlank())
+      }
+      assertTrue("${recipe.id} must have 5..6 steps", recipe.steps.size in 5..6)
       assertTrue("${recipe.id} must cite sourceName", recipe.sourceName.isNotBlank())
       assertTrue("${recipe.id} must cite https sourceUrl", recipe.sourceUrl.startsWith("https://"))
+      val hostAndPath = recipe.sourceUrl.removePrefix("https://")
+      assertTrue(
+        "${recipe.id} sourceUrl must target a dish-specific path or query",
+        hostAndPath.contains('?') || hostAndPath.trimEnd('/').contains('/')
+      )
       assertEquals(
         "${recipe.id} QUICK_15 tag must align with cookMinutes <= 15",
         recipe.cookMinutes <= 15,
@@ -180,16 +207,27 @@ class LodAndFreshnessTest {
 
     val seedDisplay = Seed.foodItems(20_000L).toDisplay(20_000L)
     val readyNow = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.READY_NOW)
-    assertTrue("Expected at least 10 seed-ready recipes, found ${readyNow.size}", readyNow.size >= 10)
+    assertTrue("Expected at least 8 seed-ready recipes, found ${readyNow.size}", readyNow.size >= 8)
 
     val rescueUrgent = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.RESCUE_URGENT)
     assertTrue(rescueUrgent.isNotEmpty())
     assertTrue(rescueUrgent.all { it.hasUrgentMatch })
 
-    val topOverall = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ALL).first()
+    val allFeed = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ALL)
+    val topOverall = allFeed.first()
     assertTrue(topOverall.isReadyToCook)
     assertTrue(topOverall.hasUrgentMatch)
     assertTrue(topOverall.matchedIngredients.all { it.tier == MatchTier.EXACT_ICON })
+
+    val topSixCounts = allFeed
+      .take(CulinaryGuideEngine.DEFAULT_FEED_DIVERSITY_WINDOW)
+      .mapNotNull { it.recipe.fridgeIngredients.firstOrNull()?.iconKeys?.firstOrNull() }
+      .groupingBy { it }
+      .eachCount()
+    assertTrue(
+      "Top 6 ALL feed exceeded diversity cap: $topSixCounts",
+      topSixCounts.values.all { it <= CulinaryGuideEngine.DEFAULT_FEED_MAX_PER_PRIMARY_KEY }
+    )
   }
 
   @Test
@@ -199,7 +237,9 @@ class LodAndFreshnessTest {
       title = "Test 3-layer recipe",
       emoji = "🍳",
       summary = "Test",
+      prepMinutes = 8,
       cookMinutes = 15,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15),
       fridgeIngredients = listOf(
         RecipeIngredient("Thịt gà", listOf("chicken"), listOf("thịt gà", "gà"), FoodGroup.THIT, "200g"),
@@ -207,10 +247,10 @@ class LodAndFreshnessTest {
         RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "1 củ"),
         RecipeIngredient("Bơ", listOf("butter"), listOf("bơ"), FoodGroup.SUA_TRUNG, "10g")
       ),
-      pantryStaples = listOf("Muối"),
-      steps = listOf("B1", "B2", "B3", "B4"),
+      seasonings = listOf(SeasoningSpec("Muối", "1/2 muỗng cà phê")),
+      steps = listOf("B1", "B2", "B3", "B4", "B5"),
       sourceName = "VnExpress Ẩm Thực",
-      sourceUrl = "https://vnexpress.net/doi-song/cooking"
+      sourceUrl = "https://timkiem.vnexpress.net/?q=ga+xao"
     )
     val fridge = listOf(
       DisplayItem(10L, listOf(10L), "fresh", "Ức gà tươi", "chicken", FoodGroup.THIT, 1, minDaysLeft = 5),
@@ -243,16 +283,18 @@ class LodAndFreshnessTest {
       title = "Anti steal",
       emoji = "🥗",
       summary = "Test",
+      prepMinutes = 5,
       cookMinutes = 10,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15),
       fridgeIngredients = listOf(
         RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "1 củ"),
         RecipeIngredient("Xà lách", listOf("lettuce"), listOf("xà lách"), FoodGroup.RAU, "1 bó")
       ),
-      pantryStaples = listOf("Muối"),
-      steps = listOf("B1", "B2", "B3", "B4"),
+      seasonings = listOf(SeasoningSpec("Muối", "1/2 muỗng cà phê")),
+      steps = listOf("B1", "B2", "B3", "B4", "B5"),
       sourceName = "Cooky",
-      sourceUrl = "https://www.cooky.vn/cach-lam"
+      sourceUrl = "https://www.cooky.vn/tim-kiem?q=salad"
     )
     val antiStealEval = CulinaryGuideEngine.evaluate(
       antiStealRecipe,
@@ -291,15 +333,17 @@ class LodAndFreshnessTest {
       title = id,
       emoji = "🍽️",
       summary = id,
+      prepMinutes = 8,
       cookMinutes = cookMinutes,
+      servingsLabel = "2 người ăn",
       categories = categories,
       fridgeIngredients = keys.map { (k, g) ->
         RecipeIngredient(k, listOf(k), listOf(k), g, "1 phần")
       },
-      pantryStaples = listOf("Muối"),
-      steps = listOf("B1", "B2", "B3", "B4"),
+      seasonings = listOf(SeasoningSpec("Muối", "1/2 muỗng cà phê")),
+      steps = listOf("B1", "B2", "B3", "B4", "B5"),
       sourceName = "Savoury Days",
-      sourceUrl = "https://www.savourydays.com/"
+      sourceUrl = "https://www.savourydays.com/?s=$id"
     )
 
     val twoUrgentReady = makeRecipe(
@@ -340,21 +384,85 @@ class LodAndFreshnessTest {
   }
 
   @Test
+  fun culinaryEngineDiversityCapLimitsPrimaryIngredientInTopSix() {
+    fun makeDish(id: String, primaryKey: String, primaryGroup: FoodGroup, secondaryKey: String? = null) =
+      CulinaryRecipe(
+        id = id,
+        title = id,
+        emoji = "🍽️",
+        summary = id,
+        prepMinutes = 5,
+        cookMinutes = 10,
+        servingsLabel = "2 người ăn",
+        categories = setOf(CulinaryFilter.QUICK_15),
+        fridgeIngredients = buildList {
+          add(RecipeIngredient(primaryKey, listOf(primaryKey), listOf(primaryKey), primaryGroup, "200g"))
+          if (secondaryKey != null) {
+            add(RecipeIngredient(secondaryKey, listOf(secondaryKey), listOf(secondaryKey), FoodGroup.RAU, "100g"))
+          }
+        },
+        seasonings = listOf(SeasoningSpec("Muối", "1/2 muỗng cà phê")),
+        steps = listOf("B1", "B2", "B3", "B4", "B5"),
+        sourceName = "Cooky",
+        sourceUrl = "https://www.cooky.vn/tim-kiem?q=$id"
+      )
+
+    val subset = listOf(
+      makeDish("salmon_1", "salmon", FoodGroup.CA_HAI_SAN, "lettuce"), // 15+6+8=29
+      makeDish("salmon_2", "salmon", FoodGroup.CA_HAI_SAN, "lettuce"), // 29
+      makeDish("salmon_3", "salmon", FoodGroup.CA_HAI_SAN, "lettuce"), // 29 (deferred past top 6)
+      makeDish("salmon_4", "salmon", FoodGroup.CA_HAI_SAN, "lettuce"), // 29 (deferred past top 6)
+      makeDish("chicken_1", "chicken", FoodGroup.THIT),                 // 6+8=14
+      makeDish("shrimp_1", "shrimp", FoodGroup.CA_HAI_SAN),            // 14
+      makeDish("egg_1", "egg", FoodGroup.SUA_TRUNG),                   // 14
+      makeDish("meat_1", "meat", FoodGroup.THIT)                       // 14
+    )
+    val fridge = listOf(
+      DisplayItem(1L, listOf(1L), "freezer", "Cá hồi", "salmon", FoodGroup.CA_HAI_SAN, 1, minDaysLeft = 0),
+      DisplayItem(2L, listOf(2L), "crisper", "Xà lách", "lettuce", FoodGroup.RAU, 1, minDaysLeft = 3),
+      DisplayItem(3L, listOf(3L), "fresh", "Thịt gà", "chicken", FoodGroup.THIT, 1, minDaysLeft = 4),
+      DisplayItem(4L, listOf(4L), "freezer", "Tôm", "shrimp", FoodGroup.CA_HAI_SAN, 1, minDaysLeft = 10),
+      DisplayItem(5L, listOf(5L), "fresh", "Trứng", "egg", FoodGroup.SUA_TRUNG, 1, minDaysLeft = 12),
+      DisplayItem(6L, listOf(6L), "fresh", "Thịt bò", "meat", FoodGroup.THIT, 1, minDaysLeft = 5)
+    )
+
+    val allFeed = CulinaryGuideEngine.recommend(fridge, CulinaryFilter.ALL, subset)
+    assertEquals(subset.size, allFeed.size)
+    val top6Ids = allFeed.take(6).map { it.recipe.id }
+    val salmonInTop6 = allFeed.take(6).count { it.recipe.fridgeIngredients.first().iconKeys.first() == "salmon" }
+    assertEquals(2, salmonInTop6)
+    assertEquals(listOf("salmon_1", "salmon_2", "chicken_1", "egg_1", "meat_1", "shrimp_1"), top6Ids)
+    assertEquals(listOf("salmon_3", "salmon_4"), allFeed.drop(6).map { it.recipe.id })
+
+    // Category filters keep pure score ranking without cross-feed diversity deferrals.
+    val urgentOnly = CulinaryGuideEngine.recommend(fridge, CulinaryFilter.RESCUE_URGENT, subset)
+    assertEquals(listOf("salmon_1", "salmon_2", "salmon_3", "salmon_4"), urgentOnly.map { it.recipe.id })
+  }
+
+  @Test
   fun culinaryEnginePantryStaplesNeverBlockReadiness() {
     val recipe = CulinaryRecipe(
       id = "pantry_only_test",
       title = "Trứng chiên nước mắm tỏi",
       emoji = "🥚",
-      summary = "Gia vị cơ bản không bao giờ chặn trạng thái đủ đồ.",
+      summary = "Gia vị đo lường sẵn trong bếp không bao giờ chặn trạng thái đủ đồ.",
+      prepMinutes = 5,
       cookMinutes = 10,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(
-        RecipeIngredient("Trứng gà", listOf("egg"), listOf("trứng"), FoodGroup.SUA_TRUNG, "2 quả")
+        RecipeIngredient("Trứng gà", listOf("egg"), listOf("trứng"), FoodGroup.SUA_TRUNG, "3 quả")
       ),
-      pantryStaples = listOf("Tỏi băm", "Nước mắm", "Dầu ăn", "Tiêu xay", "Muối", "Đường"),
-      steps = listOf("Đánh trứng.", "Phi thơm tỏi.", "Chiên trứng.", "Chan nước mắm đường và rắc tiêu."),
+      seasonings = listOf(
+        SeasoningSpec("Nước mắm ngon", "1,5 muỗng canh"),
+        SeasoningSpec("Tỏi băm", "2 tép (1 muỗng cà phê)"),
+        SeasoningSpec("Tiêu đen xay", "1/2 muỗng cà phê"),
+        SeasoningSpec("Đường", "1 muỗng cà phê"),
+        SeasoningSpec("Dầu ăn", "1,5 muỗng canh")
+      ),
+      steps = listOf("Đánh trứng.", "Phi thơm tỏi.", "Chiên trứng.", "Pha mắm đường.", "Chan sốt và rắc tiêu."),
       sourceName = "VnExpress Ẩm Thực",
-      sourceUrl = "https://vnexpress.net/doi-song/cooking"
+      sourceUrl = "https://timkiem.vnexpress.net/?q=trung+chien+nuoc+mam"
     )
     val fridgeWithOnlyEgg = listOf(
       DisplayItem(1L, listOf(1L), "fresh", "Trứng", "egg", FoodGroup.SUA_TRUNG, 2, minDaysLeft = 5)
@@ -485,5 +593,110 @@ class LodAndFreshnessTest {
     assertEquals(1.5f, DotGridSpec.DOT_RADIUS_DP, 0.0001f)
     assertEquals(PaperCream, DotGridSpec.paperColor)
     assertEquals(DotGridInk, DotGridSpec.dotColor)
+  }
+
+  @Test
+  fun culinaryEngineLeftoverUpdateKeepsActiveMarksOpenedAndClampsExpiryToTwoDays() {
+    val today = 20_000L
+    val freshMeat = FoodItemEntity(
+      id = 201L,
+      compartmentId = "fresh",
+      name = "Thịt thăn bò",
+      iconKey = "meat",
+      group = FoodGroup.THIT.name,
+      quantity = 300,
+      unit = "g",
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 6,
+      isOpened = false,
+      status = ItemStatus.ACTIVE
+    )
+    val urgentSalmon = FoodItemEntity(
+      id = 202L,
+      compartmentId = "fresh",
+      name = "Cá hồi",
+      iconKey = "salmon",
+      group = FoodGroup.CA_HAI_SAN.name,
+      quantity = 1,
+      unit = "gói",
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 1,
+      isOpened = false,
+      status = ItemStatus.ACTIVE
+    )
+
+    val leftovers = listOf(
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Thịt bò", listOf("meat"), listOf("thịt bò"), FoodGroup.THIT, "200g"),
+        item = listOf(freshMeat).toDisplay(today).single(),
+        tier = MatchTier.EXACT_ICON
+      ),
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Cá hồi", listOf("salmon"), listOf("cá hồi"), FoodGroup.CA_HAI_SAN, "250g"),
+        item = listOf(urgentSalmon).toDisplay(today).single(),
+        tier = MatchTier.EXACT_ICON
+      )
+    )
+    val entitiesById = mapOf(201L to freshMeat, 202L to urgentSalmon)
+    val updated = CulinaryGuideEngine.planLeftoverUpdates(leftovers, entitiesById, today).associateBy { it.id }
+
+    assertEquals(2, updated.size)
+    val updatedMeat = updated.getValue(201L)
+    assertEquals(ItemStatus.ACTIVE, updatedMeat.status)
+    assertTrue(updatedMeat.isOpened)
+    assertEquals(today + CulinaryGuideEngine.LEFTOVER_MAX_DAYS_LEFT, updatedMeat.expiresAtEpochDay)
+
+    val updatedSalmon = updated.getValue(202L)
+    assertEquals(ItemStatus.ACTIVE, updatedSalmon.status)
+    assertTrue(updatedSalmon.isOpened)
+    // Already expiring sooner than 2 days -> keep tighter existing expiry.
+    assertEquals(today + 1, updatedSalmon.expiresAtEpochDay)
+  }
+
+  @Test
+  fun culinaryEnginePlanDeductionsMarksWeightBasedItemsUsedUpInOneCook() {
+    val today = 20_000L
+    val beef500g = FoodItemEntity(
+      id = 301L,
+      compartmentId = "fresh",
+      name = "Thịt bò",
+      iconKey = "meat",
+      group = FoodGroup.THIT.name,
+      quantity = 500,
+      unit = "g",
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 3,
+      status = ItemStatus.ACTIVE
+    )
+    val eggs = FoodItemEntity(
+      id = 302L,
+      compartmentId = "fresh",
+      name = "Trứng gà",
+      iconKey = "egg",
+      group = FoodGroup.SUA_TRUNG.name,
+      quantity = 4,
+      unit = "quả",
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 10,
+      status = ItemStatus.ACTIVE
+    )
+
+    val matched = listOf(
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Thịt bò", listOf("meat"), listOf("bò"), FoodGroup.THIT, "250g", unitsToConsume = 1),
+        item = listOf(beef500g).toDisplay(today).single(),
+        tier = MatchTier.EXACT_ICON
+      ),
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Trứng gà", listOf("egg"), listOf("trứng"), FoodGroup.SUA_TRUNG, "2 quả", unitsToConsume = 1),
+        item = listOf(eggs).toDisplay(today).single(),
+        tier = MatchTier.EXACT_ICON
+      )
+    )
+    val entitiesById = mapOf(301L to beef500g, 302L to eggs)
+    val deductions = CulinaryGuideEngine.planDeductions(matched, entitiesById).associateBy { it.itemId }
+
+    assertEquals(0, deductions[301L]?.remainingQuantity)
+    assertEquals(3, deductions[302L]?.remainingQuantity)
   }
 }

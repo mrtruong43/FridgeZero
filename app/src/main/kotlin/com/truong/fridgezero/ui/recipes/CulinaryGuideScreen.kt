@@ -1,5 +1,14 @@
 package com.truong.fridgezero.ui.recipes
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,6 +55,7 @@ import com.truong.fridgezero.domain.CompartmentUi
 import com.truong.fridgezero.domain.CulinaryFilter
 import com.truong.fridgezero.domain.CulinaryGuideEngine
 import com.truong.fridgezero.domain.Freshness
+import com.truong.fridgezero.domain.MatchedIngredient
 import com.truong.fridgezero.domain.RecipeCategory
 import com.truong.fridgezero.domain.RecipeIngredient
 import com.truong.fridgezero.domain.RecipeRecommendation
@@ -75,7 +85,7 @@ fun CulinaryGuideScreen(
   compartments: List<CompartmentUi>,
   initialRecipeId: String? = null,
   onBack: () -> Unit,
-  onConsumeRecipe: (RecipeRecommendation) -> Unit,
+  onCompleteCook: (usedUp: List<MatchedIngredient>, leftovers: List<MatchedIngredient>) -> Unit,
   modifier: Modifier = Modifier
 ) {
   val allItems = remember(compartments) { compartments.flatMap { it.items } }
@@ -100,14 +110,24 @@ fun CulinaryGuideScreen(
   val activeDetail = remember(allRecommendations, selectedRecipeId) {
     selectedRecipeId?.let { id -> allRecommendations.firstOrNull { it.recipe.id == id } }
   }
+  val lastDetailRef = remember { object { var value: RecipeRecommendation? = activeDetail } }
+  if (activeDetail != null) {
+    lastDetailRef.value = activeDetail
+  }
+  val displayedDetail = activeDetail ?: lastDetailRef.value
 
-  Column(
-    modifier = modifier
-      .fillMaxSize()
-      .dotGridBackground()
-      .statusBarsPadding()
-      .navigationBarsPadding()
-  ) {
+  BackHandler(enabled = activeDetail != null) {
+    selectedRecipeId = null
+  }
+
+  Box(modifier = modifier.fillMaxSize()) {
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .dotGridBackground()
+        .statusBarsPadding()
+        .navigationBarsPadding()
+    ) {
     // Top Bar: square ← button | "CẨM NANG ẨM THỰC" | Ready count badge
     Row(
       modifier = Modifier
@@ -222,14 +242,32 @@ fun CulinaryGuideScreen(
         }
       }
     }
-  }
+    }
 
-  if (activeDetail != null) {
-    RecipeDetailSheet(
-      recommendation = activeDetail,
-      onCooked = { onConsumeRecipe(activeDetail) },
-      onDismiss = { selectedRecipeId = null }
-    )
+    AnimatedVisibility(
+      visible = activeDetail != null,
+      modifier = Modifier.fillMaxSize(),
+      enter = slideInVertically(
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        initialOffsetY = { it / 12 }
+      ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+      exit = slideOutVertically(
+        animationSpec = tween(durationMillis = 180, easing = FastOutLinearInEasing),
+        targetOffsetY = { it / 12 }
+      ) + fadeOut(animationSpec = tween(durationMillis = 180))
+    ) {
+      displayedDetail?.let { detail ->
+        RecipeDetailSheet(
+          recommendation = detail,
+          onCompleteCook = { usedUp, leftovers ->
+            if (selectedRecipeId == detail.recipe.id) {
+              onCompleteCook(usedUp, leftovers)
+            }
+          },
+          onDismiss = { selectedRecipeId = null }
+        )
+      }
+    }
   }
 }
 

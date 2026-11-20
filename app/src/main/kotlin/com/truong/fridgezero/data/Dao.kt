@@ -64,6 +64,13 @@ interface FoodItemDao {
   @Query("UPDATE food_items SET status = :status WHERE id IN (:ids)")
   suspend fun updateStatusForIds(ids: List<Long>, status: ItemStatus)
 
+  @Query(
+    "UPDATE food_items SET isOpened = 1, " +
+      "expiresAtEpochDay = CASE WHEN expiresAtEpochDay > :maxExpiryEpochDay THEN :maxExpiryEpochDay ELSE expiresAtEpochDay END " +
+      "WHERE id IN (:ids)"
+  )
+  suspend fun markLeftoverForIds(ids: List<Long>, maxExpiryEpochDay: Long)
+
   @Query("UPDATE food_items SET compartmentId = :compartmentId WHERE id = :id")
   suspend fun moveToCompartment(id: Long, compartmentId: String)
 

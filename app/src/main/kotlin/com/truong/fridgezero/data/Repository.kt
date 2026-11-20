@@ -32,6 +32,12 @@ class FridgeRepository(
     }
   }
 
+  suspend fun markItemsLeftover(ids: List<Long>, maxExpiryEpochDay: Long) {
+    if (ids.isNotEmpty()) {
+      foodItemDao.markLeftoverForIds(ids, maxExpiryEpochDay)
+    }
+  }
+
   suspend fun moveItemToCompartment(id: Long, compartmentId: String) =
     foodItemDao.moveToCompartment(id, compartmentId)
 

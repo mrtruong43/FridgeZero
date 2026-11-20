@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -55,6 +57,7 @@ import com.truong.fridgezero.domain.ConfigurableShelfLifeRepository
 import com.truong.fridgezero.domain.DisplayItem
 import com.truong.fridgezero.domain.Freshness
 import com.truong.fridgezero.domain.StorageZone
+import com.truong.fridgezero.domain.formattedExpiryDate
 import com.truong.fridgezero.domain.zoneForCompartment
 import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodGroup
@@ -79,7 +82,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
-private val UNITS = listOf("cái", "gói", "hộp", "kg", "chai", "quả")
+private val UNITS = listOf("g", "kg", "cái", "gói", "hộp", "chai", "quả")
 private val QUICK_EXPIRY_CHIPS = listOf(
   3 to R.string.quick_add_3d,
   7 to R.string.quick_add_7d,
@@ -552,7 +555,7 @@ fun QuickAddItemSheet(
 /**
  * Item Detail, Edit, Compartment Move & 1-Tap Direct Delete Sheet.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ItemDetailSheet(
   item: DisplayItem,
@@ -575,11 +578,16 @@ fun ItemDetailSheet(
     Freshness.SOON -> LemonWarn
     Freshness.OK -> LimeFresh
   }
-  val expiryBadgeText = when {
+  val baseExpiryText = when {
     item.minDaysLeft < 0 -> stringResource(R.string.days_overdue_fmt, -item.minDaysLeft)
     item.minDaysLeft == 0 -> stringResource(R.string.days_today)
     else -> stringResource(R.string.days_left_fmt, item.minDaysLeft)
   }
+  val expiryBadgeText = stringResource(
+    R.string.expiry_with_date_fmt,
+    baseExpiryText,
+    item.formattedExpiryDate()
+  )
 
   ModalBottomSheet(
     onDismissRequest = onDismiss,
@@ -621,9 +629,19 @@ fun ItemDetailSheet(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
           )
-          Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+          FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
             StickerBadge(text = item.group.labelVi, containerColor = SurfaceWhite, tiltDegrees = 0f)
             StickerBadge(text = expiryBadgeText, containerColor = badgeColor, tiltDegrees = -1.5f, mono = true)
+            if (item.isOpened) {
+              StickerBadge(
+                text = stringResource(R.string.leftover_badge),
+                containerColor = ButterSoft,
+                tiltDegrees = 0f
+              )
+            }
           }
         }
       }

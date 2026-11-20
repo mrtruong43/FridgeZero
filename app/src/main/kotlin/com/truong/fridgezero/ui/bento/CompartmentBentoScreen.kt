@@ -6,21 +6,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -32,6 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -45,14 +45,18 @@ import androidx.compose.ui.unit.sp
 import com.truong.fridgezero.R
 import com.truong.fridgezero.data.ItemStatus
 import com.truong.fridgezero.domain.CompartmentUi
+import com.truong.fridgezero.domain.CulinaryGuideEngine
 import com.truong.fridgezero.domain.DisplayItem
 import com.truong.fridgezero.domain.Freshness
 import com.truong.fridgezero.domain.StorageZone
+import com.truong.fridgezero.domain.daysSinceAdded
+import com.truong.fridgezero.domain.formattedExpiryDate
 import com.truong.fridgezero.domain.zoneForCompartment
 import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodGroup
 import com.truong.fridgezero.ui.icons.FoodIcon
 import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.ButterSoft
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
 import com.truong.fridgezero.ui.theme.InkBlack
@@ -245,7 +249,7 @@ fun CompartmentBentoScreen(
       }
     }
 
-    // 2-Column Flat Bento Grid (zero text truncation)
+    // Single-column full-width horizontal cards with 3-zone Auto-Layout
     if (filteredItems.isEmpty()) {
       Box(
         modifier = Modifier.weight(1f).fillMaxWidth().padding(24.dp),
@@ -267,19 +271,18 @@ fun CompartmentBentoScreen(
         }
       }
     } else {
-      LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+      LazyColumn(
         modifier = Modifier.weight(1f).fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
       ) {
         items(filteredItems, key = { it.primaryId }) { item ->
-          FoodBentoCard(
+          val isWeightLeftover = item.isOpened && CulinaryGuideEngine.isWeightBasedUnit(item.unit)
+          FoodHorizontalCard(
             item = item,
             onCardClick = { detailTarget = item },
             onDecrement = {
-              if (item.quantity <= 1) {
+              if (item.quantity <= 1 || isWeightLeftover) {
                 onMarkStatus(item.itemIds, ItemStatus.USED_UP)
               } else {
                 onAdjustQuantity(item.primaryId, -1)
@@ -317,23 +320,32 @@ fun CompartmentBentoScreen(
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FoodBentoCard(
+private fun FoodHorizontalCard(
   item: DisplayItem,
   onCardClick: () -> Unit,
   onDecrement: () -> Unit,
   onIncrement: () -> Unit
 ) {
   val emoji = (EmojiIconRepository.iconFor(item.iconKey) as? FoodIcon.Emoji)?.glyph ?: "🍽️"
+  val isWeightLeftover = item.isOpened && CulinaryGuideEngine.isWeightBasedUnit(item.unit)
   val freshnessBg = when (item.freshness) {
     Freshness.BAD -> CoralUrgent
     Freshness.SOON -> LemonWarn
     Freshness.OK -> LimeFresh
   }
-  val expiryText = when {
+  val baseCountdown = when {
     item.minDaysLeft < 0 -> stringResource(R.string.urgent_badge_overdue_fmt, -item.minDaysLeft)
     item.minDaysLeft == 0 -> stringResource(R.string.urgent_badge_today)
     else -> stringResource(R.string.urgent_badge_days_fmt, item.minDaysLeft)
+  }
+  val expiryText = stringResource(R.string.expiry_with_date_fmt, baseCountdown, item.formattedExpiryDate())
+  val addedDays = item.daysSinceAdded()
+  val storageAgeText = if (addedDays == 0) {
+    stringResource(R.string.storage_age_today)
+  } else {
+    stringResource(R.string.storage_age_days_fmt, addedDays)
   }
   val minusCd = stringResource(R.string.bento_qty_minus_cd)
   val plusCd = stringResource(R.string.bento_qty_plus_cd)
@@ -341,129 +353,183 @@ private fun FoodBentoCard(
   NeoBrutalistCard(
     modifier = Modifier.fillMaxWidth(),
     containerColor = SurfaceWhite,
-    cornerRadius = 16.dp,
+    cornerRadius = 14.dp,
     borderWidth = 2.5.dp,
     shadowOffset = 4.dp
   ) {
-    Column(
+    Row(
       modifier = Modifier
         .fillMaxWidth()
-        .defaultMinSize(minHeight = 166.dp)
+        // 7.5dp accounts for the 2.5dp InkBlack border so a 5dp status strip stays flush on the left edge.
+        .drawBehind {
+          drawRect(
+            color = freshnessBg,
+            topLeft = Offset.Zero,
+            size = Size(7.5.dp.toPx(), size.height)
+          )
+        }
         .clickable(role = Role.Button, onClick = onCardClick)
-        .padding(11.dp),
-      verticalArrangement = Arrangement.SpaceBetween
+        .padding(start = 16.dp, end = 12.dp, top = 11.dp, bottom = 11.dp),
+      verticalAlignment = Alignment.Top,
+      horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-      // Top row: 48.dp emoji icon box + tilted freshness status pill
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.SpaceBetween
+      // Left Zone: fixed 50.dp icon box top-aligned
+      Box(
+        modifier = Modifier
+          .size(50.dp)
+          .clip(RoundedCornerShape(12.dp))
+          .background(PaperCream)
+          .border(2.dp, InkBlack, RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center
       ) {
-        Box(
-          modifier = Modifier
-            .size(46.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(PaperCream)
-            .border(2.dp, InkBlack, RoundedCornerShape(12.dp)),
-          contentAlignment = Alignment.Center
-        ) {
-          Text(text = emoji, fontSize = 28.sp)
-        }
-        StickerBadge(
-          text = expiryText,
-          containerColor = freshnessBg,
-          tiltDegrees = -2f,
-          mono = true
-        )
+        Text(text = emoji, fontSize = 28.sp)
       }
 
-      Spacer(Modifier.height(8.dp))
-
-      // Middle: full 2-line Vietnamese item name + group tag
-      Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Text(
-          text = item.name,
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 14.sp,
-          lineHeight = 18.sp,
-          color = InkBlack,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis
-        )
-        Box(
-          modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(PaperCream)
-            .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
-            .padding(horizontal = 5.dp, vertical = 2.dp)
+      // Center & Right Zones
+      Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        // Top row: item name (left) + expiry countdown & dd/MM pill (right)
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.Top,
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
           Text(
-            text = item.group.labelVi,
+            text = item.name,
+            modifier = Modifier.weight(1f),
             fontFamily = BodyFont,
-            fontWeight = FontWeight.Bold,
-            fontSize = 10.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
             color = InkBlack,
-            maxLines = 1
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
           )
-        }
-      }
-
-      Spacer(Modifier.height(8.dp))
-
-      // Bottom row: crisp 30.dp x 30.dp − [qty] + stepper buttons
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-      ) {
-        NeoBrutalistButton(
-          onClick = onDecrement,
-          modifier = Modifier.size(30.dp).semantics { contentDescription = minusCd },
-          containerColor = if (item.quantity <= 1) Color(0xFFFFD6DF) else SurfaceWhite,
-          cornerRadius = 8.dp,
-          borderWidth = 2.dp,
-          shadowOffset = 2.dp,
-          contentPadding = PaddingValues(0.dp)
-        ) {
-          Text(
-            text = "−",
-            fontFamily = MonoFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 16.sp,
-            lineHeight = 16.sp,
-            color = InkBlack
+          StickerBadge(
+            text = expiryText,
+            containerColor = freshnessBg,
+            tiltDegrees = 0f,
+            mono = true
           )
         }
 
-        Text(
-          text = if (item.unit.isNullOrBlank()) "${item.quantity}"
-          else stringResource(R.string.bento_qty_unit_fmt, item.quantity, item.unit),
-          fontFamily = MonoFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 13.sp,
-          color = InkBlack,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis
-        )
-
-        NeoBrutalistButton(
-          onClick = onIncrement,
-          modifier = Modifier.size(30.dp).semantics { contentDescription = plusCd },
-          containerColor = LimeFresh,
-          cornerRadius = 8.dp,
-          borderWidth = 2.dp,
-          shadowOffset = 2.dp,
-          contentPadding = PaddingValues(0.dp)
+        // Bottom row: wrapping FlowRow metadata (left) + bottom-right aligned stepper
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.Bottom,
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          Text(
-            text = "+",
-            fontFamily = MonoFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 16.sp,
-            lineHeight = 16.sp,
-            color = InkBlack
-          )
+          FlowRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+          ) {
+            Box(
+              modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(PaperCream)
+                .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+                .padding(horizontal = 5.dp, vertical = 2.dp)
+            ) {
+              Text(
+                text = item.group.labelVi,
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                color = InkBlack,
+                softWrap = false,
+                maxLines = 1
+              )
+            }
+            if (item.isOpened) {
+              Box(
+                modifier = Modifier
+                  .clip(RoundedCornerShape(6.dp))
+                  .background(ButterSoft)
+                  .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+                  .padding(horizontal = 5.dp, vertical = 2.dp)
+              ) {
+                Text(
+                  text = stringResource(R.string.leftover_badge),
+                  fontFamily = BodyFont,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 10.sp,
+                  color = InkBlack,
+                  softWrap = false,
+                  maxLines = 1
+                )
+              }
+            }
+            Text(
+              text = storageAgeText,
+              modifier = Modifier.padding(vertical = 3.dp),
+              fontFamily = MonoFont,
+              fontWeight = FontWeight.Medium,
+              fontSize = 10.sp,
+              color = InkBlack.copy(alpha = 0.65f),
+              softWrap = false,
+              maxLines = 1
+            )
+          }
+
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
+            NeoBrutalistButton(
+              onClick = onDecrement,
+              modifier = Modifier.size(32.dp).semantics { contentDescription = minusCd },
+              containerColor = if (item.quantity <= 1 || isWeightLeftover) Color(0xFFFFD6DF) else SurfaceWhite,
+              cornerRadius = 8.dp,
+              borderWidth = 2.dp,
+              shadowOffset = 2.dp,
+              contentPadding = PaddingValues(0.dp)
+            ) {
+              Text(
+                text = "−",
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                lineHeight = 16.sp,
+                color = InkBlack
+              )
+            }
+
+            Text(
+              text = when {
+                isWeightLeftover -> stringResource(R.string.bento_leftover_remaining)
+                item.unit.isNullOrBlank() -> "${item.quantity}"
+                else -> stringResource(R.string.bento_qty_unit_fmt, item.quantity, item.unit)
+              },
+              fontFamily = if (isWeightLeftover) BodyFont else MonoFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = if (isWeightLeftover) 12.sp else 13.sp,
+              color = InkBlack,
+              softWrap = false,
+              maxLines = 1
+            )
+
+            NeoBrutalistButton(
+              onClick = onIncrement,
+              modifier = Modifier.size(32.dp).semantics { contentDescription = plusCd },
+              containerColor = LimeFresh,
+              cornerRadius = 8.dp,
+              borderWidth = 2.dp,
+              shadowOffset = 2.dp,
+              contentPadding = PaddingValues(0.dp)
+            ) {
+              Text(
+                text = "+",
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                lineHeight = 16.sp,
+                color = InkBlack
+              )
+            }
+          }
         }
       }
     }

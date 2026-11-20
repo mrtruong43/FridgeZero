@@ -1,6 +1,6 @@
 # FridgeZero — Complete Source Code & Architecture Summary
 
-> **Generated:** 2026-11-19 13:54:50 +07:00
+> **Generated:** 2026-11-20 17:35:59 +07:00
 > **Architecture:** Jetpack Compose + Room + WorkManager + CameraX 1.4.2 + Offline Three.js r128 WebGL Stage (Single Shared WebView Host at MainActivity Root + v3 Neo-Brutalist)
 > **Excluded:** `local.properties` (machine-specific paths/sensitive config), binary files (`.apk`, `.jar`, `.ttf`, `.webp`), build outputs (`build/`, `.gradle/`), and third-party minified vendor bundle `app/src/main/assets/fridge3d/three.min.js` (603,451 bytes).
 
@@ -62,7 +62,7 @@ FridgeZero/
 
 ## 2. File Contents
 
-### `docs/spec.md` (210 lines)
+### `docs/spec.md` (215 lines)
 
 ````markdown
 # FridgeZero — Đặc tả Kỹ thuật & UI/UX v3
@@ -197,43 +197,48 @@ Hiển thị khi người dùng mở app lần đầu (hoặc bấm nút `⚙️
   3. **`📷 Quét AI` (nổi bật nền `#C084FC` + sticker nghiêng `GĐ2`):** Điểm vào luồng CameraX quét hóa đơn AI. Ở GĐ1 mở `CameraAiPreviewSheet` (đã khai báo sẵn quyền/giao diện khung ngắm để sẵn sàng nối API OCR ở GĐ2).
   4. **`⚙️ Đổi dáng` (nền `#FFFFFF`):** Quay lại Màn 1 (`FridgeDesignerScreen`) để chỉnh sửa dáng tủ, màu vỏ hoặc số ngăn.
 
-### 3.3. Màn 3 — Khoang Thực phẩm Bento Grid 2 Cột (`ui/bento/CompartmentBentoScreen.kt`)
+### 3.3. Màn 3 — Khoang Thực phẩm Thẻ Ngang Full-Width (`ui/bento/CompartmentBentoScreen.kt`)
 - **Top Bar:**
   - Trái: Nút quay lại **`← Tủ 3D`**.
   - Giữa: Tên ngăn viết hoa (`NGĂN MÁT`) + sticker tổng số món (`7 MÓN`, nền `#FACC15`).
   - Phải: Nút **`+ Thêm`** (`#A3E635`) mở `QuickAddSheet` gắn sẵn ngăn hiện tại.
 - **Thanh chuyển ngăn nhanh (`LazyRow`):** Các chip tên từng ngăn trong tủ kèm số món để chuyển qua lại giữa các ngăn mà không cần thoát ra tủ 3D.
 - **Dải chip lọc (`LazyRow`):** `Tất cả`, `Sắp hết hạn`, `Rau củ`, `Thịt cá`, `Sữa trứng`, `Đồ uống`.
-- **Lưới thẻ Bento 2 cột (`LazyVerticalGrid(GridCells.Fixed(2))`, khoảng cách `12.dp`):**
+- **Danh sách thẻ ngang 1 cột (`LazyColumn`, `spacedBy(10.dp)`):**
   - Sắp xếp ưu tiên món sắp hết hạn lên đầu (`expiryEpochDay ASC`).
-  - **Cấu trúc từng thẻ Bento (`minHeight = 158.dp`):**
-    - *Hàng trên:* Khung icon `48.dp` bo góc chứa Emoji/Icon `32.dp` bên trái + Sticker hạn dùng nghiêng `-2°` bên phải (`Quá hạn Nd` / `Hôm nay` nền `#FB7185`, `Còn 1d` nền `#FACC15`, `≥ 2d` nền `#A3E635`).
-    - *Phần giữa:* Tên thực phẩm tối đa 2 dòng (`maxLines = 2`, không cắt chữ giữa từ) + tag nhóm thực phẩm (`item.group.labelVi`).
-    - *Hàng đáy:* Bộ đếm nhanh **`−` `[qty]` `+`** ngay trên mặt thẻ; bấm `−` khi số lượng $\le 1$ sẽ xóa trực tiếp món khỏi ngăn chỉ với 1 chạm (gọi `onMarkStatus(itemIds, ItemStatus.USED_UP)`) mà không mở hộp thoại xác nhận.
+  - **Cấu trúc thẻ ngang 3 vùng Auto-Layout (`cornerRadius = 14.dp`, `borderWidth = 2.5.dp`, `shadowOffset = 4.dp`):**
+    - *Vùng trái cố định:* Dải màu trạng thái dọc rộng `5.dp` sát mép trái (`#A3E635` / `#FACC15` / `#FB7185`) kết hợp ô icon `50.dp × 50.dp` ghim đỉnh trên (`Alignment.Top`) để không bị kéo giãn khi tên món nhiều dòng.
+    - *Hàng tiêu đề trên:* Tên món chiếm phần còn lại (`Modifier.weight(1f)`, tối đa `2` dòng, `Ellipsis`) + pill hạn dùng góc phải hiển thị đồng thời đếm ngược và ngày `dd/MM` (`"Còn 1d · 21/11"`, `"Hôm nay · 20/11"`, `"Quá hạn 1d · 19/11"`).
+    - *Hàng đáy:* Bên trái là `FlowRow` tự xuống dòng chứa tag nhóm (`item.group.labelVi`), pill **`🥡 Dùng dở`** (`#FEF08A`, viền `1.5.dp`) khi `item.isOpened == true`, và thời gian cất (`"Cất hôm nay"` / `"Cất Nd trước"`); bên phải ghim đáy (`Alignment.Bottom`) là cụm nút **`−` `32.dp` / `[qty]` / `+` `32.dp`**. Bấm `−` khi số lượng $\le 1$ hoặc món cân nặng `"g"` / `"kg"` đang `🥡 Dùng dở` sẽ ghi nhận `ItemStatus.USED_UP` 1 chạm (hiển thị **`~ Còn lại`** thay cho khối lượng gốc).
 
 ### 3.4. Hệ thống 4 Bottom Sheet (`ui/sheets/`)
 1. **`ItemDetailSheet` (Chi tiết, Sửa, Chuyển ngăn & Xóa nhanh 1 chạm):**
-   - Hiển thị icon lớn, tên món, nhóm, badge hạn dùng.
+   - Hiển thị icon lớn, tên món, nhóm, badge hạn dùng kèm ngày `dd/MM` và huy hiệu **`🥡 Dùng dở`** (`#FEF08A`) nếu món đang mở/dùng dở (`isOpened == true`).
    - Bộ đếm số lượng `−` / `+`, chỉnh sửa tên và số ngày hạn dùng.
    - **Chuyển ngăn bảo quản:** Danh sách chip các ngăn khác trong tủ; khi chuyển giữa ngăn mát và ngăn đông sẽ tự điều chỉnh hạn dùng phù hợp.
    - **Xóa món 1 chạm:** Bấm `🗑️ Xóa khỏi tủ` sẽ ghi nhận `ItemStatus.USED_UP` và đóng sheet ngay lập tức.
 2. **`QuickAddSheet` (Thêm nhanh thực phẩm):**
    - Hàng chip gợi ý món quen chạm 1 lần điền sẵn icon, tên, nhóm, chọn ngăn phù hợp và tự động điền số ngày hạn dùng theo chuẩn USDA/FDA (tự cập nhật khi đổi ngăn nếu người dùng chưa chọn mốc hạn thủ công, kèm chú thích `✓ Gợi ý theo chuẩn USDA/FDA (<vùng ngăn>)`).
-   - Ô nhập tên thực phẩm + dải chip chọn ngăn cất + bộ đếm số lượng + 4 chip hạn dùng nhanh (`+3 ngày`, `+1 tuần`, `+2 tuần`, `+1 tháng`) kèm DatePicker tùy chọn.
+   - Ô nhập tên thực phẩm + dải chip chọn ngăn cất + bộ đếm số lượng kèm đơn vị (`"g"`, `"kg"`, `"cái"`, `"gói"`, `"hộp"`, `"chai"`, `"quả"`) + 4 chip hạn dùng nhanh (`+3 ngày`, `+1 tuần`, `+2 tuần`, `+1 tháng`) kèm DatePicker tùy chọn.
 3. **`UrgentItemsBottomSheet` (Trung tâm cảnh báo sắp hết hạn & Gợi ý món):**
    - Mở khi chạm Banner Trợ lý trên Dashboard Màn 2; hiển thị thẻ gợi ý **`🍳 TỐI NAY NẤU GÌ?`** nối thẳng với `topRecommendation` (chạm để mở thẳng `RecipeDetailSheet` tương ứng ở Màn 4), liệt kê các món sắp hết hạn kèm nút xóa nhanh **`✓ Dùng hết`** (1 chạm) và nút **`Mở ngăn →`** nhảy thẳng tới đúng ngăn đó ở Màn 3.
 4. **`CameraAiPreviewSheet` (Cổng CameraX Quét Hóa đơn — Giai đoạn 2):**
    - Mở khi chạm `📷 Quét AI` trên Task Bar; hiển thị khung ngắm CameraX với 4 góc định vị hóa đơn, tia quét laser xanh `#A3E635`, nút đèn Flash, nút chụp và chọn ảnh thư viện (sẵn sàng nối luồng AI OCR ở GĐ2).
 
 ### 3.5. Màn 4 — Cẩm nang Ẩm thực & Giải cứu Hạn dùng (`ui/recipes/CulinaryGuideScreen.kt`, `RecipeDetailSheet.kt`)
+- **Bộ công thức tham khảo chuẩn (`CulinaryGuideRepository`):**
+  - Gồm **32 công thức cơm nhà Việt & Eat-Clean kinh điển** có nguồn kiểm chứng (*Điện máy XANH Vào Bếp*, *Savoury Days*, *VnExpress Ẩm Thực*, *Cooky*, *Serious Eats*) kèm URL tra cứu trực tiếp theo từng món, phủ đủ 32 `iconKey` của `EmojiIconRepository`.
+  - Mỗi công thức có đầy đủ khẩu phần (`servingsLabel`), thời gian `prepMinutes` + `cookMinutes`, định lượng gram/ml/quả cho nguyên liệu chính, bảng gia vị có định lượng muỗng/gram (`SeasoningSpec`), và **5–6 bước chế biến chi tiết**.
+  - Ở tab mặc định `Tất cả`, `CulinaryGuideEngine` áp dụng giới hạn đa dạng hóa top 6: tối đa **2 món cho cùng 1 nguyên liệu chính đầu tiên** để tránh một món sắp hết hạn làm lặp danh sách đầu trang.
 - **Top Bar:** Nút quay lại `←`, tiêu đề `CẨM NANG ẨM THỰC` và sticker `#A3E635` hiển thị số món đủ đồ nấu ngay.
 - **Lưới công thức Bento 2 cột (`LazyVerticalGrid`):**
   - Thẻ Hero toàn chiều rộng **`🔥 MÓN CỨU TỦ HÔM NAY`** làm nổi bật công thức có điểm giải cứu cao nhất.
   - Hàng chip lọc ngang (`Tất cả`, `Đủ đồ nấu ngay`, `Cứu đồ gấp`, `Nhanh ≤ 15p`, `Cơm nhà Việt`, `Eat-Clean`).
   - Thẻ Bento 2 cột hiển thị emoji món, tỷ lệ khớp nguyên liệu (`#A3E635` khi đủ đồ, `#FACC15` khi còn thiếu), hàng emoji nguyên liệu tô màu theo hạn dùng, thời gian nấu và `sourceName`. Tự động mở `RecipeDetailSheet` khi điều hướng kèm `initialRecipeId`.
-- **`RecipeDetailSheet`:**
-  - Hiển thị tiêu đề, thời gian nấu, độ khó (`Dễ` / `Vừa`) và nhãn nguồn uy tín; phân tách rõ **`✓ Đã có trong tủ`** (tô màu `#FB7185` / `#FACC15` cho món sắp hết hạn), **`🛒 Cần chuẩn bị thêm`** và **`🧂 Gia vị bếp cơ bản`**.
-  - Liệt kê các bước nấu đánh số trong `NeoBrutalistCard` và 2 nút đáy: **`🔗 Xem bài gốc`** (`LocalUriHandler.openUri` bọc `runCatching`) và **`🎉 Đã nấu xong`** (gọi `FridgeViewModel.consumeRecipeIngredients` để trừ `unitsToConsume` / chuyển `USED_UP` trong Room, hiện Toast và đóng sheet).
+- **`RecipeDetailSheet` (Màn chi tiết toàn màn hình trong `CulinaryGuideScreen`):**
+  - Render trực tiếp bên trong root `Box` của `CulinaryGuideScreen` qua `AnimatedVisibility` (~`180ms` slide/fade) trên nền `dotGridBackground()` kèm `BackHandler` để mở/đóng tức thì không độ trễ `Dialog` window hay giật kéo.
+  - Top bar Neo-Brutalist gồm nút quay lại vuông `44.dp` `←`, tên món và nhãn nguồn; phần thân cuộn độc lập (`weight(1f)`) hiển thị `prepMinutes` + `cookMinutes`, khẩu phần `servingsLabel`, độ khó (`Dễ` / `Vừa`), tỷ lệ khớp và phân tách rõ **`✓ Nguyên liệu tương tự đang có trong tủ`** (tô màu `#FB7185` / `#FACC15` cho món sắp hết hạn), **`🛒 Nguyên liệu chính cần chuẩn bị thêm`**, **`🧂 Gia vị & định lượng chuẩn`** (dạng bảng 2 cột tên gia vị — định lượng) cùng **5–6 bước nấu** đánh số trong `NeoBrutalistCard`.
+  - Thanh hành động đáy ghim cố định với 2 nút: **`🔗 Xem bài gốc`** (`LocalUriHandler.openUri` bọc `runCatching`) và **`🎉 Đã nấu xong`** — khi có nguyên liệu khớp trong tủ sẽ mở hộp thoại Neo-Brutalist cho phép chọn **`✓ Dùng hết`** (mặc định) hoặc **`🥡 Dùng dở`** cho từng nguyên liệu trước khi gọi `FridgeViewModel.completeRecipeCook` (trừ hết món cân nặng `g`/`kg` hoặc đếm đơn vị với `usedUp`; giữ `ACTIVE`, đặt `isOpened = true` và giới hạn hạn dùng $\le 2$ ngày với `leftovers`).
 
 ---
 
@@ -540,7 +545,7 @@ dependencies {
 </manifest>
 ```
 
-### `app/src/main/res/values/strings.xml` (196 lines)
+### `app/src/main/res/values/strings.xml` (217 lines)
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -707,6 +712,7 @@ dependencies {
 
     <string name="recipe_screen_title">CẨM NANG ẨM THỰC</string>
     <string name="recipe_back_cd">Quay lại tủ 3D</string>
+    <string name="recipe_detail_back_cd">Quay lại cẩm nang</string>
     <string name="recipe_ready_badge_fmt">%1$d SẴN SÀNG</string>
     <string name="recipe_hero_badge">🔥 MÓN CỨU TỦ HÔM NAY</string>
     <string name="recipe_hero_all_fresh_badge">🔥 GỢI Ý NẤU NGAY HÔM NAY</string>
@@ -721,22 +727,42 @@ dependencies {
     <string name="recipe_empty_filter">Chưa có món nào khớp bộ lọc này. Thử chuyển sang "Tất cả" nhé!</string>
     <string name="recipe_prep_time_short_fmt">⏱ %1$dp</string>
     <string name="recipe_prep_time_long_fmt">⏱ %1$d phút</string>
+    <string name="recipe_prep_cook_time_fmt">⏱ Sơ chế %1$dp · Nấu %2$dp</string>
+    <string name="recipe_servings_fmt">🍽️ %1$s</string>
     <string name="recipe_difficulty_easy">⚡ Dễ</string>
     <string name="recipe_difficulty_medium">⚡ Vừa</string>
     <string name="recipe_match_ratio_fmt">%1$d/%2$d</string>
-    <string name="recipe_section_in_fridge">✓ Đã có trong tủ</string>
-    <string name="recipe_section_in_fridge_empty">Chưa có nguyên liệu chính nào của món này trong tủ.</string>
-    <string name="recipe_section_missing">🛒 Cần chuẩn bị thêm</string>
+    <string name="recipe_section_in_fridge">✓ Nguyên liệu tương tự đang có trong tủ</string>
+    <string name="recipe_section_in_fridge_hint">Gợi ý đối chiếu với thực phẩm hiện có — định lượng theo công thức gốc</string>
+    <string name="recipe_section_in_fridge_empty">Chưa có nguyên liệu chính nào khớp với tủ lạnh hiện tại.</string>
+    <string name="recipe_section_missing">🛒 Nguyên liệu chính cần chuẩn bị thêm</string>
     <string name="recipe_section_missing_none">✓ Đủ 100% nguyên liệu tủ lạnh — nấu ngay thôi!</string>
-    <string name="recipe_section_pantry">🧂 Gia vị bếp cơ bản</string>
-    <string name="recipe_section_pantry_hint">Gia vị sẵn trong bếp — không chặn trạng thái đủ đồ</string>
+    <string name="recipe_section_pantry">🧂 Gia vị &amp; định lượng chuẩn</string>
+    <string name="recipe_section_pantry_hint">Định lượng tham khảo theo khẩu phần công thức — không chặn trạng thái đủ đồ</string>
     <string name="recipe_section_steps">👩‍🍳 Cách làm nhanh</string>
-    <string name="recipe_substitute_fmt">Thay bằng: %1$s</string>
+    <string name="recipe_exact_match_fmt">Trong tủ: %1$s (SL %2$d)</string>
+    <string name="recipe_substitute_fmt">Gợi ý thay bằng: %1$s</string>
     <string name="recipe_action_source">🔗 Xem bài gốc</string>
     <string name="recipe_action_cooked">🎉 Đã nấu xong</string>
     <string name="recipe_cooked_toast_fmt">Đã nấu xong! Đã trừ %1$d nguyên liệu khỏi tủ lạnh.</string>
     <string name="recipe_cooked_toast_empty">Chúc ngon miệng!</string>
     <string name="recipe_open_source_error">Không mở được liên kết bài gốc trên thiết bị này.</string>
+    <string name="leftover_badge">🥡 Dùng dở</string>
+    <string name="bento_leftover_remaining">~ Còn lại</string>
+    <string name="cook_confirm_title">CẬP NHẬT TỦ LẠNH</string>
+    <string name="cook_confirm_subtitle">Chọn trạng thái sau khi nấu cho từng nguyên liệu:</string>
+    <string name="cook_confirm_used_up">✓ Dùng hết</string>
+    <string name="cook_confirm_leftover">🥡 Dùng dở</string>
+    <string name="cook_confirm_leftover_hint">Món dùng dở sẽ gắn nhãn 🥡 và rút hạn tối đa còn 2 ngày.</string>
+    <string name="cook_confirm_cancel">Để sau</string>
+    <string name="cook_confirm_apply">Xác nhận</string>
+    <string name="cook_confirm_qty_only_fmt">SL %1$d</string>
+    <string name="cook_toast_mixed_fmt">Đã cập nhật tủ: %1$d dùng hết, %2$d dùng dở!</string>
+    <string name="cook_toast_used_only_fmt">Đã cập nhật tủ: %1$d món dùng hết!</string>
+    <string name="cook_toast_leftover_only_fmt">Đã cập nhật tủ: %1$d món dùng dở (hạn ≤ 2 ngày)!</string>
+    <string name="expiry_with_date_fmt">%1$s · %2$s</string>
+    <string name="storage_age_today">Cất hôm nay</string>
+    <string name="storage_age_days_fmt">Cất %1$dd trước</string>
 </resources>
 ```
 
@@ -2043,7 +2069,7 @@ class AppConfig(context: Context) {
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/data/Dao.kt` (83 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/data/Dao.kt` (90 lines)
 
 ```kotlin
 package com.truong.fridgezero.data
@@ -2111,6 +2137,13 @@ interface FoodItemDao {
 
   @Query("UPDATE food_items SET status = :status WHERE id IN (:ids)")
   suspend fun updateStatusForIds(ids: List<Long>, status: ItemStatus)
+
+  @Query(
+    "UPDATE food_items SET isOpened = 1, " +
+      "expiresAtEpochDay = CASE WHEN expiresAtEpochDay > :maxExpiryEpochDay THEN :maxExpiryEpochDay ELSE expiresAtEpochDay END " +
+      "WHERE id IN (:ids)"
+  )
+  suspend fun markLeftoverForIds(ids: List<Long>, maxExpiryEpochDay: Long)
 
   @Query("UPDATE food_items SET compartmentId = :compartmentId WHERE id = :id")
   suspend fun moveToCompartment(id: Long, compartmentId: String)
@@ -2269,7 +2302,7 @@ data class FoodItemEntity(
 )
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/data/Repository.kt` (114 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/data/Repository.kt` (120 lines)
 
 ```kotlin
 package com.truong.fridgezero.data
@@ -2303,6 +2336,12 @@ class FridgeRepository(
   suspend fun updateItemsStatus(ids: List<Long>, status: ItemStatus) {
     if (ids.isNotEmpty()) {
       foodItemDao.updateStatusForIds(ids, status)
+    }
+  }
+
+  suspend fun markItemsLeftover(ids: List<Long>, maxExpiryEpochDay: Long) {
+    if (ids.isNotEmpty()) {
+      foodItemDao.markLeftoverForIds(ids, maxExpiryEpochDay)
     }
   }
 
@@ -2481,7 +2520,7 @@ object Seed {
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/domain/CulinaryGuide.kt` (1225 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/domain/CulinaryGuide.kt` (1602 lines)
 
 ```kotlin
 package com.truong.fridgezero.domain
@@ -2519,6 +2558,11 @@ data class InventoryDeduction(
   val remainingQuantity: Int
 )
 
+data class SeasoningSpec(
+  val name: String,
+  val amount: String
+)
+
 data class RecipeIngredient(
   val name: String,
   val iconKeys: List<String>,
@@ -2533,16 +2577,19 @@ data class CulinaryRecipe(
   val title: String,
   val emoji: String,
   val summary: String,
+  val prepMinutes: Int,
   val cookMinutes: Int,
-  val servings: Int = 2,
+  val servingsLabel: String = "2–3 người ăn",
   val categories: Set<CulinaryFilter>,
   val fridgeIngredients: List<RecipeIngredient>,
-  val pantryStaples: List<String>,
+  val seasonings: List<SeasoningSpec>,
   val steps: List<String>,
   val sourceName: String,
   val sourceUrl: String,
   val difficulty: RecipeDifficulty = if (cookMinutes <= 15) RecipeDifficulty.EASY else RecipeDifficulty.MEDIUM
-)
+) {
+  val totalMinutes: Int get() = prepMinutes + cookMinutes
+}
 
 data class MatchedIngredient(
   val ingredient: RecipeIngredient,
@@ -2568,8 +2615,9 @@ data class RecipeRecommendation(
 }
 
 /**
- * 3-layer ingredient matcher and expiry-rescue ranker:
+ * 3-layer ingredient similarity matcher and expiry-rescue ranker:
  * Layer 1: Exact `iconKey` -> Layer 2: Vietnamese name keyword -> Layer 3: `FoodGroup` fallback.
+ * On the default `ALL` feed, limits any single primary ingredient to at most 2 cards in the top 6.
  */
 object CulinaryGuideEngine {
 
@@ -2578,7 +2626,11 @@ object CulinaryGuideEngine {
   const val SCORE_FRESH_MATCH = 6
   const val SCORE_MISSING_PENALTY = -3
   const val SCORE_READY_BONUS = 8
+  const val DEFAULT_FEED_DIVERSITY_WINDOW = 6
+  const val DEFAULT_FEED_MAX_PER_PRIMARY_KEY = 2
+  const val LEFTOVER_MAX_DAYS_LEFT = 2
 
+  private val WEIGHT_UNITS = setOf("g", "kg")
   private val VI_LOCALE = Locale.forLanguageTag("vi-VN")
   private val NON_WORD_REGEX = Regex("[^\\p{L}\\p{Nd}]+")
   private val DIACRITICS_REGEX = Regex("\\p{InCombiningDiacriticalMarks}+")
@@ -2588,7 +2640,7 @@ object CulinaryGuideEngine {
     filter: CulinaryFilter = CulinaryFilter.ALL,
     recipes: List<CulinaryRecipe> = CulinaryGuideRepository.recipes
   ): List<RecipeRecommendation> {
-    return recipes
+    val sorted = recipes
       .map { evaluate(it, fridgeItems) }
       .filter { rec ->
         when (filter) {
@@ -2614,6 +2666,55 @@ object CulinaryGuideEngine {
           .thenBy { it.recipe.cookMinutes }
           .thenBy { it.recipe.id }
       )
+    return if (filter == CulinaryFilter.ALL) {
+      applyTopWindowDiversityCap(sorted)
+    } else {
+      sorted
+    }
+  }
+
+  internal fun applyTopWindowDiversityCap(
+    sorted: List<RecipeRecommendation>,
+    windowSize: Int = DEFAULT_FEED_DIVERSITY_WINDOW,
+    maxPerPrimaryKey: Int = DEFAULT_FEED_MAX_PER_PRIMARY_KEY
+  ): List<RecipeRecommendation> {
+    if (sorted.size <= 1 || windowSize <= 0 || maxPerPrimaryKey <= 0) return sorted
+
+    val topSelected = ArrayList<RecipeRecommendation>(minOf(windowSize, sorted.size))
+    val deferred = ArrayList<RecipeRecommendation>()
+    val countsInWindow = HashMap<String, Int>()
+    var nextIndex = 0
+
+    while (nextIndex < sorted.size && topSelected.size < windowSize) {
+      val rec = sorted[nextIndex++]
+      val primaryKey = rec.recipe.fridgeIngredients
+        .firstOrNull()
+        ?.iconKeys
+        ?.firstOrNull()
+        ?.trim()
+        ?.lowercase(Locale.ROOT)
+        ?.takeIf { it.isNotEmpty() }
+
+      val count = if (primaryKey != null) countsInWindow[primaryKey] ?: 0 else 0
+      if (primaryKey == null || count < maxPerPrimaryKey) {
+        topSelected.add(rec)
+        if (primaryKey != null) countsInWindow[primaryKey] = count + 1
+      } else {
+        deferred.add(rec)
+      }
+    }
+
+    while (topSelected.size < windowSize && deferred.isNotEmpty()) {
+      topSelected.add(deferred.removeAt(0))
+    }
+
+    val result = ArrayList<RecipeRecommendation>(sorted.size)
+    result.addAll(topSelected)
+    result.addAll(deferred)
+    while (nextIndex < sorted.size) {
+      result.add(sorted[nextIndex++])
+    }
+    return result
   }
 
   fun evaluate(
@@ -2684,6 +2785,9 @@ object CulinaryGuideEngine {
     )
   }
 
+  fun isWeightBasedUnit(unit: String?): Boolean =
+    unit?.trim()?.lowercase(Locale.ROOT) in WEIGHT_UNITS
+
   /**
    * Computes earliest-expiry quantity decrements across active Room rows backing matched items.
    * Returned entries with `remainingQuantity <= 0` should be transitioned to [ItemStatus.USED_UP].
@@ -2709,9 +2813,15 @@ object CulinaryGuideEngine {
         if (need <= 0) break
         val available = remainingQty[id] ?: 0
         if (available <= 0) continue
-        val consumed = minOf(available, need)
-        remainingQty[id] = available - consumed
-        need -= consumed
+        val effectiveUnit = entitiesById[id]?.unit ?: entry.item.unit
+        if (isWeightBasedUnit(effectiveUnit)) {
+          remainingQty[id] = 0
+          need -= 1
+        } else {
+          val consumed = minOf(available, need)
+          remainingQty[id] = available - consumed
+          need -= consumed
+        }
       }
     }
 
@@ -2720,6 +2830,33 @@ object CulinaryGuideEngine {
       if (remaining < initial) InventoryDeduction(itemId = id, remainingQuantity = remaining) else null
     }
   }
+
+  /** Marks an active entity as opened/leftover and clamps expiry to at most 2 days left. */
+  fun applyLeftoverUpdate(
+    entity: FoodItemEntity,
+    todayEpochDay: Long
+  ): FoodItemEntity {
+    val maxExpiry = todayEpochDay + LEFTOVER_MAX_DAYS_LEFT.toLong()
+    val clampedExpiry = if (entity.expiresAtEpochDay > maxExpiry) maxExpiry else entity.expiresAtEpochDay
+    return entity.copy(
+      isOpened = true,
+      expiresAtEpochDay = clampedExpiry,
+      status = ItemStatus.ACTIVE
+    )
+  }
+
+  fun planLeftoverUpdates(
+    leftovers: List<MatchedIngredient>,
+    entitiesById: Map<Long, FoodItemEntity>,
+    todayEpochDay: Long
+  ): List<FoodItemEntity> =
+    leftovers
+      .flatMap { it.item.itemIds }
+      .distinct()
+      .mapNotNull { id ->
+        val entity = entitiesById[id] ?: return@mapNotNull null
+        if (entity.status == ItemStatus.ACTIVE) applyLeftoverUpdate(entity, todayEpochDay) else null
+      }
 
   private inline fun assignTier(
     recipe: CulinaryRecipe,
@@ -2776,31 +2913,28 @@ object CulinaryGuideEngine {
 }
 
 /**
- * Curated catalog of 36 practical Vietnamese home-cooking & Eat-Clean recipes
- * covering all 32 `EmojiIconRepository` icon keys.
+ * Curated reference cookbook of 32 authentic Vietnamese home-cooking & Eat-Clean recipes
+ * covering all 32 `EmojiIconRepository` icon keys with measured seasonings and dish-specific citations.
  */
 object CulinaryGuideRepository {
 
   private const val SRC_SAVOURY_DAYS = "Savoury Days"
-  private const val URL_SAVOURY_DAYS = "https://www.savourydays.com/"
   private const val SRC_COOKY = "Cooky"
-  private const val URL_COOKY = "https://www.cooky.vn/cach-lam"
   private const val SRC_VNEXPRESS = "VnExpress Ẩm Thực"
-  private const val URL_VNEXPRESS = "https://vnexpress.net/doi-song/cooking"
   private const val SRC_DMX = "Điện máy XANH Vào Bếp"
-  private const val URL_DMX = "https://www.dienmayxanh.com/vao-bep"
   private const val SRC_SERIOUS_EATS = "Serious Eats"
-  private const val URL_SERIOUS_EATS = "https://www.seriouseats.com/"
 
-  private fun ingChicken(amount: String = "300g") = RecipeIngredient(
-    name = "Thịt gà / Ức gà",
+  private fun sp(name: String, amount: String) = SeasoningSpec(name = name, amount = amount)
+
+  private fun ingChicken(amount: String = "300g", name: String = "Thịt gà / Ức gà") = RecipeIngredient(
+    name = name,
     iconKeys = listOf("chicken"),
     keywords = listOf("thịt gà", "ức gà", "đùi gà", "cánh gà", "gà"),
     fallbackGroup = FoodGroup.THIT,
     amountText = amount
   )
 
-  private fun ingMeat(amount: String = "250g", name: String = "Thịt bò / Thịt nạc") = RecipeIngredient(
+  private fun ingMeat(amount: String = "250g", name: String = "Thịt thăn bò") = RecipeIngredient(
     name = name,
     iconKeys = listOf("meat"),
     keywords = listOf("thịt bò", "thịt heo", "thịt lợn", "nạc vai", "thăn bò", "thịt bằm", "bò", "heo"),
@@ -2808,7 +2942,7 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingBacon(amount: String = "200g") = RecipeIngredient(
+  private fun ingBacon(amount: String = "300g") = RecipeIngredient(
     name = "Thịt ba chỉ",
     iconKeys = listOf("bacon"),
     keywords = listOf("ba chỉ", "ba rọi", "thịt ba chỉ", "bacon"),
@@ -2816,8 +2950,8 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingSalmon(amount: String = "250g") = RecipeIngredient(
-    name = "Cá hồi",
+  private fun ingSalmon(amount: String = "300g") = RecipeIngredient(
+    name = "Phi lê cá hồi",
     iconKeys = listOf("salmon"),
     keywords = listOf("cá hồi", "phi lê cá", "salmon"),
     fallbackGroup = FoodGroup.CA_HAI_SAN,
@@ -2833,22 +2967,22 @@ object CulinaryGuideRepository {
   )
 
   private fun ingCrab(amount: String = "200g") = RecipeIngredient(
-    name = "Cua / Thịt cua",
+    name = "Thịt cua tươi",
     iconKeys = listOf("crab"),
     keywords = listOf("thịt cua", "cua", "cua biển", "ghẹ"),
     fallbackGroup = FoodGroup.CA_HAI_SAN,
     amountText = amount
   )
 
-  private fun ingSquid(amount: String = "250g") = RecipeIngredient(
-    name = "Mực tươi",
+  private fun ingSquid(amount: String = "300g") = RecipeIngredient(
+    name = "Mực ống tươi",
     iconKeys = listOf("squid"),
     keywords = listOf("mực", "mực ống", "mực lá", "mực tươi"),
     fallbackGroup = FoodGroup.CA_HAI_SAN,
     amountText = amount
   )
 
-  private fun ingLettuce(amount: String = "1 bó") = RecipeIngredient(
+  private fun ingLettuce(amount: String = "150g") = RecipeIngredient(
     name = "Rau xà lách",
     iconKeys = listOf("lettuce"),
     keywords = listOf("xà lách", "rau xà lách", "rau cải", "rau xanh"),
@@ -2856,7 +2990,7 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingCarrot(amount: String = "1 củ") = RecipeIngredient(
+  private fun ingCarrot(amount: String = "1/2 củ (60g)") = RecipeIngredient(
     name = "Cà rốt",
     iconKeys = listOf("carrot"),
     keywords = listOf("cà rốt", "carrot"),
@@ -2864,7 +2998,7 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingBellPepper(amount: String = "1 quả") = RecipeIngredient(
+  private fun ingBellPepper(amount: String = "1 quả (150g)") = RecipeIngredient(
     name = "Ớt chuông",
     iconKeys = listOf("bell_pepper"),
     keywords = listOf("ớt chuông", "ớt ngọt", "ớt chuông đỏ"),
@@ -2872,7 +3006,7 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingBroccoli(amount: String = "1 bông") = RecipeIngredient(
+  private fun ingBroccoli(amount: String = "1 bông (250g)") = RecipeIngredient(
     name = "Bông cải xanh",
     iconKeys = listOf("broccoli"),
     keywords = listOf("bông cải", "súp lơ", "bông cải xanh"),
@@ -2880,7 +3014,7 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingCorn(amount: String = "1 trái") = RecipeIngredient(
+  private fun ingCorn(amount: String = "1 trái (150g hạt)") = RecipeIngredient(
     name = "Bắp ngọt",
     iconKeys = listOf("corn"),
     keywords = listOf("bắp ngọt", "ngô ngọt", "bắp mỹ", "ngô", "bắp"),
@@ -2896,8 +3030,8 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingPickle(amount: String = "100g") = RecipeIngredient(
-    name = "Dưa muối / Dưa chuột",
+  private fun ingPickle(amount: String = "150g") = RecipeIngredient(
+    name = "Dưa cải muối chua",
     iconKeys = listOf("pickle"),
     keywords = listOf("dưa muối", "dưa cải", "dưa chua", "dưa leo", "dưa chuột"),
     fallbackGroup = FoodGroup.RAU,
@@ -2912,15 +3046,15 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingMilk(amount: String = "150ml") = RecipeIngredient(
-    name = "Sữa tươi",
+  private fun ingMilk(amount: String = "100ml") = RecipeIngredient(
+    name = "Sữa tươi không đường",
     iconKeys = listOf("milk"),
     keywords = listOf("sữa tươi", "sữa không đường", "sữa"),
     fallbackGroup = FoodGroup.SUA_TRUNG,
     amountText = amount
   )
 
-  private fun ingCheese(amount: String = "2 lát") = RecipeIngredient(
+  private fun ingCheese(amount: String = "30g") = RecipeIngredient(
     name = "Phô mai",
     iconKeys = listOf("cheese"),
     keywords = listOf("phô mai", "cheddar", "mozzarella", "cheese"),
@@ -2928,8 +3062,8 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingYogurt(amount: String = "1 hũ") = RecipeIngredient(
-    name = "Sữa chua",
+  private fun ingYogurt(amount: String = "1 hũ (100g)") = RecipeIngredient(
+    name = "Sữa chua không đường",
     iconKeys = listOf("yogurt"),
     keywords = listOf("sữa chua", "sữa chua không đường", "yogurt"),
     fallbackGroup = FoodGroup.SUA_TRUNG,
@@ -2937,7 +3071,7 @@ object CulinaryGuideRepository {
   )
 
   private fun ingButter(amount: String = "15g") = RecipeIngredient(
-    name = "Bơ",
+    name = "Bơ lạt",
     iconKeys = listOf("butter"),
     keywords = listOf("bơ lạt", "bơ mặn", "bơ thực vật", "bơ"),
     fallbackGroup = FoodGroup.SUA_TRUNG,
@@ -2945,30 +3079,30 @@ object CulinaryGuideRepository {
   )
 
   private fun ingOrangeJuice(amount: String = "120ml") = RecipeIngredient(
-    name = "Nước cam",
+    name = "Nước cam tươi",
     iconKeys = listOf("orange_juice"),
     keywords = listOf("nước cam", "cam ép", "nước ép cam"),
     fallbackGroup = FoodGroup.DO_UONG,
     amountText = amount
   )
 
-  private fun ingWater(amount: String = "300ml") = RecipeIngredient(
-    name = "Nước suối",
+  private fun ingWater(amount: String = "500ml") = RecipeIngredient(
+    name = "Nước suối / Nước lọc",
     iconKeys = listOf("water"),
     keywords = listOf("nước suối", "nước lọc", "nước tinh khiết"),
     fallbackGroup = FoodGroup.DO_UONG,
     amountText = amount
   )
 
-  private fun ingTomatoSauce(amount: String = "3 muỗng") = RecipeIngredient(
-    name = "Sốt cà",
+  private fun ingTomatoSauce(amount: String = "60g (4 muỗng canh)") = RecipeIngredient(
+    name = "Sốt cà chua",
     iconKeys = listOf("tomato_sauce"),
     keywords = listOf("sốt cà", "sốt cà chua", "tương cà", "cà chua cô đặc"),
     fallbackGroup = FoodGroup.DO_KHO,
     amountText = amount
   )
 
-  private fun ingBread(amount: String = "2 ổ / lát") = RecipeIngredient(
+  private fun ingBread(amount: String = "2 ổ (160g)") = RecipeIngredient(
     name = "Bánh mì",
     iconKeys = listOf("bread"),
     keywords = listOf("bánh mì", "bánh mì gối", "sandwich", "baguette"),
@@ -2976,15 +3110,15 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingRice(amount: String = "2 chén") = RecipeIngredient(
-    name = "Cơm nguội / Gạo",
+  private fun ingRice(amount: String = "350g (2 chén cơm nguội)") = RecipeIngredient(
+    name = "Cơm nguội hạt dẻo",
     iconKeys = listOf("rice"),
     keywords = listOf("cơm", "cơm nguội", "gạo", "gạo tẻ"),
     fallbackGroup = FoodGroup.DO_KHO,
     amountText = amount
   )
 
-  private fun ingDumpling(amount: String = "3 cái") = RecipeIngredient(
+  private fun ingDumpling(amount: String = "3 cái (270g)") = RecipeIngredient(
     name = "Bánh bao",
     iconKeys = listOf("dumpling"),
     keywords = listOf("bánh bao", "há cảo", "sủi cảo"),
@@ -2992,24 +3126,24 @@ object CulinaryGuideRepository {
     amountText = amount
   )
 
-  private fun ingIceCream(amount: String = "2 viên") = RecipeIngredient(
-    name = "Kem lạnh",
+  private fun ingIceCream(amount: String = "2 viên (120g)") = RecipeIngredient(
+    name = "Kem vani",
     iconKeys = listOf("ice_cream"),
     keywords = listOf("kem", "kem vani", "kem tươi"),
     fallbackGroup = FoodGroup.AN_SAN,
     amountText = amount
   )
 
-  private fun ingApple(amount: String = "1 quả") = RecipeIngredient(
-    name = "Táo",
+  private fun ingApple(amount: String = "1 quả (150g)") = RecipeIngredient(
+    name = "Táo tươi",
     iconKeys = listOf("apple"),
     keywords = listOf("táo", "táo đỏ", "táo xanh"),
     fallbackGroup = FoodGroup.TRAI_CAY,
     amountText = amount
   )
 
-  private fun ingBanana(amount: String = "1 quả") = RecipeIngredient(
-    name = "Chuối",
+  private fun ingBanana(amount: String = "1 quả (120g)") = RecipeIngredient(
+    name = "Chuối chín",
     iconKeys = listOf("banana"),
     keywords = listOf("chuối", "chuối chín", "chuối cau"),
     fallbackGroup = FoodGroup.TRAI_CAY,
@@ -3017,7 +3151,7 @@ object CulinaryGuideRepository {
   )
 
   private fun ingGrape(amount: String = "100g") = RecipeIngredient(
-    name = "Nho tươi",
+    name = "Nho tươi không hạt",
     iconKeys = listOf("grape"),
     keywords = listOf("nho", "nho xanh", "nho đỏ", "nho đen"),
     fallbackGroup = FoodGroup.TRAI_CAY,
@@ -3025,23 +3159,23 @@ object CulinaryGuideRepository {
   )
 
   private fun ingStrawberry(amount: String = "100g") = RecipeIngredient(
-    name = "Dâu tây",
+    name = "Dâu tây tươi",
     iconKeys = listOf("strawberry"),
     keywords = listOf("dâu tây", "dâu", "strawberry"),
     fallbackGroup = FoodGroup.TRAI_CAY,
     amountText = amount
   )
 
-  private fun ingWatermelon(amount: String = "300g") = RecipeIngredient(
-    name = "Dưa hấu",
+  private fun ingWatermelon(amount: String = "350g ruột") = RecipeIngredient(
+    name = "Dưa hấu đỏ",
     iconKeys = listOf("watermelon"),
     keywords = listOf("dưa hấu", "ruột dưa hấu"),
     fallbackGroup = FoodGroup.TRAI_CAY,
     amountText = amount
   )
 
-  private fun ingMango(amount: String = "1 quả") = RecipeIngredient(
-    name = "Xoài",
+  private fun ingMango(amount: String = "1 quả (250g)", name: String = "Xoài") = RecipeIngredient(
+    name = name,
     iconKeys = listOf("mango"),
     keywords = listOf("xoài", "xoài xanh", "xoài chín"),
     fallbackGroup = FoodGroup.TRAI_CAY,
@@ -3049,662 +3183,944 @@ object CulinaryGuideRepository {
   )
 
   val recipes: List<CulinaryRecipe> = listOf(
-    // 1–12: Ready out-of-the-box with Seed.kt and prioritize rescuing salmon (1d), chicken (1d), orange_juice (2d), lettuce (2d), ice_cream (3d).
+    // 1. Cá hồi áp chảo sốt bơ chanh tỏi
     CulinaryRecipe(
-      id = "ga_ap_chao_sot_cam_xa_lach",
-      title = "Gà áp chảo sốt cam mật ong & xà lách",
-      emoji = "🍗",
-      summary = "Ức gà áp chảo vàng cạnh quyện sốt cam chua ngọt dịu nhẹ, ăn cùng xà lách giòn mát.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingChicken(), ingOrangeJuice(), ingLettuce(), ingButter("10g")),
-      pantryStaples = listOf("Tỏi băm", "Mật ong", "Muối", "Tiêu xay", "Dầu ăn"),
-      steps = listOf(
-        "Thấm khô thịt gà, ướp với chút muối, tiêu và tỏi băm trong 5 phút.",
-        "Làm nóng chảo với dầu ăn, áp chảo gà mỗi mặt 4 phút cho chín vàng đều rồi gắp ra.",
-        "Hạ lửa nhỏ, cho bơ, nước cam và 1 muỗng mật ong vào chảo khuấy tới khi sốt hơi sánh.",
-        "Xếp xà lách rửa sạch ra đĩa, thái lát gà đặt lên trên và rưới sốt cam ấm nóng."
-      ),
-      sourceName = SRC_VNEXPRESS,
-      sourceUrl = URL_VNEXPRESS
-    ),
-    CulinaryRecipe(
-      id = "ca_hoi_sot_cam_bo_toi",
-      title = "Cá hồi áp chảo sốt cam bơ tỏi & xà lách",
+      id = "ca_hoi_ap_chao_bo_chanh_toi",
+      title = "Cá hồi áp chảo sốt bơ chanh tỏi",
       emoji = "🐟",
-      summary = "Cá hồi da giòn thấm bơ tỏi kết hợp sốt cam thơm thanh, chuẩn bữa Eat-Clean nhanh gọn.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingSalmon(), ingOrangeJuice("100ml"), ingButter("15g"), ingLettuce()),
-      pantryStaples = listOf("Tỏi đập dập", "Muối", "Tiêu xay", "Dầu ăn"),
-      steps = listOf(
-        "Thấm thật ráo miếng cá hồi rồi rắc đều một lớp muối mỏng và tiêu lên hai mặt.",
-        "Áp chảo mặt da trước trên lửa vừa khoảng 3 phút cho giòn, lật mặt áp tiếp 2 phút.",
-        "Cho bơ và tỏi đập dập vào chảo rưới đều lên thân cá, sau đó gắp cá đặt lên đĩa xà lách.",
-        "Đổ nước cam vào phần bơ tỏi còn lại, đun sôi nhẹ 1 phút cho sánh rồi chan lên cá."
-      ),
-      sourceName = SRC_SERIOUS_EATS,
-      sourceUrl = URL_SERIOUS_EATS
-    ),
-    CulinaryRecipe(
-      id = "ca_hoi_ap_chao_bo_toi_salad",
-      title = "Cá hồi áp chảo bơ tỏi kèm salad cà rốt",
-      emoji = "🥗",
-      summary = "Phi lê cá hồi béo ngậy bơ tỏi ăn kèm xà lách và cà rốt bào sợi cân vị.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingSalmon(), ingButter("15g"), ingLettuce(), ingCarrot()),
-      pantryStaples = listOf("Tỏi băm", "Nước cốt chanh", "Muối", "Tiêu xay", "Dầu ô liu"),
-      steps = listOf(
-        "Ướp cá hồi với muối tiêu trong 5 phút; xà lách cắt vừa ăn, cà rốt bào sợi mảnh.",
-        "Áp chảo cá hồi với ít dầu cho vàng hai mặt rồi thả bơ và tỏi băm vào dậy mùi thơm.",
-        "Trộn xà lách và cà rốt với dầu ô liu, nước cốt chanh và chút muối tiêu làm salad nền.",
-        "Đặt cá hồi lên trên đĩa salad, rưới thêm bơ tỏi nóng và thưởng thức ngay."
-      ),
-      sourceName = SRC_DMX,
-      sourceUrl = URL_DMX
-    ),
-    CulinaryRecipe(
-      id = "salad_ga_xe_sua_chua",
-      title = "Salad ức gà xé xà lách sốt sữa chua",
-      emoji = "🥗",
-      summary = "Xốt sữa chua chua dịu thay mayonnaise giúp đĩa salad gà thanh đạm mà vẫn đậm vị.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingChicken("250g"), ingLettuce(), ingYogurt(), ingCarrot()),
-      pantryStaples = listOf("Nước cốt chanh", "Mật ong", "Muối", "Tiêu xay", "Tỏi băm"),
-      steps = listOf(
-        "Luộc hoặc áp chảo chín ức gà với nhúm muối, để nguội bớt rồi xé thành sợi vừa ăn.",
-        "Rửa sạch xà lách để ráo, cà rốt thái sợi mỏng hoặc hạt lựu nhỏ.",
-        "Khuấy đều sữa chua với 1 muỗng mật ong, nước cốt chanh, muối và tiêu làm xốt trộn.",
-        "Cho gà xé, xà lách, cà rốt vào tô lớn, rưới xốt sữa chua và đảo nhẹ trước khi ăn."
-      ),
-      sourceName = SRC_SAVOURY_DAYS,
-      sourceUrl = URL_SAVOURY_DAYS
-    ),
-    CulinaryRecipe(
-      id = "ga_xao_ot_chuong_ca_rot",
-      title = "Ức gà xào ớt chuông cà rốt kiểu cơm nhà",
-      emoji = "🫑",
-      summary = "Món xào nhiều màu sắc giàu đạm, thịt gà mềm ngọt hòa cùng ớt chuông giòn tươi.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingChicken(), ingBellPepper(), ingCarrot()),
-      pantryStaples = listOf("Hành tỏi băm", "Dầu hào", "Nước mắm", "Tiêu xay", "Dầu ăn"),
-      steps = listOf(
-        "Thái gà miếng vừa ăn, ướp nhanh với tỏi băm, 1 muỗng dầu hào và nửa muỗng tiêu.",
-        "Thái vuông ớt chuông và tỉa lát mỏng cà rốt để khi xào chín đồng đều.",
-        "Xào nhanh thịt gà trên lửa lớn cho săn chín khoảng 80% rồi trút ra đĩa.",
-        "Phi thơm hành tỏi, xào cà rốt và ớt chuông 2 phút rồi trút gà vào đảo chung, nêm nước mắm vừa ăn."
-      ),
-      sourceName = SRC_DMX,
-      sourceUrl = URL_DMX
-    ),
-    CulinaryRecipe(
-      id = "salad_ca_hoi_dua_muoi",
-      title = "Salad cá hồi áp chảo dưa muối thanh vị",
-      emoji = "🥬",
-      summary = "Chút chua giòn của dưa muối kết hợp cá hồi béo thơm giúp chống ngấy cực hiệu quả.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingSalmon(), ingLettuce(), ingPickle("80g"), ingCarrot()),
-      pantryStaples = listOf("Dầu ô liu", "Đường", "Muối", "Tiêu xay", "Hành tím"),
-      steps = listOf(
-        "Vắt nhẹ dưa muối cho ráo nước và thái nhỏ vừa ăn; cà rốt bào sợi, xà lách cắt khúc.",
-        "Áp chảo cá hồi với muối tiêu đến khi chín vàng hai mặt, tách miếng vừa gắp.",
-        "Pha nhanh dầu ô liu, chút đường và tiêu thành nước trộn salad cân vị.",
-        "Xếp xà lách, cà rốt, dưa muối ra tô, đặt cá hồi lên trên và rưới sốt trộn đều."
-      ),
-      sourceName = SRC_COOKY,
-      sourceUrl = URL_COOKY
-    ),
-    CulinaryRecipe(
-      id = "kem_sua_chua_cam_tuoi",
-      title = "Kem sữa chua sốt cam tươi mát lạnh",
-      emoji = "🍨",
-      summary = "Tráng miệng 5 phút giải cứu ngay hộp kem lạnh, nước cam và sữa chua trong tủ.",
-      cookMinutes = 5,
-      servings = 1,
-      categories = setOf(CulinaryFilter.QUICK_15),
-      fridgeIngredients = listOf(ingIceCream(), ingOrangeJuice("80ml"), ingYogurt()),
-      pantryStaples = listOf("Mật ong", "Lá bạc hà hoặc vỏ cam bào"),
-      steps = listOf(
-        "Đun ấm nước cam với nửa muỗng mật ong trong 2 phút cho thơm nhẹ rồi để nguội.",
-        "Múc sữa chua ra ly hoặc chén lạnh làm lớp nền mịn màng.",
-        "Thêm 2 viên kem lạnh lên trên phần sữa chua.",
-        "Rưới nước sốt cam nguội lên mặt kem, trang trí thêm vỏ cam bào và thưởng thức ngay."
-      ),
-      sourceName = SRC_SAVOURY_DAYS,
-      sourceUrl = URL_SAVOURY_DAYS
-    ),
-    CulinaryRecipe(
-      id = "trung_chien_pho_mai_sot_ca",
-      title = "Trứng chiên phô mai sốt cà chua đậm đà",
-      emoji = "🍳",
-      summary = "Trứng xốp thơm mùi bơ kẹp nhân phô mai tan chảy và sốt cà chua bắt cơm.",
+      summary = "Phi lê cá hồi da giòn quyện sốt bơ chanh tỏi thơm béo chuẩn nhà hàng, ăn kèm xà lách giòn mát.",
+      prepMinutes = 10,
       cookMinutes = 12,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingEgg("3 quả"), ingCheese(), ingTomatoSauce(), ingButter("10g")),
-      pantryStaples = listOf("Hành lá", "Nước mắm", "Đường", "Tiêu xay", "Dầu ăn"),
-      steps = listOf(
-        "Đánh tan trứng với hành lá cắt nhỏ, nửa muỗng nước mắm và chút tiêu xay.",
-        "Đun chảy bơ trên chảo chống dính lửa nhỏ, đổ trứng vào tráng mỏng đều mặt chảo.",
-        "Đặt phô mai lên một nửa mặt trứng, rưới sốt cà pha chút đường rồi gập đôi miếng trứng.",
-        "Chiên thêm 1 phút cho phô mai chảy đều, rưới phần sốt cà còn lại lên mặt và rắc tiêu."
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingSalmon("300g"), ingButter("20g"), ingLettuce("100g")),
+      seasonings = listOf(
+        sp("Tỏi đập dập / băm", "3 tép (1 muỗng canh)"),
+        sp("Nước cốt chanh vàng", "1,5 muỗng canh"),
+        sp("Dầu ô liu", "1 muỗng canh"),
+        sp("Muối biển", "1/2 muỗng cà phê"),
+        sp("Tiêu đen xay", "1/3 muỗng cà phê")
       ),
-      sourceName = SRC_COOKY,
-      sourceUrl = URL_COOKY
-    ),
-    CulinaryRecipe(
-      id = "tom_rim_bo_toi_sot_ca",
-      title = "Tôm rim bơ tỏi sốt cà ăn kèm dưa muối",
-      emoji = "🦐",
-      summary = "Tôm rim săn chắc áo lớp sốt cà bơ tỏi bóng đẹp, ăn cùng cơm trắng và dưa muối cực đưa cơm.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingShrimp(), ingButter("15g"), ingTomatoSauce(), ingPickle()),
-      pantryStaples = listOf("Tỏi băm", "Nước mắm", "Đường", "Tiêu xay", "Hành lá"),
       steps = listOf(
-        "Cắt bỏ râu tôm, rút chỉ lưng, rửa sạch để ráo và xóc nhẹ với chút tiêu.",
-        "Đun chảy bơ cùng tỏi băm cho dậy thơm rồi cho tôm vào đảo nhanh trên lửa lớn.",
-        "Khi tôm chuyển đỏ săn lại, thêm sốt cà, 1 muỗng nước mắm và 1 muỗng nhỏ đường vào rim.",
-        "Rim 3 phút đến khi sốt sệt bám đều vỏ tôm, rắc hành lá và dọn kèm đĩa dưa muối."
-      ),
-      sourceName = SRC_VNEXPRESS,
-      sourceUrl = URL_VNEXPRESS
-    ),
-    CulinaryRecipe(
-      id = "trung_bac_sua_tuoi_pho_mai",
-      title = "Trứng bác sữa tươi phô mai béo mịn",
-      emoji = "🥚",
-      summary = "Bữa sáng mềm mịn kiểu Tây nhờ đánh trứng với sữa tươi và nấu chậm cùng bơ phô mai.",
-      cookMinutes = 10,
-      servings = 1,
-      categories = setOf(CulinaryFilter.QUICK_15),
-      fridgeIngredients = listOf(ingEgg("3 quả"), ingMilk("60ml"), ingCheese(), ingButter("15g")),
-      pantryStaples = listOf("Muối", "Tiêu đen", "Hành lá hoặc ngò rí"),
-      steps = listOf(
-        "Đập trứng vào tô, thêm sữa tươi và nhúm muối rồi đánh đều cho tan quyện.",
-        "Làm tan chảy bơ ở lửa thật nhỏ trên chảo chống dính.",
-        "Đổ trứng vào, dùng phới đảo nhẹ liên tục từ ngoài vào trong để tạo các lớp trứng mềm mịn.",
-        "Khi trứng còn hơi ướt thì tắt bếp, thả phô mai xé nhỏ vào đảo tan và rắc tiêu đen."
-      ),
-      sourceName = SRC_SERIOUS_EATS,
-      sourceUrl = URL_SERIOUS_EATS
-    ),
-    CulinaryRecipe(
-      id = "banh_bao_chien_sot_ca_dua_muoi",
-      title = "Bánh bao chiên giòn chấm sốt cà & dưa muối",
-      emoji = "🥟",
-      summary = "Bánh bao vỏ giòn rụm nóng hổi chấm sốt cà pha đậm vị và kèm dưa muối chống ngấy.",
-      cookMinutes = 12,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingDumpling("4 cái"), ingTomatoSauce(), ingPickle("80g")),
-      pantryStaples = listOf("Dầu ăn", "Tỏi băm", "Đường", "Xì dầu", "Tương ớt"),
-      steps = listOf(
-        "Cho bánh bao vào chảo dầu nóng vừa (hoặc nồi chiên không dầu), chiên vàng giòn các mặt.",
-        "Trong lúc đó phi thơm tỏi băm, cho sốt cà, chút xì dầu và nửa muỗng đường vào đảo sánh.",
-        "Vớt bánh bao ra giấy thấm dầu và cắt đôi cho dễ thưởng thức.",
-        "Dọn bánh bao nóng kèm chén sốt cà ấm và dưa muối thái vừa ăn."
+        "Rửa nhanh cá hồi với nước muối loãng rồi dùng khăn giấy thấm thật khô hai mặt để khi áp chảo không bắn dầu và da giòn đều.",
+        "Ướp đều hai mặt cá hồi với 1/2 muỗng cà phê muối biển và 1/3 muỗng cà phê tiêu đen xay, để nghỉ 10 phút cho thấm vị.",
+        "Làm nóng chảo chống dính với 1 muỗng canh dầu ô liu trên lửa vừa lớn, đặt mặt da cá úp xuống áp 4 phút rồi nhẹ nhàng lật áp thêm 2 phút.",
+        "Hạ lửa nhỏ, cho 20g bơ lạt và 3 tép tỏi vào góc chảo cho thơm rồi nghiêng chảo múc bơ tỏi nóng rưới liên tục lên thân cá khoảng 1 phút.",
+        "Gắp cá đặt lên đĩa xà lách đã rửa ráo; tắt bếp, vắt 1,5 muỗng canh nước cốt chanh vào phần bơ tỏi còn lại khuấy hòa quyện rồi chan lên cá."
       ),
       sourceName = SRC_DMX,
-      sourceUrl = URL_DMX
-    ),
-    CulinaryRecipe(
-      id = "tom_xao_ot_chuong_ca_rot",
-      title = "Tôm tươi xào ớt chuông cà rốt giòn ngọt",
-      emoji = "🦐",
-      summary = "Món xào cơm nhà ít dầu mỡ, giữ nguyên vị ngọt giòn tự nhiên của tôm và rau củ.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingShrimp(), ingBellPepper(), ingCarrot()),
-      pantryStaples = listOf("Tỏi băm", "Dầu hào", "Hành lá", "Tiêu xay", "Dầu ăn"),
-      steps = listOf(
-        "Tôm bóc vỏ chừa đuôi, rút chỉ lưng, ướp nhanh với chút tỏi băm và tiêu.",
-        "Cà rốt tỉa lát mỏng, ớt chuông bỏ hạt thái miếng vuông vừa đũa.",
-        "Xào tôm trên lửa lớn 2 phút đến khi vừa săn cong lại thì trút ra bát.",
-        "Xào cà rốt và ớt chuông 2 phút, trút tôm vào đảo cùng 1 muỗng dầu hào và rắc hành lá."
-      ),
-      sourceName = SRC_COOKY,
-      sourceUrl = URL_COOKY
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=ca+hoi+ap+chao+sot+bo+chanh+toi"
     ),
 
-    // 13–36: Practical Vietnamese home-cooking & Eat-Clean coverage for all remaining iconKeys.
+    // 2. Cá hồi áp chảo sốt cam mật ong
     CulinaryRecipe(
-      id = "ba_chi_rang_chay_canh_dua_muoi",
-      title = "Thịt ba chỉ rang cháy cạnh kèm dưa muối & cơm",
-      emoji = "🥓",
-      summary = "Ba chỉ xém vàng thơm lừng mắm hành, ăn cùng dưa cải muối chua và cơm nóng chuẩn vị.",
-      cookMinutes = 20,
-      categories = setOf(CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingBacon("300g"), ingPickle("150g"), ingRice()),
-      pantryStaples = listOf("Hành tím băm", "Nước mắm", "Đường", "Hành lá", "Tiêu xay"),
-      steps = listOf(
-        "Thịt ba chỉ thái miếng mỏng vừa ăn, chần sơ nước sôi 1 phút rồi để ráo.",
-        "Đặt chảo nóng, đảo thịt trên lửa vừa đến khi ra mỡ và các cạnh cháy xém vàng.",
-        "Chắt bớt mỡ thừa, phi thơm hành tím rồi nêm nước mắm, chút đường đảo thấm đều.",
-        "Rắc hành lá, tiêu và dọn ăn nóng cùng dưa muối và cơm trắng."
-      ),
-      sourceName = SRC_VNEXPRESS,
-      sourceUrl = URL_VNEXPRESS
-    ),
-    CulinaryRecipe(
-      id = "bo_xao_bong_cai_ca_rot",
-      title = "Thịt bò xào bông cải xanh cà rốt",
-      emoji = "🥦",
-      summary = "Thịt bò mềm mọng xào lửa lớn với bông cải xanh và cà rốt giòn giữ trọn vitamin.",
+      id = "ca_hoi_sot_cam_mat_ong",
+      title = "Cá hồi áp chảo sốt cam mật ong",
+      emoji = "🍊",
+      summary = "Cá hồi chín mềm mọng kết hợp nước sốt cam mật ong bơ lạt chua ngọt thanh tao, cực kỳ bắt vị.",
+      prepMinutes = 10,
       cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingMeat("250g", "Thịt bò"), ingBroccoli(), ingCarrot()),
-      pantryStaples = listOf("Tỏi băm", "Dầu hào", "Xì dầu", "Tiêu xay", "Dầu ăn"),
-      steps = listOf(
-        "Thái mỏng thịt bò ngang thớ, ướp 1 muỗng dầu hào, chút xì dầu, tiêu và nửa phần tỏi băm.",
-        "Cắt nhỏ bông cải xanh và thái lát cà rốt, chần qua nước sôi 45 giây rồi vớt ngâm nước mát.",
-        "Làm nóng chảo thật già dầu, xào thịt bò thật nhanh tay trên lửa lớn 1 phút rồi trút ra.",
-        "Xào thơm phần tỏi còn lại với bông cải, cà rốt rồi đổ thịt bò vào đảo chung 30 giây."
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingSalmon("300g"), ingOrangeJuice("120ml"), ingButter("15g")),
+      seasonings = listOf(
+        sp("Mật ong nguyên chất", "1 muỗng canh"),
+        sp("Tỏi băm", "2 tép (1 muỗng cà phê)"),
+        sp("Dầu ô liu", "1 muỗng canh"),
+        sp("Bột bắp pha loãng", "1 muỗng cà phê bột + 1 muỗng nước"),
+        sp("Muối", "1/2 muỗng cà phê"),
+        sp("Tiêu đen xay", "1/3 muỗng cà phê")
       ),
-      sourceName = SRC_DMX,
-      sourceUrl = URL_DMX
-    ),
-    CulinaryRecipe(
-      id = "bo_xao_ot_chuong_nam",
-      title = "Thịt bò xào ớt chuông nấm hương",
-      emoji = "🥩",
-      summary = "Nấm ngọt nước quyện vị thịt bò mềm và ớt chuông thơm lừng cho bữa tối gọn lẹ.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingMeat("250g", "Thịt bò"), ingBellPepper(), ingMushroom()),
-      pantryStaples = listOf("Tỏi băm", "Dầu hào", "Xì dầu", "Tiêu xay", "Dầu ăn"),
       steps = listOf(
-        "Thịt bò thái lát mỏng ướp nhanh với xì dầu, tỏi băm và tiêu trong 5 phút.",
-        "Nấm làm sạch cắt đôi; ớt chuông bỏ hạt thái miếng vuông vừa ăn.",
-        "Xào thịt bò trên lửa lớn cho chín tái rồi vớt ra đĩa riêng.",
-        "Xào nấm và ớt chuông với chút dầu hào 2 phút rồi trút bò vào đảo đều, rắc tiêu và tắt bếp."
-      ),
-      sourceName = SRC_VNEXPRESS,
-      sourceUrl = URL_VNEXPRESS
-    ),
-    CulinaryRecipe(
-      id = "muc_xao_ot_chuong_nam",
-      title = "Mực xào ớt chuông nấm & cà rốt giòn ngọt",
-      emoji = "🦑",
-      summary = "Mực khứa vảy rồng giòn sần sật xào nhanh cùng ớt chuông, nấm và cà rốt không ra nước.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingSquid(), ingBellPepper(), ingMushroom("100g"), ingCarrot()),
-      pantryStaples = listOf("Gừng thái lát", "Tỏi băm", "Dầu hào", "Nước mắm", "Hành lá"),
-      steps = listOf(
-        "Làm sạch mực, khứa caro nhẹ và cắt miếng vừa, chần nhanh qua nước sôi có vài lát gừng.",
-        "Cắt miếng vừa ăn ớt chuông, cà rốt và nấm tươi.",
-        "Phi thơm tỏi, xào mực trên lửa lớn 1 phút với nửa muỗng dầu hào rồi vớt ra.",
-        "Xào rau củ 2 phút cho chín tới, trút mực vào đảo lại cùng hành lá và chút nước mắm."
-      ),
-      sourceName = SRC_DMX,
-      sourceUrl = URL_DMX
-    ),
-    CulinaryRecipe(
-      id = "muc_hap_gung_cuon_xa_lach",
-      title = "Mực hấp gừng sả cuốn xà lách",
-      emoji = "🦑",
-      summary = "Mực hấp giữ nguyên độ giòn ngọt tự nhiên, cuốn xà lách cà rốt nhẹ bụng ít calo.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingSquid("300g"), ingLettuce(), ingCarrot()),
-      pantryStaples = listOf("Gừng thái sợi", "Sả đập dập", "Nước mắm", "Chanh", "Tỏi ớt"),
-      steps = listOf(
-        "Rửa sạch mực với gừng giã để khử tanh, để nguyên con hoặc cắt khoanh dày.",
-        "Lót sả đập dập và gừng sợi dưới đĩa, xếp mực lên hấp cách thủy khoảng 6–7 phút.",
-        "Rửa sạch xà lách và thái cà rốt thành thanh dài để chuẩn bị đồ cuốn.",
-        "Pha nước mắm gừng chanh tỏi ớt; dọn mực hấp nóng ăn cuốn kèm xà lách và cà rốt."
-      ),
-      sourceName = SRC_VNEXPRESS,
-      sourceUrl = URL_VNEXPRESS
-    ),
-    CulinaryRecipe(
-      id = "sup_cua_bap_ngot_trung",
-      title = "Súp cua bắp ngọt trứng gà sánh mịn",
-      emoji = "🦀",
-      summary = "Chén súp nóng hổi sánh nhẹ với thịt cua ngọt, hạt bắp vàng giòn và vân trứng mây.",
-      cookMinutes = 25,
-      categories = setOf(CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingCrab(), ingCorn(), ingEgg(), ingCarrot("1/2 củ")),
-      pantryStaples = listOf("Bột năng hoặc bột bắp", "Hành tím băm", "Dầu mè", "Tiêu xay", "Ngò rí"),
-      steps = listOf(
-        "Tách hạt bắp ngọt, thái hạt lựu nhỏ cà rốt; xào thơm nhẹ thịt cua với hành tím băm.",
-        "Đun sôi 800ml nước với bắp và cà rốt trong 8 phút cho ra nước ngọt.",
-        "Cho thịt cua vào, nêm muối và hạt nêm rồi khuấy từ từ nước bột năng cho súp sánh nhẹ.",
-        "Đánh tan trứng rót thành dòng mảnh vào nồi khuấy theo một chiều, thêm dầu mè, tiêu và ngò."
+        "Thấm ráo hoàn toàn hai miếng phi lê cá hồi (mỗi miếng khoảng 150g), xoa đều 1/2 muỗng cà phê muối và 1/3 muỗng cà phê tiêu.",
+        "Khuấy sẵn hỗn hợp sốt trong chén gồm 120ml nước cam tươi và 1 muỗng canh mật ong cho tan đều.",
+        "Đun nóng 1 muỗng canh dầu ô liu trên lửa vừa, áp chảo mặt da cá trước khoảng 3–4 phút tới khi vàng giòn rồi trở mặt áp thêm 2 phút.",
+        "Gắp cá hồi ra đĩa ấm; hạ lửa nhỏ, cho 15g bơ lạt và 2 tép tỏi băm vào chảo phi thơm khoảng 30 giây.",
+        "Đổ chén nước cam mật ong vào đun sôi lăn tăn, rót từ từ nước bột bắp khuấy đều 1–2 phút tới khi sốt sánh bóng rồi rưới lên cá hồi."
       ),
       sourceName = SRC_SAVOURY_DAYS,
-      sourceUrl = URL_SAVOURY_DAYS
+      sourceUrl = "https://www.savourydays.com/?s=ca+hoi+sot+cam"
     ),
+
+    // 3. Salad cá hồi áp chảo xà lách & cà rốt
     CulinaryRecipe(
-      id = "com_chien_cua_bap_ngot",
-      title = "Cơm chiên thịt cua bắp ngọt trứng vàng",
-      emoji = "🦀",
-      summary = "Hạt cơm tơi săn áo trứng vàng ươm hòa với thịt cua và bắp ngọt thơm nức mũi.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingCrab("150g"), ingRice(), ingCorn("1/2 trái"), ingEgg()),
-      pantryStaples = listOf("Hành tím băm", "Nước mắm", "Hành lá", "Tiêu xay", "Dầu ăn"),
-      steps = listOf(
-        "Đánh 1 lòng đỏ trứng trộn sẵn vào cơm nguội để hạt cơm tơi và lên màu vàng đẹp.",
-        "Phi thơm hành tím, xào nhanh thịt cua và hạt bắp ngọt với chút tiêu rồi múc ra.",
-        "Đổ phần trứng còn lại vào chảo đảo tơi, trút cơm vào rang săn trên lửa vừa.",
-        "Cho thịt cua và bắp vào đảo chung 2 phút, nêm chút nước mắm và rắc hành lá trước khi tắt bếp."
+      id = "salad_ca_hoi_ap_chao_rau_cu",
+      title = "Salad cá hồi áp chảo xà lách & cà rốt",
+      emoji = "🥗",
+      summary = "Bữa tối Eat-Clean đủ đạm và chất xơ với cá hồi áp chảo, xà lách giòn và xốt dầu giấm chanh mật ong.",
+      prepMinutes = 10,
+      cookMinutes = 12,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingSalmon("250g"), ingLettuce("150g"), ingCarrot("80g (1/2 củ)")),
+      seasonings = listOf(
+        sp("Dầu ô liu", "2 muỗng canh"),
+        sp("Nước cốt chanh tươi", "1,5 muỗng canh"),
+        sp("Mật ong", "1 muỗng cà phê"),
+        sp("Tỏi băm nhuyễn", "1 tép"),
+        sp("Muối", "1/2 muỗng cà phê"),
+        sp("Tiêu đen xay", "1/3 muỗng cà phê")
       ),
-      sourceName = SRC_COOKY,
-      sourceUrl = URL_COOKY
-    ),
-    CulinaryRecipe(
-      id = "com_chien_duong_chau_tom",
-      title = "Cơm chiên Dương Châu tôm trứng bắp ngọt",
-      emoji = "🍚",
-      summary = "Đĩa cơm chiên đủ sắc màu từ tôm, trứng và hạt bắp ngọt tận dụng hoàn hảo cơm nguội.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingRice(), ingShrimp("150g"), ingEgg(), ingCorn("1/2 trái")),
-      pantryStaples = listOf("Tỏi băm", "Xì dầu", "Dầu ăn", "Hành lá", "Tiêu xay"),
       steps = listOf(
-        "Tôm bóc vỏ cắt hạt lựu; luộc sơ hạt bắp ngọt khoảng 2 phút cho chín mềm.",
-        "Làm nóng dầu, chiên tơi trứng gà rồi trút cơm nguội vào đảo đều cho hạt cơm ráo tơi.",
-        "Đẩy cơm sang một bên chảo, xào chín tôm và bắp với chút tỏi băm rồi trộn chung.",
-        "Nêm xì dầu vừa miệng, đảo thêm 1 phút trên lửa lớn và rắc hành lá, tiêu xay."
+        "Rửa sạch 150g xà lách ngâm nước muối loãng rồi quay ráo và cắt khúc vừa ăn; gọt vỏ cà rốt bào sợi mỏng.",
+        "Thấm khô 250g cá hồi, ướp nhẹ với 1/3 muỗng cà phê muối và 1/3 muỗng cà phê tiêu đen xay trong 5 phút.",
+        "Áp chảo cá hồi với 1/2 muỗng canh dầu ô liu ở lửa vừa mỗi mặt 3 phút đến khi cá chín xém vàng, để nghỉ 2 phút rồi tách miếng vừa ăn.",
+        "Pha xốt trộn salad trong hũ nhỏ gồm 1,5 muỗng canh dầu ô liu còn lại, 1,5 muỗng canh nước cốt chanh, 1 muỗng cà phê mật ong, tỏi băm và nhúm muối.",
+        "Trộn nhẹ xà lách và cà rốt với một nửa lượng xốt ra đĩa sâu lòng, xếp cá hồi lên trên và rưới nốt phần xốt còn lại."
+      ),
+      sourceName = SRC_SERIOUS_EATS,
+      sourceUrl = "https://www.seriouseats.com/search?q=pan+seared+salmon+salad"
+    ),
+
+    // 4. Gà kho gừng sả ớt đậm đà
+    CulinaryRecipe(
+      id = "ga_kho_gung_sa_ot",
+      title = "Gà kho gừng sả ớt đậm đà",
+      emoji = "🍗",
+      summary = "Món mặn đưa cơm kinh điển với thịt gà săn chắc thấm vị nước mắm ngon, sả thơm nồng và gừng ấm.",
+      prepMinutes = 15,
+      cookMinutes = 25,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingChicken("500g", "Thịt gà chặt miếng")),
+      seasonings = listOf(
+        sp("Gừng tươi thái sợi", "30g (1 củ nhỏ)"),
+        sp("Sả băm & đập dập", "2 cây"),
+        sp("Hành tím băm", "2 củ"),
+        sp("Tỏi băm", "3 tép"),
+        sp("Nước mắm ngon", "2,5 muỗng canh"),
+        sp("Đường vàng", "1,5 muỗng canh"),
+        sp("Tiêu xay & ớt tươi", "1/2 muỗng cà phê tiêu, 1 trái ớt"),
+        sp("Dầu ăn", "1,5 muỗng canh")
+      ),
+      steps = listOf(
+        "Xát thịt gà với chút muối và gừng giã rồi rửa sạch, chặt miếng vừa ăn và để thật ráo nước.",
+        "Ướp gà 15 phút với 2,5 muỗng canh nước mắm, 1/2 muỗng canh đường, 1/2 lượng hành tỏi băm, sả băm và 1/2 muỗng cà phê tiêu.",
+        "Bắc nồi lên bếp với 1,5 muỗng canh dầu ăn và 1 muỗng canh đường còn lại, thắng lửa nhỏ đến khi đường chuyển màu cánh gián nhạt.",
+        "Trút hành tỏi phi thơm rồi cho gà đã ướp vào đảo săn trên lửa lớn 4–5 phút cho da gà săn bóng và thấm màu.",
+        "Rắc 30g gừng thái sợi cùng ớt cắt lát, thêm 60ml nước sôi đậy nắp kho lửa nhỏ 15 phút cho nước sốt sánh sệt bám quanh miếng gà."
       ),
       sourceName = SRC_VNEXPRESS,
-      sourceUrl = URL_VNEXPRESS
+      sourceUrl = "https://timkiem.vnexpress.net/?q=ga+kho+gung+sa+ot"
     ),
+
+    // 5. Ức gà xào ớt chuông cà rốt
     CulinaryRecipe(
-      id = "com_chien_ba_chi_dua_muoi",
-      title = "Cơm chiên thịt ba chỉ dưa cải muối",
-      emoji = "🍚",
-      summary = "Vị chua mặn của dưa cải muối giúp đĩa cơm rang thịt ba chỉ trứng gà tròn vị không ngán.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingRice(), ingBacon("150g"), ingPickle("100g"), ingEgg()),
-      pantryStaples = listOf("Tỏi băm", "Nước mắm", "Hành lá", "Tiêu xay", "Đường"),
+      id = "uc_ga_xao_ot_chuong_ca_rot",
+      title = "Ức gà xào ớt chuông hành tây & cà rốt",
+      emoji = "🫑",
+      summary = "Ức gà mềm ngọt không bị khô bã, xào nhanh trên lửa lớn cùng ớt chuông và cà rốt giòn tươi.",
+      prepMinutes = 10,
+      cookMinutes = 12,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingChicken("300g", "Ức gà phi lê"), ingBellPepper("1 quả (150g)"), ingCarrot("1/2 củ (60g)")),
+      seasonings = listOf(
+        sp("Dầu hào", "1,5 muỗng canh"),
+        sp("Nước tương (xì dầu)", "1 muỗng canh"),
+        sp("Tỏi băm", "3 tép (1 muỗng canh)"),
+        sp("Bột bắp", "1 muỗng cà phê"),
+        sp("Dầu ăn", "1,5 muỗng canh"),
+        sp("Tiêu đen xay", "1/2 muỗng cà phê")
+      ),
       steps = listOf(
-        "Thịt ba chỉ thái hạt lựu nhỏ, dưa muối vắt ráo thái vừa; đảo ba chỉ xém cạnh để lấy mỡ thơm.",
-        "Cho tỏi băm và dưa muối vào xào săn cùng chút đường rồi múc bớt ra.",
-        "Đập trứng vào chảo đảo nhanh tay cùng cơm nguội cho hạt cơm khô tơi.",
-        "Trút dưa muối và ba chỉ vào đảo chung 2 phút, nêm chút nước mắm, rắc hành lá và tiêu."
+        "Ức gà thái lát mỏng vừa ăn rồi ướp 10 phút với 1 muỗng canh nước tương, 1/2 lượng tỏi băm, 1 muỗng cà phê bột bắp và 1/3 muỗng cà phê tiêu để giữ ẩm.",
+        "Ớt chuông bỏ ruột thái miếng vuông cạnh 3cm; cà rốt gọt vỏ thái lát xéo mỏng khoảng 3mm để chín đồng đều.",
+        "Làm nóng 1 muỗng canh dầu ăn trên lửa lớn, trút gà vào đảo nhanh 3 phút đến khi săn chín khoảng 85% thì múc riêng ra đĩa.",
+        "Dùng 1/2 muỗng canh dầu còn lại phi thơm phần tỏi băm, cho cà rốt vào xào trước 2 phút với 1 muỗng canh nước lọc rồi thêm ớt chuông đảo tiếp 1,5 phút.",
+        "Đổ đĩa gà trở lại chảo, nêm 1,5 muỗng canh dầu hào đảo đều trên lửa lớn 1 phút rồi rắc nốt tiêu xay và dọn ra đĩa."
       ),
       sourceName = SRC_DMX,
-      sourceUrl = URL_DMX
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=uc+ga+xao+ot+chuong"
     ),
+
+    // 6. Salad ức gà áp chảo sốt sữa chua Hy Lạp
     CulinaryRecipe(
-      id = "canh_thit_bam_nam_bong_cai",
-      title = "Canh thịt bằm nấm bông cải cà rốt thanh ngọt",
-      emoji = "🍲",
-      summary = "Bát canh rau củ thanh mát, ngọt tự nhiên từ nấm, bông cải, cà rốt và thịt nạc bằm.",
-      cookMinutes = 20,
-      categories = setOf(CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingMeat("150g", "Thịt heo bằm"), ingMushroom(), ingBroccoli("1/2 bông"), ingCarrot()),
-      pantryStaples = listOf("Hành tím băm", "Nước mắm", "Muối", "Hành lá", "Tiêu xay"),
-      steps = listOf(
-        "Ướp thịt bằm với hành tím, chút nước mắm và tiêu; cắt vừa ăn nấm, bông cải và cà rốt.",
-        "Xào săn thịt bằm với nhúm hành tím trong nồi rồi chế khoảng 800ml nước đun sôi.",
-        "Hớt bọt, thả cà rốt vào nấu 3 phút rồi cho tiếp bông cải và nấm vào.",
-        "Nấu thêm 2–3 phút đến khi rau chín tới, nêm muối vừa ăn, rắc hành lá và tiêu."
-      ),
-      sourceName = SRC_VNEXPRESS,
-      sourceUrl = URL_VNEXPRESS
-    ),
-    CulinaryRecipe(
-      id = "ba_chi_cuon_nam_ap_chao",
-      title = "Thịt ba chỉ cuộn nấm áp chảo cuốn xà lách",
-      emoji = "🍄",
-      summary = "Nấm ngọt mọng gói gọn trong lát ba chỉ áp chảo cháy cạnh, ăn cuốn xà lách cực cuốn.",
+      id = "salad_uc_ga_sot_sua_chua",
+      title = "Salad ức gà áp chảo sốt sữa chua",
+      emoji = "🥗",
+      summary = "Xốt sữa chua chanh mật ong thanh nhẹ thay mayonnaise, hợp hoàn hảo với ức gà mọng nước và xà lách.",
+      prepMinutes = 10,
       cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingBacon(), ingMushroom("200g"), ingLettuce()),
-      pantryStaples = listOf("Xì dầu", "Tỏi băm", "Mật ong", "Tiêu xay", "Dầu ăn"),
-      steps = listOf(
-        "Nấm cắt gốc rửa sạch để ráo; trải lát ba chỉ mỏng cuộn chặt quanh từng bó nấm nhỏ.",
-        "Pha xốt quét gồm 2 muỗng xì dầu, 1 muỗng mật ong, tỏi băm và ít tiêu.",
-        "Áp chảo các cuộn thịt nấm ở lửa vừa cho xém vàng đều các mặt không cần nhiều dầu.",
-        "Phết đều xốt lên cuộn thịt trong 1 phút cuối cho bóng đẹp, dọn cuốn với xà lách tươi."
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingChicken("250g", "Ức gà"), ingLettuce("150g"), ingYogurt("1 hũ (100g)"), ingCarrot("1/2 củ (50g)")),
+      seasonings = listOf(
+        sp("Nước cốt chanh tươi", "1 muỗng canh"),
+        sp("Mật ong", "1 muỗng canh"),
+        sp("Dầu ô liu", "1 muỗng canh"),
+        sp("Tỏi băm", "1 tép"),
+        sp("Muối", "1/2 muỗng cà phê"),
+        sp("Tiêu đen xay", "1/3 muỗng cà phê")
       ),
-      sourceName = SRC_COOKY,
-      sourceUrl = URL_COOKY
+      steps = listOf(
+        "Khứa nhẹ mặt ức gà rồi ướp với 1/3 muỗng cà phê muối, 1/3 muỗng cà phê tiêu và 1/2 muỗng canh dầu ô liu trong 10 phút.",
+        "Rửa sạch 150g xà lách ngâm nước muối loãng rồi quay thật ráo; cà rốt bào sợi nhỏ.",
+        "Làm nóng chảo chống dính trên lửa vừa, áp chảo ức gà mỗi mặt 4–5 phút tới khi chín vàng đều, tắt bếp ủ thêm 3 phút rồi thái lát xéo.",
+        "Đánh quyện trong chén gồm 100g sữa chua không đường, 1 muỗng canh mật ong, 1 muỗng canh nước cốt chanh, 1/2 muỗng canh dầu ô liu, tỏi băm và nhúm muối.",
+        "Xếp xà lách và cà rốt ra đĩa rộng, đặt từng lát ức gà ấm lên trên rồi rưới đều nước xốt sữa chua trước khi ăn."
+      ),
+      sourceName = SRC_SAVOURY_DAYS,
+      sourceUrl = "https://www.savourydays.com/?s=salad+uc+ga+sot+sua+chua"
     ),
+
+    // 7. Gà hầm nấm hương cà rốt & bắp ngọt
     CulinaryRecipe(
       id = "ga_ham_nam_bap_ngot",
-      title = "Gà hầm nấm cà rốt bắp ngọt bổ dưỡng",
-      emoji = "🍄",
-      summary = "Nồi gà hầm thanh ngọt đậm vị nấm, cà rốt và bắp thích hợp cho bữa cơm gia đình ấm áp.",
+      title = "Gà hầm nấm cà rốt & bắp ngọt",
+      emoji = "🍲",
+      summary = "Nước dùng trong ngọt tự nhiên từ xương gà, bắp Mỹ và nấm tươi, giàu dinh dưỡng cho bữa cơm gia đình.",
+      prepMinutes = 15,
       cookMinutes = 30,
+      servingsLabel = "3–4 người ăn",
       categories = setOf(CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingChicken("400g"), ingMushroom(), ingCarrot(), ingCorn()),
-      pantryStaples = listOf("Hành tím", "Gừng đập dập", "Nước mắm", "Muối", "Hành ngò"),
+      fridgeIngredients = listOf(ingChicken("500g", "Thịt gà chặt khúc"), ingMushroom("150g"), ingCarrot("1 củ (100g)"), ingCorn("1 trái (180g)")),
+      seasonings = listOf(
+        sp("Hành tím đập dập", "2 củ"),
+        sp("Gừng tươi thái lát", "15g"),
+        sp("Nước mắm ngon", "1,5 muỗng canh"),
+        sp("Muối hạt", "1 muỗng cà phê"),
+        sp("Hạt nêm", "1 muỗng cà phê"),
+        sp("Hành lá & ngò rí", "2 nhánh"),
+        sp("Tiêu xay", "1/3 muỗng cà phê")
+      ),
       steps = listOf(
-        "Chặt gà miếng vừa ăn, ướp với chút muối, nước mắm và hành tím trong 10 phút.",
-        "Cắt khúc bắp ngọt, thái khoanh cà rốt và làm sạch nấm tươi.",
-        "Xào săn thịt gà với hành tím và gừng, đổ nước ngập mặt rồi hầm lửa vừa 12 phút.",
-        "Cho cà rốt, bắp ngọt và nấm vào hầm thêm 10 phút đến khi mềm ngọt, nêm vừa ăn và rắc hành ngò."
+        "Rửa sạch 500g gà chặt khúc, ướp với 1 muỗng canh nước mắm, 1/2 muỗng cà phê muối và 1 củ hành tím băm trong 10 phút.",
+        "Cắt bắp ngọt thành 4–5 khoanh dày; cà rốt tỉa khoanh 1,5cm; nấm rửa sạch cắt bỏ gốc.",
+        "Phi thơm phần hành tím và gừng với 1 muỗng nhỏ dầu ăn, cho gà vào đảo săn 3 phút rồi chế khoảng 1,1 lít nước lọc vào nấu sôi.",
+        "Hớt sạch bọt để nước canh trong, thả bắp ngọt và cà rốt vào hầm lửa vừa nhỏ 15 phút.",
+        "Cho nấm tươi vào nấu thêm 5 phút, nêm 1/2 muỗng canh nước mắm còn lại, hạt nêm cho vừa khẩu vị rồi rắc hành ngò và tiêu xay."
       ),
       sourceName = SRC_DMX,
-      sourceUrl = URL_DMX
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=ga+ham+nam+ca+rot+bap"
     ),
+
+    // 8. Thịt ba chỉ kho trứng nước dừa
     CulinaryRecipe(
-      id = "tom_xao_bong_cai_toi",
-      title = "Tôm xào bông cải xanh tỏi thơm Eat-Clean",
-      emoji = "🥦",
-      summary = "Bữa tối ít béo chỉ 12 phút với tôm săn giòn cùng bông cải xanh và cà rốt.",
-      cookMinutes = 12,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingShrimp(), ingBroccoli(), ingCarrot("1/2 củ")),
-      pantryStaples = listOf("Tỏi băm", "Dầu hào", "Muối", "Tiêu xay", "Dầu ăn"),
+      id = "ba_chi_kho_trung_nuoc_dua",
+      title = "Thịt ba chỉ kho trứng nước dừa",
+      emoji = "🥘",
+      summary = "Món thịt kho tàu chuẩn vị Việt với ba chỉ mềm tan, trứng thấm màu cánh gián óng ả nước dừa.",
+      prepMinutes = 15,
+      cookMinutes = 45,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingBacon("500g"), ingEgg("4 quả")),
+      seasonings = listOf(
+        sp("Nước dừa tươi", "350ml"),
+        sp("Nước mắm ngon", "3,5 muỗng canh"),
+        sp("Đường phèn hoặc đường vàng", "2 muỗng canh"),
+        sp("Hành tím băm", "3 củ"),
+        sp("Tỏi băm", "3 tép"),
+        sp("Tiêu xay", "1/2 muỗng cà phê")
+      ),
       steps = listOf(
-        "Bóc vỏ tôm chừa đuôi, xóc với chút muối tiêu; tách bông cải miếng nhỏ và thái lát cà rốt.",
-        "Chần nhanh bông cải và cà rốt trong nước sôi 45 giây rồi vớt ra giữ màu xanh.",
-        "Phi thơm tỏi băm với ít dầu, xào tôm trên lửa lớn 2 phút đến khi vừa chuyển đỏ.",
-        "Trút bông cải và cà rốt vào đảo đều 1 phút với nửa muỗng dầu hào và rắc tiêu."
+        "Cắt thịt ba chỉ thành miếng vuông cạnh 3,5cm, chần sơ nước sôi 2 phút rồi xả nước nguội cho sạch bọt; luộc chín 4 quả trứng và bóc vỏ.",
+        "Ướp thịt 20 phút với 3 muỗng canh nước mắm, 1 muỗng canh đường, hành tím băm, tỏi băm và 1/2 muỗng cà phê tiêu xay.",
+        "Cho 1 muỗng canh đường còn lại vào nồi cùng 1 muỗng canh nước lọc, thắng lửa nhỏ tới khi chuyển màu cánh gián đẹp thì tắt bếp 5 giây rồi cho thịt vào đảo săn.",
+        "Chế 350ml nước dừa tươi ngập mặt thịt, đun sôi hớt bọt rồi hạ lửa liu riu kho mở vung khoảng 20 phút.",
+        "Thả trứng đã bóc vỏ vào kho thêm 20 phút tới khi thịt mềm rục và nước kho rút sánh lại còn 1/3, nêm lại 1/2 muỗng canh nước mắm cho vừa miệng."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=thit+ba+chi+kho+trung+nuoc+dua"
+    ),
+
+    // 9. Thịt ba chỉ rang cháy cạnh kèm dưa cải
+    CulinaryRecipe(
+      id = "ba_chi_rang_chay_canh_dua_cai",
+      title = "Thịt ba chỉ rang cháy cạnh ăn kèm dưa cải",
+      emoji = "🥓",
+      summary = "Ba chỉ áp chảo cháy cạnh giòn thơm quyện mắm hành, dọn kèm dưa cải muối chua giảm ngấy hoàn hảo.",
+      prepMinutes = 10,
+      cookMinutes = 20,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingBacon("400g"), ingPickle("150g")),
+      seasonings = listOf(
+        sp("Nước mắm ngon", "2 muỗng canh"),
+        sp("Đường", "1 muỗng cà phê"),
+        sp("Hành tím băm", "2 củ"),
+        sp("Tỏi băm", "2 tép"),
+        sp("Hành lá thái khúc", "3 nhánh"),
+        sp("Tiêu đen xay", "1/2 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Rửa sạch 400g ba chỉ, thái lát mỏng khoảng 4–5mm; vắt nhẹ 150g dưa cải muối cho bớt chua mặn rồi bày ra đĩa riêng.",
+        "Đặt thịt ba chỉ vào chảo khô trên lửa vừa (không cần thêm dầu), rang 8–10 phút đến khi thịt tiết bớt mỡ và hai mặt xém vàng giòn.",
+        "Chắt bớt khoảng 2/3 lượng mỡ thừa trong chảo ra bát để món ăn không bị ngấy.",
+        "Đẩy thịt sang một bên chảo, phi thơm hành tím và tỏi băm trong phần mỡ còn lại khoảng 30 giây.",
+        "Rưới hỗn hợp 2 muỗng canh nước mắm và 1 muỗng cà phê đường vào đảo đều 2 phút cho thịt thấm óng, rắc hành lá và tiêu rồi ăn nóng cùng dưa cải."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=ba+chi+rang+chay+canh"
+    ),
+
+    // 10. Thịt bò xào bông cải xanh cà rốt
+    CulinaryRecipe(
+      id = "bo_xao_bong_cai_xanh",
+      title = "Thịt bò xào bông cải xanh cà rốt",
+      emoji = "🥦",
+      summary = "Thịt thăn bò mềm mọng nước xào nhanh lửa lớn cùng bông cải xanh và cà rốt giữ trọn độ giòn ngọt.",
+      prepMinutes = 12,
+      cookMinutes = 10,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingMeat("250g", "Thịt thăn bò"), ingBroccoli("1 bông (250g)"), ingCarrot("1/2 củ (60g)")),
+      seasonings = listOf(
+        sp("Tỏi băm", "4 tép (1 muỗng canh)"),
+        sp("Dầu hào", "1,5 muỗng canh"),
+        sp("Nước tương (xì dầu)", "1 muỗng canh"),
+        sp("Bột bắp", "1 muỗng cà phê"),
+        sp("Dầu ăn", "2 muỗng canh"),
+        sp("Tiêu đen xay", "1/2 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Thịt thăn bò thái lát mỏng ngang thớ, ướp 10 phút với 1 muỗng canh nước tương, 1 muỗng cà phê bột bắp, 1/2 lượng tỏi băm và 1/2 muỗng canh dầu ăn.",
+        "Tách 250g bông cải xanh thành từng nhánh vừa ăn; cà rốt thái lát mỏng 3mm.",
+        "Chần bông cải và cà rốt trong nồi nước sôi pha chút muối đúng 45 giây rồi vớt ngay vào tô nước lạnh giữ màu xanh mướt và để ráo.",
+        "Đun nóng già 1,5 muỗng canh dầu ăn trên lửa lớn, trút thịt bò vào đảo thật nhanh 60–90 giây cho vừa chín tái rồi múc ra đĩa.",
+        "Phi thơm nốt phần tỏi băm, xào bông cải và cà rốt với 1,5 muỗng canh dầu hào 1,5 phút rồi đổ thịt bò vào đảo chung 30 giây, rắc tiêu và tắt bếp."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=thit+bo+xao+bong+cai+xanh"
+    ),
+
+    // 11. Thịt bò xào dưa cải chua
+    CulinaryRecipe(
+      id = "bo_xao_dua_cai_chua",
+      title = "Thịt bò xào dưa cải chua",
+      emoji = "🥩",
+      summary = "Món xào cơm nhà đậm đà với thịt bò mềm thơm tỏi hòa quyện vị chua giòn kích thích vị giác của dưa cải.",
+      prepMinutes = 10,
+      cookMinutes = 12,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingMeat("250g", "Thịt bò thăn"), ingPickle("200g")),
+      seasonings = listOf(
+        sp("Tỏi băm", "3 tép (1 muỗng canh)"),
+        sp("Gừng băm", "1 muỗng cà phê"),
+        sp("Dầu hào", "1 muỗng canh"),
+        sp("Đường", "1/2 muỗng canh"),
+        sp("Nước tương (xì dầu)", "1 muỗng canh"),
+        sp("Dầu ăn", "1,5 muỗng canh"),
+        sp("Tiêu xay", "1/2 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Rửa sơ 200g dưa cải muối nếu quá chua mặn rồi vắt ráo nước, cắt khúc khoảng 3cm.",
+        "Thịt bò thái mỏng ngang thớ, ướp 10 phút với 1 muỗng canh nước tương, gừng băm, 1/2 lượng tỏi băm và 1/2 muỗng canh dầu ăn.",
+        "Làm nóng 1/2 muỗng canh dầu ăn, phi thơm tỏi rồi cho dưa cải vào xào 3 phút cùng 1/2 muỗng canh đường để dưa dịu vị và giòn thơm, trút ra đĩa.",
+        "Bật lửa lớn nhất, thêm 1/2 muỗng canh dầu còn lại và xào thịt bò thật nhanh trong 1 phút cho thịt vừa tái mềm.",
+        "Đổ đĩa dưa cải trở lại chảo cùng 1 muỗng canh dầu hào, đảo chung trên lửa lớn 45 giây rồi rắc tiêu xay và dọn ăn nóng."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=thit+bo+xao+dua+cai+chua"
+    ),
+
+    // 12. Canh nấm thịt bằm cà rốt & bông cải
+    CulinaryRecipe(
+      id = "canh_nam_thit_bam_ca_rot",
+      title = "Canh nấm thịt bằm cà rốt & bông cải",
+      emoji = "🍄",
+      summary = "Nước canh thanh ngọt tự nhiên không cần ninh xương nhờ thịt heo bằm xào thơm cùng nấm và rau củ.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingMushroom("150g"), ingMeat("150g", "Thịt heo bằm"), ingCarrot("1/2 củ (60g)"), ingBroccoli("150g")),
+      seasonings = listOf(
+        sp("Hành tím băm", "2 củ"),
+        sp("Nước mắm ngon", "1,5 muỗng canh"),
+        sp("Muối", "1/2 muỗng cà phê"),
+        sp("Hành lá & ngò rí", "2 nhánh"),
+        sp("Dầu ăn", "1 muỗng cà phê"),
+        sp("Tiêu đen xay", "1/3 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Ướp 150g thịt heo bằm với 1/2 lượng hành tím băm, 1/2 muỗng canh nước mắm và 1/3 muỗng cà phê tiêu trong 5 phút.",
+        "Nấm cắt gốc rửa sạch; cà rốt gọt vỏ tỉa lát mỏng; bông cải xanh cắt miếng nhỏ vừa thìa.",
+        "Làm nóng nồi với 1 muỗng cà phê dầu, phi thơm hành tím còn lại rồi cho thịt bằm vào đảo tơi 2 phút cho săn dậy mùi.",
+        "Chế 900ml nước vào nồi đun sôi, hớt bọt rồi thả cà rốt vào nấu trước 3 phút trên lửa vừa.",
+        "Cho bông cải và nấm vào nấu thêm 3 phút cho rau chín vừa tới, nêm 1 muỗng canh nước mắm còn lại và 1/2 muỗng cà phê muối, rắc hành ngò rồi tắt bếp."
       ),
       sourceName = SRC_COOKY,
-      sourceUrl = URL_COOKY
+      sourceUrl = "https://www.cooky.vn/tim-kiem?q=canh+nam+thit+bam+ca+rot"
     ),
+
+    // 13. Tôm sú rim mặn ngọt tiêu xanh
+    CulinaryRecipe(
+      id = "tom_su_rim_man_ngot",
+      title = "Tôm sú rim mặn ngọt tiêu xanh",
+      emoji = "🦐",
+      summary = "Từng con tôm sú đỏ au săn chắc áo lớp nước sốt mắm đường cánh gián sánh bóng, thơm cay dịu tiêu.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingShrimp("350g (tôm sú tươi)")),
+      seasonings = listOf(
+        sp("Nước mắm ngon", "2 muỗng canh"),
+        sp("Đường vàng", "1,5 muỗng canh"),
+        sp("Tỏi băm", "3 tép"),
+        sp("Hành tím băm", "2 củ"),
+        sp("Hành lá & tiêu xay", "2 nhánh hành, 1/2 muỗng cà phê tiêu"),
+        sp("Dầu ăn", "1,5 muỗng canh")
+      ),
+      steps = listOf(
+        "Tôm sú cắt bỏ râu, phần đầu nhọn và rút sạch chỉ đen dọc sống lưng, rửa nước muối loãng rồi để thật ráo nước.",
+        "Ướp tôm 10 phút với 1 muỗng canh nước mắm, 1/2 muỗng canh đường, hành tím băm và 1/3 muỗng cà phê tiêu.",
+        "Đun 1,5 muỗng canh dầu ăn và 1 muỗng canh đường còn lại trên lửa vừa tới khi đường tan và ngả màu vàng cánh gián thì cho tỏi băm vào phi thơm.",
+        "Đổ tôm đã ướp vào đảo nhanh trên lửa lớn 3 phút cho vỏ tôm chuyển đỏ au và săn cong lại.",
+        "Hạ lửa vừa rim tiếp 5–6 phút cùng 1 muỗng canh nước mắm còn lại tới khi sốt kẹo sánh bám bóng quanh vỏ tôm, rắc hành lá và tiêu xay."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=tom+rim+man+ngot"
+    ),
+
+    // 14. Tôm tươi xào bông cải xanh & ớt chuông
+    CulinaryRecipe(
+      id = "tom_xao_bong_cai_toi",
+      title = "Tôm tươi xào bông cải xanh & ớt chuông",
+      emoji = "🥦",
+      summary = "Đĩa xào thanh đạm giàu đạm ít béo chỉ 12 phút nấu với tôm sú giòn ngọt và rau củ rực rỡ sắc màu.",
+      prepMinutes = 10,
+      cookMinutes = 12,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingShrimp("250g"), ingBroccoli("200g"), ingBellPepper("1/2 quả (80g)")),
+      seasonings = listOf(
+        sp("Tỏi băm", "3 tép (1 muỗng canh)"),
+        sp("Dầu hào", "1 muỗng canh"),
+        sp("Nước mắm ngon", "1/2 muỗng canh"),
+        sp("Muối", "1/3 muỗng cà phê"),
+        sp("Dầu ăn", "1,5 muỗng canh"),
+        sp("Tiêu xay", "1/3 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Bóc vỏ tôm chừa phần đuôi, rút chỉ lưng và ướp nhẹ với nhúm muối cùng 1/3 muỗng cà phê tiêu xay trong 5 phút.",
+        "Cắt bông cải xanh thành từng bông nhỏ đều nhau và chần nhanh trong nước sôi 45 giây rồi vớt ra ngâm nước nguội, để ráo; ớt chuông thái miếng vừa ăn.",
+        "Đun nóng 1 muỗng canh dầu ăn, phi thơm 1/2 lượng tỏi băm rồi cho tôm vào xào lửa lớn 2 phút tới khi chín đỏ săn lại thì múc ra đĩa.",
+        "Cho phần dầu và tỏi còn lại vào chảo, trút bông cải và ớt chuông vào xào nhanh tay trong 2 phút trên lửa lớn.",
+        "Đổ tôm trở lại chảo, nêm 1 muỗng canh dầu hào và 1/2 muỗng canh nước mắm đảo đều 45 giây cho quyện vị rồi dọn ra đĩa."
+      ),
+      sourceName = SRC_COOKY,
+      sourceUrl = "https://www.cooky.vn/tim-kiem?q=tom+xao+bong+cai+xanh"
+    ),
+
+    // 15. Mực xào cần tỏi ớt chuông giòn ngọt
+    CulinaryRecipe(
+      id = "muc_xao_can_toi_ot_chuong",
+      title = "Mực xào cần tỏi ớt chuông giòn ngọt",
+      emoji = "🦑",
+      summary = "Mực ống khứa vảy rồng chần gừng giữ độ giòn sần sật, xào lửa lớn với ớt chuông và cà rốt không hề ra nước.",
+      prepMinutes = 12,
+      cookMinutes = 12,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingSquid("300g"), ingBellPepper("1 quả (140g)"), ingCarrot("1/2 củ (60g)")),
+      seasonings = listOf(
+        sp("Gừng tươi đập dập", "15g"),
+        sp("Tỏi băm", "3 tép (1 muỗng canh)"),
+        sp("Dầu hào", "1 muỗng canh"),
+        sp("Nước mắm ngon", "1 muỗng cà phê"),
+        sp("Hành lá & cần tây (nếu có)", "2 nhánh"),
+        sp("Dầu ăn", "1,5 muỗng canh"),
+        sp("Tiêu đen xay", "1/3 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Làm sạch ruột, túi mực và lớp da ngoài của 300g mực ống, khứa nhẹ hình caro bên trong thân rồi cắt miếng chữ nhật 3x4cm.",
+        "Chần mực nhanh 30 giây trong nồi nước sôi có 15g gừng đập dập rồi vớt ngay ra tô đá lạnh 1 phút để mực giòn và hết hẳn nước khi xào.",
+        "Thái lát mỏng cà rốt và cắt miếng vuông vừa đũa phần ớt chuông; hành lá thái khúc dài 4cm.",
+        "Phi thơm 1/2 lượng tỏi với 1 muỗng canh dầu trên lửa lớn, xào mực nhanh tay 1 phút cùng 1/2 muỗng canh dầu hào rồi múc ra.",
+        "Xào cà rốt và ớt chuông 2 phút cho chín tới, trút mực vào đảo đều 45 giây với phần dầu hào còn lại, 1 muỗng cà phê nước mắm và hành lá."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=muc+xao+ot+chuong"
+    ),
+
+    // 16. Mực hấp gừng sả cuốn xà lách mắm gừng
+    CulinaryRecipe(
+      id = "muc_hap_gung_sa_cuon_rau",
+      title = "Mực hấp gừng sả cuốn xà lách mắm gừng",
+      emoji = "🦑",
+      summary = "Mực tươi hấp sả gừng giữ nguyên vị ngọt giòn tự nhiên của hải sản, cuốn lá xà lách chấm mắm gừng chua cay.",
+      prepMinutes = 10,
+      cookMinutes = 10,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingSquid("350g"), ingLettuce("150g")),
+      seasonings = listOf(
+        sp("Gừng tươi (sợi hấp + giã làm mắm)", "35g"),
+        sp("Sả cây đập dập", "3 cây"),
+        sp("Nước mắm ngon", "2 muỗng canh"),
+        sp("Đường", "1,5 muỗng canh"),
+        sp("Nước cốt chanh", "1,5 muỗng canh"),
+        sp("Tỏi & ớt giã nhuyễn", "2 tép tỏi, 1 trái ớt")
+      ),
+      steps = listOf(
+        "Làm sạch mực ống, bóp nhẹ với chút rượu trắng hoặc gừng đập rồi xả sạch, để nguyên ống cho ngọt nước hoặc khứa khoanh.",
+        "Xếp 3 cây sả đập dập và một nửa số gừng thái sợi xuống đáy đĩa sâu lòng, đặt mực lên trên.",
+        "Đun sôi nước trong xửng rồi mới đặt đĩa mực vào hấp trên lửa lớn đúng 6–7 phút (không hấp quá lâu để mực không bị dai).",
+        "Trong lúc chờ mực chín, rửa sạch 150g xà lách để thật ráo; giã nhuyễn phần gừng còn lại cùng tỏi ớt rồi pha với 2 muỗng canh nước mắm, 1,5 muỗng canh đường và 1,5 muỗng canh nước cốt chanh.",
+        "Vớt mực ra cắt khoanh dày 1,5cm nếu để nguyên con, bày kèm lá xà lách tươi và chén nước mắm gừng thơm nồng."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=muc+hap+gung+sa"
+    ),
+
+    // 17. Súp cua bắp ngọt trứng gà sánh mịn
+    CulinaryRecipe(
+      id = "sup_cua_bap_ngot_trung_ga",
+      title = "Súp cua bắp ngọt trứng gà sánh mịn",
+      emoji = "🦀",
+      summary = "Chén súp nóng hổi sánh nhẹ chuẩn vị quán với thịt cua ngọt thanh, hạt bắp vàng giòn và vân trứng mây tơ mịn.",
+      prepMinutes = 15,
+      cookMinutes = 20,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingCrab("200g"), ingCorn("1 trái (150g hạt)"), ingEgg("2 quả"), ingCarrot("1/2 củ (50g)")),
+      seasonings = listOf(
+        sp("Bột năng hòa tan", "3 muỗng canh bột + 80ml nước lạnh"),
+        sp("Hành tím băm", "1 củ"),
+        sp("Hạt nêm", "1,5 muỗng cà phê"),
+        sp("Muối", "1/2 muỗng cà phê"),
+        sp("Dầu mè", "1 muỗng cà phê"),
+        sp("Ngò rí & tiêu xay", "2 nhánh ngò, 1/2 muỗng cà phê tiêu")
+      ),
+      steps = listOf(
+        "Tách hạt 1 trái bắp ngọt; cà rốt thái hạt lựu thật nhỏ; dùng tay gỡ nhẹ phần thịt cua kiểm tra kỹ để không sót vỏ cứng.",
+        "Phi thơm 1 củ hành tím băm với 1 muỗng cà phê dầu ăn, cho thịt cua vào đảo nhanh 1 phút cho dậy thơm rồi múc ra bát.",
+        "Đun sôi 900ml nước dùng (hoặc nước lọc) cùng bắp ngọt và cà rốt trong 10 phút cho mềm ngọt rồi nêm 1,5 muỗng cà phê hạt nêm và 1/2 muỗng cà phê muối.",
+        "Hạ lửa vừa, vừa khuấy đều tay vừa rót từ từ nước bột năng vào đến khi nồi súp đạt độ sánh mượt vừa ý, sau đó thả thịt cua vào.",
+        "Đánh tan 2 quả trứng gà rồi rót qua rây thành dòng thật mảnh vào nồi súp đang sôi nhẹ đồng thời khuấy một chiều tạo vân mây; tắt bếp thêm 1 muỗng cà phê dầu mè, ngò rí và tiêu xay."
+      ),
+      sourceName = SRC_SAVOURY_DAYS,
+      sourceUrl = "https://www.savourydays.com/?s=sup+cua+bap+ngot"
+    ),
+
+    // 18. Trứng chiên thịt bằm sốt cà chua
+    CulinaryRecipe(
+      id = "trung_chien_thit_bam_sot_ca",
+      title = "Trứng chiên thịt bằm sốt cà chua",
+      emoji = "🍳",
+      summary = "Món cơm nhà cực kỳ bắt cơm với trứng chiên nhân thịt bằm đậm vị rưới sốt cà chua chua ngọt óng ả.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingEgg("3 quả"), ingMeat("100g", "Thịt heo bằm"), ingTomatoSauce("60g (4 muỗng canh)")),
+      seasonings = listOf(
+        sp("Hành tím băm", "2 củ"),
+        sp("Nước mắm ngon", "1,5 muỗng canh"),
+        sp("Đường", "1 muỗng cà phê"),
+        sp("Hành lá thái nhỏ", "2 nhánh"),
+        sp("Dầu ăn", "1,5 muỗng canh"),
+        sp("Tiêu đen xay", "1/2 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Ướp 100g thịt heo bằm với 1/2 lượng hành tím băm, 1/2 muỗng canh nước mắm và 1/3 muỗng cà phê tiêu; đánh tan 3 quả trứng với hành lá và nhúm tiêu.",
+        "Xào chín săn phần thịt bằm trong chảo với 1/2 muỗng canh dầu ăn trong 2 phút rồi trút vào tô trứng khuấy đều.",
+        "Làm nóng 1 muỗng canh dầu còn lại trên chảo chống dính, đổ hỗn hợp trứng thịt bằm vào chiên lửa vừa mỗi mặt 2–3 phút tới khi vàng đều rồi gắp ra đĩa.",
+        "Trên cùng chảo đó phi thơm phần hành tím còn lại, đổ 4 muỗng canh sốt cà chua cùng 40ml nước lọc, 1 muỗng canh nước mắm và 1 muỗng cà phê đường vào đảo.",
+        "Đun sốt cà chua khoảng 2–3 phút cho sánh nhẹ rồi chan lên đĩa trứng thịt bằm, rắc nốt tiêu xay và dùng nóng với cơm."
+      ),
+      sourceName = SRC_COOKY,
+      sourceUrl = "https://www.cooky.vn/tim-kiem?q=trung+chien+thit+bam+sot+ca"
+    ),
+
+    // 19. Trứng bác sữa tươi bơ phô mai kiểu Pháp
+    CulinaryRecipe(
+      id = "trung_bac_sua_tuoi_pho_mai",
+      title = "Trứng bác sữa tươi bơ phô mai kiểu Pháp",
+      emoji = "🥚",
+      summary = "Bữa sáng mềm ẩm, tan mịn như kem nhờ đánh trứng với sữa tươi và nấu lửa thật nhỏ cùng bơ lạt và phô mai.",
+      prepMinutes = 5,
+      cookMinutes = 8,
+      servingsLabel = "1–2 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15),
+      fridgeIngredients = listOf(ingEgg("3 quả"), ingMilk("45ml"), ingButter("15g"), ingCheese("30g")),
+      seasonings = listOf(
+        sp("Muối mịn", "1/3 muỗng cà phê"),
+        sp("Tiêu đen xay", "1/4 muỗng cà phê"),
+        sp("Hành lá hoặc ngò rí thái nhuyễn", "1 muỗng canh")
+      ),
+      steps = listOf(
+        "Đập 3 quả trứng gà vào tô, thêm 45ml sữa tươi không đường và 1/3 muỗng cà phê muối rồi đánh nhẹ đến khi lòng trắng và lòng đỏ hòa tan hoàn toàn.",
+        "Cắt nhỏ hoặc xé sợi 30g phô mai; đặt chảo chống dính lên bếp ở lửa thật nhỏ và cho 15g bơ lạt vào tan chảy từ từ (tránh làm cháy bơ).",
+        "Đổ hỗn hợp trứng sữa vào chảo, chờ khoảng 15 giây cho phần đáy se nhẹ rồi dùng phới silicon đẩy nhẹ từng lớp trứng từ mép vào tâm.",
+        "Lặp lại thao tác khuấy chậm 3–4 phút cho đến khi hình thành các mảng trứng mềm mịn như kem và vẫn còn hơi bóng ẩm.",
+        "Tắt bếp ngay khi trứng chưa khô kiệt (sức nóng dư sẽ làm trứng chín tiếp), thả phô mai vào đảo tan đều, rắc tiêu đen và hành lá lên mặt."
+      ),
+      sourceName = SRC_SERIOUS_EATS,
+      sourceUrl = "https://www.seriouseats.com/search?q=soft+scrambled+eggs+butter+cheese"
+    ),
+
+    // 20. Canh trứng mây cà chua & bắp ngọt
+    CulinaryRecipe(
+      id = "canh_trung_may_sot_ca_bap_ngot",
+      title = "Canh trứng mây cà chua & bắp ngọt",
+      emoji = "🍅",
+      summary = "Bát canh quốc dân thanh nhẹ nấu chỉ 12 phút, nổi bật sắc đỏ cà chua, hạt bắp ngọt và vân trứng mịn mượt.",
+      prepMinutes = 5,
+      cookMinutes = 12,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingTomatoSauce("45g (3 muỗng canh)"), ingEgg("2 quả"), ingCorn("1/2 trái (80g hạt)"), ingWater("750ml")),
+      seasonings = listOf(
+        sp("Hành tím băm", "1 củ"),
+        sp("Nước mắm ngon", "1 muỗng canh"),
+        sp("Muối", "1/2 muỗng cà phê"),
+        sp("Dầu ăn", "1 muỗng cà phê"),
+        sp("Hành lá & ngò rí", "2 nhánh"),
+        sp("Tiêu xay", "1/3 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Đánh tan 2 quả trứng gà với nhúm muối nhỏ cho đều tay; tách hạt 1/2 trái bắp ngọt và thái nhỏ hành lá, ngò rí.",
+        "Làm nóng 1 muỗng cà phê dầu ăn trong nồi, phi thơm 1 củ hành tím băm rồi cho 3 muỗng canh sốt cà chua vào đảo 1 phút cho dậy màu đỏ đẹp.",
+        "Chế 750ml nước suối vào nồi, thả hạt bắp ngọt vào nấu sôi khoảng 5 phút để hạt bắp chín mềm và ra vị ngọt tự nhiên.",
+        "Nêm 1 muỗng canh nước mắm và 1/2 muỗng cà phê muối vừa khẩu vị, chỉnh bếp sôi lăn tăn nhẹ.",
+        "Rót trứng từ từ theo vòng tròn quanh nồi rồi khuấy nhẹ theo một chiều tạo vân mây mịn mượt, tắt bếp thêm hành ngò và tiêu xay."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=canh+trung+may+ca+chua"
+    ),
+
+    // 21. Cơm chiên Dương Châu tôm trứng cà rốt
+    CulinaryRecipe(
+      id = "com_chien_duong_chau",
+      title = "Cơm chiên Dương Châu tôm trứng cà rốt",
+      emoji = "🍚",
+      summary = "Hạt cơm tơi săn vàng óng áo trứng gà, đầy đủ sắc vị từ tôm sú giòn, cà rốt hạt lựu và hương dầu mè thơm lừng.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingRice("350g (2 chén cơm nguội)"), ingShrimp("150g"), ingEgg("2 quả"), ingCarrot("1/2 củ (50g)")),
+      seasonings = listOf(
+        sp("Tỏi băm", "2 tép"),
+        sp("Nước tương (xì dầu)", "1,5 muỗng canh"),
+        sp("Dầu hào", "1/2 muỗng canh"),
+        sp("Dầu ăn", "2 muỗng canh"),
+        sp("Hành lá thái nhỏ", "2 nhánh"),
+        sp("Tiêu đen xay", "1/2 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Tôm bóc vỏ rút chỉ lưng rồi cắt hạt lựu, xóc với chút tiêu; cà rốt thái hạt lựu nhỏ rồi chần nước sôi 1,5 phút cho mềm và để ráo.",
+        "Tán tơi 350g cơm nguội với 1 lòng đỏ trứng gà và 1/2 muỗng canh dầu ăn để hạt cơm săn rời và có màu vàng đều đẹp mắt.",
+        "Làm nóng 1 muỗng canh dầu ăn trên chảo rộng, cho tỏi băm vào phi thơm rồi xào tôm và cà rốt 2 phút cho vừa chín săn thì múc ra đĩa.",
+        "Thêm 1/2 muỗng canh dầu, đổ phần trứng còn lại vào đảo tơi rồi trút tô cơm vào rang trên lửa vừa 4–5 phút đến khi hạt cơm săn nhảy nhẹ.",
+        "Cho tôm và cà rốt vào đảo chung, nêm 1,5 muỗng canh nước tương và 1/2 muỗng canh dầu hào xào lửa lớn thêm 1,5 phút rồi rắc hành lá và tiêu."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=com+chien+duong+chau"
+    ),
+
+    // 22. Cơm chiên dưa bò chuẩn vị quán
+    CulinaryRecipe(
+      id = "com_chien_dua_bo",
+      title = "Cơm chiên dưa bò chuẩn vị quán",
+      emoji = "🍚",
+      summary = "Đĩa cơm chiên nóng giòn trứ danh với thịt bò mềm, dưa cải muối chua xào thấm vị và hạt cơm rang trứng tơi xốp.",
+      prepMinutes = 10,
+      cookMinutes = 15,
+      servingsLabel = "2–3 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingRice("350g (2 chén cơm nguội)"), ingMeat("150g", "Thịt bò thăn"), ingPickle("120g"), ingEgg("2 quả")),
+      seasonings = listOf(
+        sp("Tỏi băm", "3 tép"),
+        sp("Nước tương (xì dầu)", "1,5 muỗng canh"),
+        sp("Dầu hào", "1 muỗng canh"),
+        sp("Đường", "1/2 muỗng cà phê"),
+        sp("Dầu ăn", "2 muỗng canh"),
+        sp("Hành lá & tiêu xay", "2 nhánh hành, 1/2 muỗng cà phê tiêu")
+      ),
+      steps = listOf(
+        "Thịt bò thái lát thật mỏng rồi băm nhẹ hoặc cắt miếng nhỏ, ướp 5 phút với 1/2 muỗng canh nước tương, 1/2 lượng tỏi băm và 1/2 muỗng canh dầu ăn.",
+        "Vắt ráo 120g dưa cải muối chua và thái nhỏ vừa miếng ăn; tán tơi cơm nguội với 1 quả trứng để cơm không bị vón cục.",
+        "Xào dưa cải với 1/2 muỗng canh dầu và 1/2 muỗng cà phê đường trong 2 phút cho săn thơm rồi đẩy sang một bên; bật lửa lớn xào thịt bò tái 1 phút và trút chung ra đĩa.",
+        "Làm nóng 1 muỗng canh dầu còn lại, chiên tơi quả trứng thứ 2 rồi đổ cơm nguội vào rang trên lửa vừa 4–5 phút tới khi cơm khô tơi.",
+        "Trút đĩa dưa bò vào rang chung trên lửa lớn, nêm 1 muỗng canh nước tương còn lại và 1 muỗng canh dầu hào đảo đều 1,5 phút, rắc hành lá và tiêu."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=com+chien+dua+bo"
+    ),
+
+    // 23. Bánh mì chảo trứng ốp la sốt cà bơ thơm
     CulinaryRecipe(
       id = "banh_mi_chao_trung_sot_ca",
       title = "Bánh mì chảo trứng ốp la sốt cà bơ thơm",
       emoji = "🥖",
-      summary = "Bữa sáng kiểu tiệm nóng hổi ngay tại nhà với bánh mì giòn chấm sốt cà chua bơ béo.",
+      summary = "Bữa sáng kiểu tiệm nóng hổi ngay tại nhà với chảo sốt cà bơ tỏi béo thơm, trứng ốp la lòng đào và bánh mì giòn rụm.",
+      prepMinutes = 5,
       cookMinutes = 12,
-      servings = 1,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
-      fridgeIngredients = listOf(ingBread("1 ổ"), ingEgg("2 quả"), ingTomatoSauce(), ingButter("15g")),
-      pantryStaples = listOf("Tỏi băm", "Đường", "Xì dầu", "Tiêu xay", "Ngò rí"),
+      fridgeIngredients = listOf(ingBread("2 ổ (160g)"), ingEgg("2 quả"), ingTomatoSauce("60g (4 muỗng canh)"), ingButter("15g")),
+      seasonings = listOf(
+        sp("Tỏi băm", "2 tép"),
+        sp("Đường", "1 muỗng cà phê"),
+        sp("Nước tương (xì dầu)", "1 muỗng cà phê"),
+        sp("Ngò rí & hành lá", "2 nhánh"),
+        sp("Tiêu đen xay", "1/3 muỗng cà phê")
+      ),
       steps = listOf(
-        "Đun chảy bơ với chút tỏi băm trên chảo nhỏ, cho sốt cà và nửa muỗng đường vào đun sánh.",
-        "Tạo hai khoảng trống trên chảo sốt rồi đập 2 quả trứng gà vào ốp la nhẹ tay.",
-        "Đậy nắp khoảng 2 phút trên lửa nhỏ để lòng trắng chín mượt còn lòng đỏ vẫn dẻo thơm.",
-        "Rắc tiêu, ngò rí lên mặt chảo, rưới chút xì dầu và chấm nóng với bánh mì nướng giòn."
+        "Xịt nhẹ nước hoặc áp nóng 2 ổ bánh mì trên chảo khô hoặc lò nướng ở 180°C khoảng 3 phút cho lớp vỏ giòn tan.",
+        "Đun chảy 15g bơ lạt trên chảo gang hoặc chảo chống dính nhỏ ở lửa vừa nhỏ rồi phi thơm 2 tép tỏi băm trong 20 giây.",
+        "Cho 4 muỗng canh sốt cà chua, 30ml nước lọc và 1 muỗng cà phê đường vào đun sôi lăn tăn khoảng 2 phút cho sốt sánh mượt.",
+        "Gạt nhẹ tạo hai khoảng trống trên mặt sốt rồi đập 2 quả trứng gà vào ốp la, đậy nắp nấu trên lửa nhỏ khoảng 2,5 phút để lòng trắng chín mượt còn lòng đỏ vẫn dẻo thơm.",
+        "Tắt bếp, rưới 1 muỗng cà phê nước tương lên trứng, rắc ngò rí và tiêu đen rồi mang cả chảo nóng ra chấm cùng bánh mì giòn."
       ),
       sourceName = SRC_SAVOURY_DAYS,
-      sourceUrl = URL_SAVOURY_DAYS
+      sourceUrl = "https://www.savourydays.com/?s=banh+mi+chao"
     ),
-    CulinaryRecipe(
-      id = "banh_mi_kep_ba_chi_pho_mai",
-      title = "Bánh mì kẹp thịt ba chỉ phô mai xà lách",
-      emoji = "🥪",
-      summary = "Sandwich kẹp nhanh 10 phút với ba chỉ áp chảo giòn, phô mai tan nhẹ và xà lách tươi.",
-      cookMinutes = 10,
-      servings = 1,
-      categories = setOf(CulinaryFilter.QUICK_15),
-      fridgeIngredients = listOf(ingBread("2 lát"), ingBacon("120g"), ingCheese(), ingLettuce("3 lá")),
-      pantryStaples = listOf("Tiêu đen", "Tương cà hoặc tương ớt", "Dầu ăn"),
-      steps = listOf(
-        "Áp chảo thịt ba chỉ trên lửa vừa cho xém giòn hai mặt rồi thấm bớt dầu.",
-        "Áp nóng nhanh hai lát bánh mì trên chính chảo vừa chiên để bánh giòn thơm.",
-        "Xếp xà lách khô ráo lên lát bánh dưới, đặt ba chỉ nóng và lát phô mai lên trên cho chảy nhẹ.",
-        "Phết thêm chút tương cà hoặc tương ớt, rắc tiêu và kẹp lát bánh còn lại."
-      ),
-      sourceName = SRC_SERIOUS_EATS,
-      sourceUrl = URL_SERIOUS_EATS
-    ),
+
+    // 24. Bánh mì nướng bơ tỏi nấm phô mai
     CulinaryRecipe(
       id = "banh_mi_bo_toi_nam_pho_mai",
-      title = "Bánh mì nướng bơ tỏi nấm phô mai kéo sợi",
+      title = "Bánh mì nướng bơ tỏi nấm phô mai",
       emoji = "🧀",
-      summary = "Lớp bơ tỏi thơm lừng phủ nấm xào đậm vị và phô mai nướng chảy vàng rụm.",
-      cookMinutes = 15,
+      summary = "Vỏ bánh mì giòn rụm thấm bơ tỏi thơm lừng kết hợp nấm xào đậm đà và lớp phô mai nướng tan kéo sợi.",
+      prepMinutes = 10,
+      cookMinutes = 12,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15),
-      fridgeIngredients = listOf(ingBread("2 ổ nhỏ"), ingButter("25g"), ingMushroom("120g"), ingCheese("50g")),
-      pantryStaples = listOf("Tỏi băm", "Muối", "Tiêu xay", "Ngò rí hoặc lá oregano"),
+      fridgeIngredients = listOf(ingBread("2 ổ nhỏ (150g)"), ingButter("25g"), ingMushroom("120g"), ingCheese("50g")),
+      seasonings = listOf(
+        sp("Tỏi băm thật nhuyễn", "4 tép (1 muỗng canh)"),
+        sp("Muối mịn", "1/4 muỗng cà phê"),
+        sp("Tiêu đen xay", "1/4 muỗng cà phê"),
+        sp("Ngò rí hoặc lá oregano băm", "1 muỗng canh")
+      ),
       steps = listOf(
-        "Trộn bơ mềm với tỏi băm, nhúm muối và ngò rí băm nhuyễn; xào nhanh nấm thái lát cho ráo nước.",
-        "Xẻ dọc bánh mì, phết đều hỗn hợp bơ tỏi lên mặt cắt.",
-        "Xếp phần nấm đã xào lên bánh rồi phủ phô mai bào sợi kín mặt.",
-        "Nướng ở 180°C trong 6–7 phút (hoặc áp chảo đậy nắp) đến khi phô mai tan vàng rụm."
+        "Để 25g bơ lạt mềm ở nhiệt độ phòng rồi trộn thật nhuyễn với 4 tép tỏi băm, 1/4 muỗng cà phê muối, 1/4 muỗng cà phê tiêu và ngò rí băm.",
+        "Thái lát mỏng 120g nấm tươi, cho lên chảo khô đảo lửa lớn 3 phút với nhúm muối nhỏ cho nấm chín và ra hết hơi nước để không làm ướt bánh.",
+        "Xẻ đôi 2 ổ bánh mì theo chiều dọc, phết đều hỗn hợp bơ tỏi kín hai mặt cắt.",
+        "Trải đều phần nấm đã xào khô lên bề mặt bánh rồi phủ 50g phô mai thái sợi lên trên.",
+        "Nướng bằng nồi chiên không dầu hoặc lò nướng ở 180°C trong 6–7 phút (hoặc áp chảo đậy vung 5 phút) tới khi phô mai tan chảy vàng xém cạnh."
       ),
       sourceName = SRC_SAVOURY_DAYS,
-      sourceUrl = URL_SAVOURY_DAYS
+      sourceUrl = "https://www.savourydays.com/?s=banh+mi+nuong+bo+toi+pho+mai"
     ),
+
+    // 25. Bánh mì nướng kiểu Pháp chuối mật ong
     CulinaryRecipe(
       id = "banh_mi_nuong_phap_chuoi",
-      title = "Bánh mì nướng kiểu Pháp chuối sữa tươi",
+      title = "Bánh mì nướng kiểu Pháp chuối mật ong",
       emoji = "🍌",
-      summary = "Bánh mì nhúng hỗn hợp trứng sữa áp chảo thơm lừng kết hợp chuối chín ngọt tự nhiên.",
-      cookMinutes = 15,
+      summary = "Bánh mì nhúng trứng sữa áp chảo mềm thơm bên trong, xém vàng bên ngoài ăn kèm chuối chín cắt lát.",
+      prepMinutes = 8,
+      cookMinutes = 12,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingBread("3 lát"), ingBanana("2 quả"), ingMilk("100ml"), ingEgg()),
-      pantryStaples = listOf("Mật ong", "Bột quế (tùy chọn)", "Nhúm muối", "Dầu dừa hoặc dầu ăn"),
-      steps = listOf(
-        "Đánh đều trứng gà, sữa tươi và nhúm muối nhỏ trong tô rộng; cắt lát chuối chín.",
-        "Nhúng từng lát bánh mì vào hỗn hợp trứng sữa khoảng 15 giây cho thấm đều hai mặt.",
-        "Áp chảo bánh trên lửa vừa nhỏ mỗi mặt 2–3 phút đến khi vàng thơm.",
-        "Xếp bánh ra đĩa kèm chuối thái lát và rưới thêm chút mật ong trước khi thưởng thức."
+      fridgeIngredients = listOf(ingBread("4 lát sandwich (120g)"), ingBanana("1 quả (100g)"), ingMilk("80ml"), ingEgg("2 quả")),
+      seasonings = listOf(
+        sp("Mật ong", "1,5 muỗng canh"),
+        sp("Bột quế (tùy chọn)", "1/4 muỗng cà phê"),
+        sp("Muối tinh", "1 nhúm nhỏ"),
+        sp("Dầu dừa hoặc dầu ăn", "1 muỗng canh")
       ),
-      sourceName = SRC_SAVOURY_DAYS,
-      sourceUrl = URL_SAVOURY_DAYS
+      steps = listOf(
+        "Đập 2 quả trứng gà vào tô rộng, thêm 80ml sữa tươi không đường, 1 nhúm muối tinh và 1/4 muỗng cà phê bột quế rồi đánh hòa quyện.",
+        "Bóc vỏ 1 quả chuối chín, cắt khoanh chéo dày khoảng 5mm để bày kèm.",
+        "Nhúng từng lát bánh mì sandwich vào hỗn hợp trứng sữa khoảng 15 giây mỗi mặt sao cho bánh thấm ướt nhưng không bị nhũn rách.",
+        "Làm nóng chảo chống dính với 1 muỗng canh dầu dừa trên lửa vừa nhỏ, áp chảo bánh mỗi mặt 2,5–3 phút đến khi vàng ruộm thơm mùi trứng sữa.",
+        "Xếp bánh chồng lên đĩa, phủ các lát chuối chín lên mặt và rưới đều 1,5 muỗng canh mật ong trước khi dùng ấm."
+      ),
+      sourceName = SRC_SERIOUS_EATS,
+      sourceUrl = "https://www.seriouseats.com/search?q=french+toast+banana"
     ),
+
+    // 26. Bánh bao hấp nóng ăn sáng kèm sữa tươi
+    CulinaryRecipe(
+      id = "banh_bao_hap_sua_tuoi_an_sang",
+      title = "Bánh bao hấp nóng ăn sáng kèm sữa tươi",
+      emoji = "🥟",
+      summary = "Bữa sáng nhanh gọn chỉ 12 phút với bánh bao hấp giữ vỏ xốp ẩm cùng ly sữa tươi thanh mát đủ năng lượng.",
+      prepMinutes = 3,
+      cookMinutes = 12,
+      servingsLabel = "1–2 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
+      fridgeIngredients = listOf(ingDumpling("3 cái (270g)"), ingMilk("200ml")),
+      seasonings = listOf(
+        sp("Giấm trắng (nhỏ vào nước hấp)", "1 muỗng cà phê"),
+        sp("Nước tương & tương ớt ăn kèm", "1 muỗng canh (tùy thích)")
+      ),
+      steps = listOf(
+        "Chuẩn bị nồi hấp với lượng nước vừa đủ, nhỏ thêm 1 muỗng cà phê giấm trắng giúp vỏ bánh sau khi hấp trắng xốp tự nhiên.",
+        "Đợi nước trong xửng sôi mạnh, xếp 3 chiếc bánh bao lên đĩa hoặc giấy nến cách nhau 2cm để hơi nước lưu thông đều và không dính đáy.",
+        "Bọc một chiếc khăn sạch dưới nắp nồi hấp để hơi nước ngưng tụ không nhỏ giọt làm nhão mặt vỏ bánh.",
+        "Hấp lửa vừa trong 10–12 phút nếu bánh để ngăn mát (hoặc 15 phút nếu lấy thẳng từ ngăn đông) đến khi vỏ bánh phồng mềm.",
+        "Tắt bếp chờ 1 phút rồi mở nắp từ từ để bánh không bị xẹp vỏ; rót 200ml sữa tươi ra ly dùng nóng cùng bánh bao và tương ớt nếu thích."
+      ),
+      sourceName = SRC_DMX,
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=cach+hap+banh+bao+mem+xop"
+    ),
+
+    // 27. Gỏi xoài xanh tôm thịt ba chỉ
+    CulinaryRecipe(
+      id = "goi_xoai_xanh_tom_thit",
+      title = "Gỏi xoài xanh tôm thịt ba chỉ",
+      emoji = "🥭",
+      summary = "Đĩa gỏi chua cay mặn ngọt đúng điệu Việt Nam với xoài keo xanh bào sợi giòn sần sật, tôm luộc và ba chỉ thái mỏng.",
+      prepMinutes = 15,
+      cookMinutes = 15,
+      servingsLabel = "3–4 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingMango("1 quả xoài xanh (300g)", "Xoài keo xanh"), ingShrimp("150g"), ingBacon("120g"), ingCarrot("1/2 củ (50g)")),
+      seasonings = listOf(
+        sp("Nước mắm ngon", "2,5 muỗng canh"),
+        sp("Đường", "2,5 muỗng canh"),
+        sp("Nước cốt chanh tươi", "2 muỗng canh"),
+        sp("Tỏi & ớt băm nhuyễn", "3 tép tỏi, 1 trái ớt"),
+        sp("Đậu phộng rang giã dập", "2 muỗng canh"),
+        sp("Rau răm hoặc húng lủi", "1 nắm nhỏ")
+      ),
+      steps = listOf(
+        "Luộc chín 120g thịt ba chỉ với nhúm muối khoảng 12 phút rồi vớt ngâm nước lạnh và thái lát mỏng; tôm luộc 3 phút tới khi chín đỏ, bóc vỏ chẻ đôi lưng.",
+        "Gọt vỏ xoài xanh và cà rốt, bào sợi dài đều nhau rồi ngâm tô nước đá khoảng 5 phút và vớt thật ráo để giữ độ giòn.",
+        "Pha nước trộn gỏi theo tỷ lệ chuẩn 2,5 muỗng canh nước mắm : 2,5 muỗng canh đường : 2 muỗng canh nước cốt chanh, khuấy tan rồi cho tỏi ớt băm vào.",
+        "Cho xoài và cà rốt vào âu lớn, rưới một nửa chén nước gỏi vào đảo nhẹ tay 2 phút cho thấm rồi chắt bỏ bớt nước tiết ra.",
+        "Thêm tôm, ba chỉ thái mỏng, rau răm thái rối và phần nước trộn còn lại đảo đều; bày ra đĩa rắc 2 muỗng canh đậu phộng rang giã dập lên mặt."
+      ),
+      sourceName = SRC_VNEXPRESS,
+      sourceUrl = "https://timkiem.vnexpress.net/?q=goi+xoai+tom+thit"
+    ),
+
+    // 28. Salad ức gà táo xanh nho tươi dầu giấm
+    CulinaryRecipe(
+      id = "salad_uc_ga_tao_nho",
+      title = "Salad ức gà táo nho dầu giấm",
+      emoji = "🍏",
+      summary = "Món salad tươi giòn cân bằng vị ngọt của táo, nho mọng nước cùng ức gà áp chảo và xốt dầu giấm mật ong.",
+      prepMinutes = 10,
+      cookMinutes = 12,
+      servingsLabel = "2 người ăn",
+      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
+      fridgeIngredients = listOf(ingApple("1 quả (150g)"), ingGrape("100g"), ingChicken("200g", "Ức gà"), ingLettuce("120g")),
+      seasonings = listOf(
+        sp("Dầu ô liu", "2 muỗng canh"),
+        sp("Nước cốt chanh hoặc giấm táo", "1,5 muỗng canh"),
+        sp("Mật ong", "1 muỗng canh"),
+        sp("Muối", "1/2 muỗng cà phê"),
+        sp("Tiêu đen xay", "1/3 muỗng cà phê")
+      ),
+      steps = listOf(
+        "Ướp 200g ức gà với 1/3 muỗng cà phê muối, tiêu đen và 1/2 muỗng canh dầu ô liu trong 5 phút rồi áp chảo mỗi mặt 4 phút cho chín vàng, thái lát vừa ăn.",
+        "Rửa sạch 120g xà lách để thật ráo; 100g nho cắt đôi theo chiều dọc.",
+        "Táo tươi rửa sạch giữ vỏ, cắt lát mỏng vừa ăn và ngâm nhanh 2 phút trong tô nước pha chút nước cốt chanh loãng để không bị thâm, sau đó để ráo.",
+        "Khuấy đều xốt dầu giấm gồm 1,5 muỗng canh dầu ô liu, 1,5 muỗng canh nước cốt chanh (hoặc giấm táo), 1 muỗng canh mật ong và nhúm muối.",
+        "Trộn nhẹ xà lách, táo, nho trong âu với 2/3 phần xốt rồi trút ra đĩa, xếp ức gà ấm lên trên và rưới nốt phần xốt còn lại."
+      ),
+      sourceName = SRC_SERIOUS_EATS,
+      sourceUrl = "https://www.seriouseats.com/search?q=apple+grape+chicken+salad"
+    ),
+
+    // 29. Sinh tố chuối dâu tây sữa chua ít đường
     CulinaryRecipe(
       id = "sinh_to_chuoi_dau_sua_chua",
       title = "Sinh tố chuối dâu tây sữa chua ít đường",
       emoji = "🍓",
-      summary = "Ly sinh tố sánh mịn giàu chất xơ, ngọt dịu từ chuối chín và dâu tây tươi mát.",
-      cookMinutes = 5,
-      servings = 1,
+      summary = "Thức uống Eat-Clean sánh mịn tự nhiên không cần thêm đường tinh luyện nhờ độ ngọt từ chuối chín và dâu tây tươi.",
+      prepMinutes = 5,
+      cookMinutes = 3,
+      servingsLabel = "1–2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingBanana(), ingStrawberry(), ingYogurt(), ingMilk("100ml")),
-      pantryStaples = listOf("Đá viên", "Hạt chia hoặc mật ong (tùy chọn)"),
+      fridgeIngredients = listOf(ingBanana("1 quả (120g)"), ingStrawberry("100g"), ingYogurt("1 hũ (100g)"), ingMilk("100ml")),
+      seasonings = listOf(
+        sp("Mật ong (tùy khẩu vị)", "1 muỗng cà phê"),
+        sp("Đá viên nhỏ", "60g (khoảng 4–5 viên)"),
+        sp("Hạt chia (tùy chọn)", "1 muỗng cà phê")
+      ),
       steps = listOf(
-        "Rửa sạch dâu tây, bỏ cuống và cắt đôi; bóc vỏ chuối cắt khoanh vừa xay.",
-        "Cho chuối, dâu tây, sữa chua và sữa tươi vào máy xay sinh tố.",
-        "Thêm vài viên đá nhỏ nếu thích uống lạnh và xay nhuyễn khoảng 30 giây.",
-        "Rót ra ly, rắc thêm chút hạt chia nếu có và dùng ngay để giữ vitamin."
+        "Ngâm nhẹ 100g dâu tây với nước muối loãng 2 phút rồi rửa sạch, cắt bỏ đài cuống và bổ đôi quả.",
+        "Bóc vỏ 1 quả chuối chín, cắt khoanh dày khoảng 2cm (có thể dùng chuối đã cấp đông để ly sinh tố sánh lạnh hơn).",
+        "Cho chuối, dâu tây, 100g sữa chua không đường và 100ml sữa tươi vào cối xay sinh tố.",
+        "Thêm đá viên và 1 muỗng cà phê mật ong nếu muốn ngọt hơn, bật máy xay ở tốc độ cao khoảng 30–40 giây tới khi hỗn hợp mịn mượt hoàn toàn.",
+        "Rót sinh tố ra ly cao, rắc 1 muỗng cà phê hạt chia lên mặt và thưởng thức ngay để giữ trọn vitamin C."
       ),
       sourceName = SRC_DMX,
-      sourceUrl = URL_DMX
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=sinh+to+chuoi+dau+tay+sua+chua"
     ),
+
+    // 30. Sữa chua tô trái cây táo nho dâu tây
     CulinaryRecipe(
-      id = "sua_chua_to_tao_nho_dau",
+      id = "sua_chua_to_trai_cay_tuoi",
       title = "Sữa chua tô trái cây táo nho dâu tây",
-      emoji = "🍎",
-      summary = "Smoothie bowl mát giòn đầy màu sắc từ táo, nho, dâu tây và sữa chua không làm nóng bếp.",
-      cookMinutes = 5,
-      servings = 1,
+      emoji = "🍓",
+      summary = "Bữa sáng thanh nhẹ không cần bật bếp, kết hợp 2 hũ sữa chua mát lạnh cùng táo giòn, nho ngọt và dâu tây tươi.",
+      prepMinutes = 8,
+      cookMinutes = 2,
+      servingsLabel = "1–2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingYogurt("2 hũ"), ingApple(), ingGrape(), ingStrawberry("80g")),
-      pantryStaples = listOf("Mật ong", "Yến mạch hoặc hạt điều rang (tùy chọn)"),
+      fridgeIngredients = listOf(ingYogurt("2 hũ (200g)"), ingApple("1/2 quả (80g)"), ingGrape("80g"), ingStrawberry("80g")),
+      seasonings = listOf(
+        sp("Mật ong nguyên chất", "1 muỗng canh"),
+        sp("Nước cốt chanh (ngâm táo)", "1/2 muỗng cà phê"),
+        sp("Granola / yến mạch rang (tùy chọn)", "2 muỗng canh")
+      ),
       steps = listOf(
-        "Rửa sạch táo, nho và dâu tây với nước muối loãng rồi để ráo hoàn toàn.",
-        "Thái táo miếng nhỏ vừa ăn, cắt đôi quả nho và lát mỏng dâu tây.",
-        "Đổ sữa chua lạnh ra tô rộng làm phần nền sánh mịn.",
-        "Xếp gọn táo, nho và dâu tây lên mặt tô, rưới thêm 1 muỗng nhỏ mật ong nếu thích ngọt."
+        "Rửa sạch táo, nho và dâu tây qua nước muối loãng rồi thấm ráo hoàn toàn để không làm loãng sữa chua.",
+        "Thái hạt lựu hoặc lát mỏng 80g táo và xóc nhanh với vài giọt nước cốt chanh giữ màu sáng giòn.",
+        "Cắt đôi 80g nho bỏ hạt (nếu có) và bổ đôi hoặc lát mỏng 80g dâu tây.",
+        "Múc 200g sữa chua lạnh ra tô rộng, dùng muỗng dàn đều thành bề mặt phẳng mịn.",
+        "Xếp xen kẽ táo, nho và dâu tây lên trên, rắc thêm 2 muỗng canh granola nếu có rồi rưới 1 muỗng canh mật ong."
       ),
       sourceName = SRC_COOKY,
-      sourceUrl = URL_COOKY
+      sourceUrl = "https://www.cooky.vn/tim-kiem?q=sua+chua+trai+cay+healthy"
     ),
+
+    // 31. Xoài dầm sữa tươi kem vani mát lạnh
     CulinaryRecipe(
-      id = "salad_ga_tao_nho_xa_lach",
-      title = "Salad ức gà táo nho xà lách giòn mát",
-      emoji = "🍏",
-      summary = "Vị ngọt giòn của táo và nho giúp món salad ức gà Eat-Clean tươi mới và dễ ăn hơn hẳn.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingChicken("250g"), ingApple(), ingGrape("100g"), ingLettuce()),
-      pantryStaples = listOf("Dầu ô liu", "Nước cốt chanh", "Mật ong", "Muối", "Tiêu xay"),
-      steps = listOf(
-        "Áp chảo hoặc luộc chín ức gà với nhúm muối, để nguội bớt rồi thái lát vừa ăn.",
-        "Cắt xà lách khúc ngắn; táo thái lát mỏng ngâm nhanh nước chanh loãng chống thâm; nho cắt đôi.",
-        "Khuấy đều 2 muỗng dầu ô liu, 1 muỗng nước cốt chanh, nửa muỗng mật ong, muối và tiêu.",
-        "Cho toàn bộ nguyên liệu vào tô, rưới sốt trộn nhẹ tay và thưởng thức."
-      ),
-      sourceName = SRC_SERIOUS_EATS,
-      sourceUrl = URL_SERIOUS_EATS
-    ),
-    CulinaryRecipe(
-      id = "goi_xoai_tom_ca_rot",
-      title = "Gỏi xoài tôm tươi cà rốt cuốn xà lách",
-      emoji = "🥭",
-      summary = "Đĩa gỏi xoài chua ngọt giòn sần sật cùng tôm luộc ngọt thịt và nước mắm chua cay.",
-      cookMinutes = 15,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingMango(), ingShrimp("200g"), ingCarrot("1/2 củ"), ingLettuce()),
-      pantryStaples = listOf("Nước mắm", "Đường", "Nước cốt chanh", "Tỏi ớt băm", "Đậu phộng rang"),
-      steps = listOf(
-        "Luộc chín tôm với nhúm muối, bóc vỏ và chẻ đôi theo chiều dọc; xoài và cà rốt bào sợi.",
-        "Pha nước trộn gỏi theo tỷ lệ 2 muỗng nước mắm, 2 muỗng đường, 2 muỗng nước chanh và tỏi ớt.",
-        "Trộn xoài bào và cà rốt với một nửa nước trộn cho thấm dịu rồi gạn bớt nước.",
-        "Cho tôm và phần nước gỏi còn lại vào đảo đều, bày trên lá xà lách và rắc đậu phộng rang."
-      ),
-      sourceName = SRC_VNEXPRESS,
-      sourceUrl = URL_VNEXPRESS
-    ),
-    CulinaryRecipe(
-      id = "sinh_to_xoai_sua_tuoi_kem",
-      title = "Sinh tố xoài sữa tươi topping kem lạnh",
-      emoji = "🥭",
-      summary = "Món tráng miệng xoài chín thơm lừng, sánh mịn quyện sữa tươi và viên kem mát lạnh.",
-      cookMinutes = 8,
+      id = "kem_xoai_sua_tuoi_tran_chau",
+      title = "Xoài dầm sữa tươi kem vani mát lạnh",
+      emoji = "🍨",
+      summary = "Món tráng miệng chiều hè chuẩn quán chè với thịt xoài chín thơm lừng, sữa tươi béo nhẹ và kem vani mát lạnh.",
+      prepMinutes = 7,
+      cookMinutes = 3,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15),
-      fridgeIngredients = listOf(ingMango(), ingMilk("150ml"), ingIceCream("1 viên")),
-      pantryStaples = listOf("Đá viên", "Đường hoặc mật ong (tùy chọn)"),
+      fridgeIngredients = listOf(ingIceCream("2 viên (120g)"), ingMango("1 quả xoài chín (250g)", "Xoài cát chín"), ingMilk("100ml")),
+      seasonings = listOf(
+        sp("Sữa đặc có đường (hoặc mật ong)", "1,5 muỗng canh"),
+        sp("Đá bào hoặc đá viên nhỏ", "80g"),
+        sp("Dừa sấy khô / hạnh nhân lát (tùy chọn)", "1 muỗng canh")
+      ),
       steps = listOf(
-        "Gọt vỏ xoài chín, lấy phần thịt cắt miếng vuông (giữ lại vài miếng nhỏ để trang trí).",
-        "Cho thịt xoài, sữa tươi và ít đá viên vào máy xay mịn trong 30 giây.",
-        "Rót sinh tố xoài ra ly cao, nhẹ nhàng đặt 1 viên kem lạnh lên trên mặt.",
-        "Trang trí thêm vài miếng xoài cắt hạt lựu rồi dùng ngay bằng muỗng và ống hút."
+        "Gọt vỏ 1 quả xoài chín ngọt, cắt phần má xoài thành các khối vuông cạnh 1,5cm; giữ lại vài miếng đầu hạt để xay sệt.",
+        "Xay nhuyễn phần thịt xoài vụn với 40ml sữa tươi và 1 muỗng canh sữa đặc tạo hỗn hợp sốt xoài vàng sánh.",
+        "Chuẩn bị 2 chén hoặc ly thủy tinh lạnh, rải đá bào xuống đáy và chan phần sốt xoài sánh vào.",
+        "Đổ nốt 60ml sữa tươi còn lại cùng 1/2 muỗng canh sữa đặc vào ly rồi xếp đều xoài cắt khối vuông lên trên.",
+        "Múc 2 viên kem vani đặt lên chính giữa mặt ly, rắc thêm chút dừa khô nếu thích và thưởng thức ngay bằng muỗng."
       ),
       sourceName = SRC_DMX,
-      sourceUrl = URL_DMX
+      sourceUrl = "https://www.dienmayxanh.com/kinh-nghiem-hay/tim-kiem?q=xoai+dam+sua+tuoi+kem"
     ),
+
+    // 32. Nước ép dưa hấu cam tươi bạc hà giải nhiệt
     CulinaryRecipe(
-      id = "detox_dua_hau_nuoc_cam",
-      title = "Nước ép detox dưa hấu nước cam giải nhiệt",
+      id = "nuoc_ep_dua_hau_cam_tuoi",
+      title = "Nước ép dưa hấu cam tươi bạc hà giải nhiệt",
       emoji = "🍉",
-      summary = "Thức uống giải nhiệt giàu vitamin C kết hợp dưa hấu thanh mát, nước cam và nước suối lạnh.",
-      cookMinutes = 5,
+      summary = "Thức uống giải nhiệt giàu vitamin C kết hợp ruột dưa hấu ngọt mát, nước cam ép và hương bạc hà sảng khoái.",
+      prepMinutes = 7,
+      cookMinutes = 3,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingWatermelon(), ingOrangeJuice(), ingWater("150ml")),
-      pantryStaples = listOf("Lá bạc hà", "Đá viên", "Nước cốt chanh (tùy chọn)"),
+      fridgeIngredients = listOf(ingWatermelon("350g ruột"), ingOrangeJuice("120ml"), ingWater("100ml")),
+      seasonings = listOf(
+        sp("Lá bạc hà tươi", "6–8 lá"),
+        sp("Nước cốt chanh", "1/2 muỗng canh"),
+        sp("Đá viên", "80g"),
+        sp("Muối tinh", "1 nhúm cực nhỏ")
+      ),
       steps = listOf(
-        "Lọc bỏ hạt dưa hấu, cắt phần ruột đỏ thành khối nhỏ cho vào cối xay.",
-        "Thêm nước suối mát vào xay nhanh 20 giây rồi lọc qua rây nếu thích nước trong mượt.",
-        "Rót hỗn hợp dưa hấu ra ly lớn cùng nước cam tươi và khuấy nhẹ cho hòa quyện.",
-        "Thêm đá viên và vài lá bạc hà vò nhẹ để tăng hương thơm sảng khoái."
+        "Gọt bỏ phần vỏ trắng và nhặt sạch hạt từ 350g ruột dưa hấu đỏ, cắt thành khối nhỏ cho dễ xay.",
+        "Cho dưa hấu cùng 100ml nước suối mát và 1 nhúm muối cực nhỏ (giúp vị dưa ngọt đậm hơn) vào máy xay sinh tố xay 20 giây.",
+        "Đặt rây lọc qua ca lớn để loại bỏ phần bã xơ giúp nước ép thanh trong và dễ uống.",
+        "Vò nhẹ 6 lá bạc hà cho tinh dầu tiết ra dưới đáy 2 ly cao rồi thêm đá viên đến nửa ly.",
+        "Rót nước ép dưa hấu, 120ml nước cam tươi và 1/2 muỗng canh nước cốt chanh vào khuấy đều, gắn thêm nhánh bạc hà trên miệng ly."
       ),
       sourceName = SRC_COOKY,
-      sourceUrl = URL_COOKY
-    ),
-    CulinaryRecipe(
-      id = "canh_trung_ca_chua_bap_ngot",
-      title = "Canh trứng mây sốt cà bắp ngọt thanh mát",
-      emoji = "🍅",
-      summary = "Bát canh quốc dân nấu chỉ 12 phút, vân trứng tơ mềm cùng vị cà chua và bắp ngọt tự nhiên.",
-      cookMinutes = 12,
-      categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME, CulinaryFilter.EAT_CLEAN),
-      fridgeIngredients = listOf(ingEgg(), ingTomatoSauce(), ingCorn("1/2 trái"), ingWater("600ml")),
-      pantryStaples = listOf("Hành tím băm", "Nước mắm", "Hành lá", "Tiêu xay", "Dầu ăn"),
-      steps = listOf(
-        "Phi thơm hành tím với chút dầu, đảo nhanh sốt cà chua trong 1 phút cho lên màu đỏ đẹp.",
-        "Chế nước suối và hạt bắp ngọt vào nồi, đun sôi khoảng 5 phút cho hạt bắp chín mềm.",
-        "Nêm nước mắm và nhúm muối vừa khẩu vị, đánh tan trứng rồi rót thành dòng mỏng vào nồi đang sôi nhẹ.",
-        "Khuấy vòng tròn tạo vân trứng mây mượt, rắc hành lá cùng tiêu xay rồi tắt bếp."
-      ),
-      sourceName = SRC_VNEXPRESS,
-      sourceUrl = URL_VNEXPRESS
+      sourceUrl = "https://www.cooky.vn/tim-kiem?q=nuoc+ep+dua+hau+cam+bac+ha"
     )
   )
 }
@@ -3736,7 +4152,7 @@ fun freshnessOf(daysLeft: Int): Freshness = when {
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/domain/Models.kt` (66 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/domain/Models.kt` (84 lines)
 
 ```kotlin
 package com.truong.fridgezero.domain
@@ -3746,6 +4162,10 @@ import com.truong.fridgezero.data.FoodItemEntity
 import com.truong.fridgezero.data.FridgeEntity
 import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodGroup
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
+private val DD_MM_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
 
 data class NRect(val x: Float, val y: Float, val w: Float, val h: Float) {
   val cx: Float get() = x + w / 2f
@@ -3762,9 +4182,21 @@ data class DisplayItem(
   val quantity: Int,
   val unit: String? = null,
   val minDaysLeft: Int,
-  val isOpened: Boolean = false
+  val isOpened: Boolean = false,
+  val earliestExpiryEpochDay: Long = 0L,
+  val earliestAddedEpochDay: Long = 0L
 ) {
   val freshness: Freshness get() = freshnessOf(minDaysLeft)
+}
+
+fun DisplayItem.formattedExpiryDate(todayEpochDay: Long = LocalDate.now().toEpochDay()): String {
+  val epochDay = if (earliestExpiryEpochDay > 0L) earliestExpiryEpochDay else todayEpochDay + minDaysLeft.toLong()
+  return LocalDate.ofEpochDay(epochDay).format(DD_MM_FORMATTER)
+}
+
+fun DisplayItem.daysSinceAdded(todayEpochDay: Long = LocalDate.now().toEpochDay()): Int {
+  if (earliestAddedEpochDay <= 0L) return 0
+  return (todayEpochDay - earliestAddedEpochDay).toInt().coerceAtLeast(0)
 }
 
 fun List<FoodItemEntity>.toDisplay(todayEpochDay: Long): List<DisplayItem> =
@@ -3782,7 +4214,9 @@ fun List<FoodItemEntity>.toDisplay(todayEpochDay: Long): List<DisplayItem> =
         quantity = xs.sumOf { it.quantity },
         unit = earliest.unit,
         minDaysLeft = xs.minOf { (it.expiresAtEpochDay - todayEpochDay).toInt() },
-        isOpened = xs.any { it.isOpened }
+        isOpened = xs.any { it.isOpened },
+        earliestExpiryEpochDay = earliest.expiresAtEpochDay,
+        earliestAddedEpochDay = xs.minOf { it.addedAtEpochDay }
       )
     }
     .sortedWith(compareBy({ it.freshness.ordinal * -1 }, { it.minDaysLeft }))
@@ -4151,7 +4585,7 @@ class MainActivity : ComponentActivity() {
                       compartments = uiState.compartments,
                       initialRecipeId = recipesRoute.initialRecipeId,
                       onBack = { route = RootRoute.Home },
-                      onConsumeRecipe = { rec -> vm.consumeRecipeIngredients(rec.matchedIngredients) }
+                      onCompleteCook = { usedUp, leftovers -> vm.completeRecipeCook(usedUp, leftovers) }
                     )
                   }
                   route is RootRoute.Bento -> {
@@ -5023,7 +5457,7 @@ private fun CameraViewfinderBox(
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/bento/CompartmentBentoScreen.kt` (472 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/bento/CompartmentBentoScreen.kt` (538 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.bento
@@ -5034,21 +5468,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -5060,6 +5491,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -5073,14 +5507,18 @@ import androidx.compose.ui.unit.sp
 import com.truong.fridgezero.R
 import com.truong.fridgezero.data.ItemStatus
 import com.truong.fridgezero.domain.CompartmentUi
+import com.truong.fridgezero.domain.CulinaryGuideEngine
 import com.truong.fridgezero.domain.DisplayItem
 import com.truong.fridgezero.domain.Freshness
 import com.truong.fridgezero.domain.StorageZone
+import com.truong.fridgezero.domain.daysSinceAdded
+import com.truong.fridgezero.domain.formattedExpiryDate
 import com.truong.fridgezero.domain.zoneForCompartment
 import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodGroup
 import com.truong.fridgezero.ui.icons.FoodIcon
 import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.ButterSoft
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
 import com.truong.fridgezero.ui.theme.InkBlack
@@ -5273,7 +5711,7 @@ fun CompartmentBentoScreen(
       }
     }
 
-    // 2-Column Flat Bento Grid (zero text truncation)
+    // Single-column full-width horizontal cards with 3-zone Auto-Layout
     if (filteredItems.isEmpty()) {
       Box(
         modifier = Modifier.weight(1f).fillMaxWidth().padding(24.dp),
@@ -5295,19 +5733,18 @@ fun CompartmentBentoScreen(
         }
       }
     } else {
-      LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+      LazyColumn(
         modifier = Modifier.weight(1f).fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
       ) {
         items(filteredItems, key = { it.primaryId }) { item ->
-          FoodBentoCard(
+          val isWeightLeftover = item.isOpened && CulinaryGuideEngine.isWeightBasedUnit(item.unit)
+          FoodHorizontalCard(
             item = item,
             onCardClick = { detailTarget = item },
             onDecrement = {
-              if (item.quantity <= 1) {
+              if (item.quantity <= 1 || isWeightLeftover) {
                 onMarkStatus(item.itemIds, ItemStatus.USED_UP)
               } else {
                 onAdjustQuantity(item.primaryId, -1)
@@ -5345,23 +5782,32 @@ fun CompartmentBentoScreen(
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FoodBentoCard(
+private fun FoodHorizontalCard(
   item: DisplayItem,
   onCardClick: () -> Unit,
   onDecrement: () -> Unit,
   onIncrement: () -> Unit
 ) {
   val emoji = (EmojiIconRepository.iconFor(item.iconKey) as? FoodIcon.Emoji)?.glyph ?: "🍽️"
+  val isWeightLeftover = item.isOpened && CulinaryGuideEngine.isWeightBasedUnit(item.unit)
   val freshnessBg = when (item.freshness) {
     Freshness.BAD -> CoralUrgent
     Freshness.SOON -> LemonWarn
     Freshness.OK -> LimeFresh
   }
-  val expiryText = when {
+  val baseCountdown = when {
     item.minDaysLeft < 0 -> stringResource(R.string.urgent_badge_overdue_fmt, -item.minDaysLeft)
     item.minDaysLeft == 0 -> stringResource(R.string.urgent_badge_today)
     else -> stringResource(R.string.urgent_badge_days_fmt, item.minDaysLeft)
+  }
+  val expiryText = stringResource(R.string.expiry_with_date_fmt, baseCountdown, item.formattedExpiryDate())
+  val addedDays = item.daysSinceAdded()
+  val storageAgeText = if (addedDays == 0) {
+    stringResource(R.string.storage_age_today)
+  } else {
+    stringResource(R.string.storage_age_days_fmt, addedDays)
   }
   val minusCd = stringResource(R.string.bento_qty_minus_cd)
   val plusCd = stringResource(R.string.bento_qty_plus_cd)
@@ -5369,129 +5815,183 @@ private fun FoodBentoCard(
   NeoBrutalistCard(
     modifier = Modifier.fillMaxWidth(),
     containerColor = SurfaceWhite,
-    cornerRadius = 16.dp,
+    cornerRadius = 14.dp,
     borderWidth = 2.5.dp,
     shadowOffset = 4.dp
   ) {
-    Column(
+    Row(
       modifier = Modifier
         .fillMaxWidth()
-        .defaultMinSize(minHeight = 166.dp)
+        // 7.5dp accounts for the 2.5dp InkBlack border so a 5dp status strip stays flush on the left edge.
+        .drawBehind {
+          drawRect(
+            color = freshnessBg,
+            topLeft = Offset.Zero,
+            size = Size(7.5.dp.toPx(), size.height)
+          )
+        }
         .clickable(role = Role.Button, onClick = onCardClick)
-        .padding(11.dp),
-      verticalArrangement = Arrangement.SpaceBetween
+        .padding(start = 16.dp, end = 12.dp, top = 11.dp, bottom = 11.dp),
+      verticalAlignment = Alignment.Top,
+      horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-      // Top row: 48.dp emoji icon box + tilted freshness status pill
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.SpaceBetween
+      // Left Zone: fixed 50.dp icon box top-aligned
+      Box(
+        modifier = Modifier
+          .size(50.dp)
+          .clip(RoundedCornerShape(12.dp))
+          .background(PaperCream)
+          .border(2.dp, InkBlack, RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center
       ) {
-        Box(
-          modifier = Modifier
-            .size(46.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(PaperCream)
-            .border(2.dp, InkBlack, RoundedCornerShape(12.dp)),
-          contentAlignment = Alignment.Center
-        ) {
-          Text(text = emoji, fontSize = 28.sp)
-        }
-        StickerBadge(
-          text = expiryText,
-          containerColor = freshnessBg,
-          tiltDegrees = -2f,
-          mono = true
-        )
+        Text(text = emoji, fontSize = 28.sp)
       }
 
-      Spacer(Modifier.height(8.dp))
-
-      // Middle: full 2-line Vietnamese item name + group tag
-      Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Text(
-          text = item.name,
-          fontFamily = BodyFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 14.sp,
-          lineHeight = 18.sp,
-          color = InkBlack,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis
-        )
-        Box(
-          modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(PaperCream)
-            .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
-            .padding(horizontal = 5.dp, vertical = 2.dp)
+      // Center & Right Zones
+      Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        // Top row: item name (left) + expiry countdown & dd/MM pill (right)
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.Top,
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
           Text(
-            text = item.group.labelVi,
+            text = item.name,
+            modifier = Modifier.weight(1f),
             fontFamily = BodyFont,
-            fontWeight = FontWeight.Bold,
-            fontSize = 10.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
             color = InkBlack,
-            maxLines = 1
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
           )
-        }
-      }
-
-      Spacer(Modifier.height(8.dp))
-
-      // Bottom row: crisp 30.dp x 30.dp − [qty] + stepper buttons
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-      ) {
-        NeoBrutalistButton(
-          onClick = onDecrement,
-          modifier = Modifier.size(30.dp).semantics { contentDescription = minusCd },
-          containerColor = if (item.quantity <= 1) Color(0xFFFFD6DF) else SurfaceWhite,
-          cornerRadius = 8.dp,
-          borderWidth = 2.dp,
-          shadowOffset = 2.dp,
-          contentPadding = PaddingValues(0.dp)
-        ) {
-          Text(
-            text = "−",
-            fontFamily = MonoFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 16.sp,
-            lineHeight = 16.sp,
-            color = InkBlack
+          StickerBadge(
+            text = expiryText,
+            containerColor = freshnessBg,
+            tiltDegrees = 0f,
+            mono = true
           )
         }
 
-        Text(
-          text = if (item.unit.isNullOrBlank()) "${item.quantity}"
-          else stringResource(R.string.bento_qty_unit_fmt, item.quantity, item.unit),
-          fontFamily = MonoFont,
-          fontWeight = FontWeight.ExtraBold,
-          fontSize = 13.sp,
-          color = InkBlack,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis
-        )
-
-        NeoBrutalistButton(
-          onClick = onIncrement,
-          modifier = Modifier.size(30.dp).semantics { contentDescription = plusCd },
-          containerColor = LimeFresh,
-          cornerRadius = 8.dp,
-          borderWidth = 2.dp,
-          shadowOffset = 2.dp,
-          contentPadding = PaddingValues(0.dp)
+        // Bottom row: wrapping FlowRow metadata (left) + bottom-right aligned stepper
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.Bottom,
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          Text(
-            text = "+",
-            fontFamily = MonoFont,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 16.sp,
-            lineHeight = 16.sp,
-            color = InkBlack
-          )
+          FlowRow(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+          ) {
+            Box(
+              modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(PaperCream)
+                .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+                .padding(horizontal = 5.dp, vertical = 2.dp)
+            ) {
+              Text(
+                text = item.group.labelVi,
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                color = InkBlack,
+                softWrap = false,
+                maxLines = 1
+              )
+            }
+            if (item.isOpened) {
+              Box(
+                modifier = Modifier
+                  .clip(RoundedCornerShape(6.dp))
+                  .background(ButterSoft)
+                  .border(1.5.dp, InkBlack, RoundedCornerShape(6.dp))
+                  .padding(horizontal = 5.dp, vertical = 2.dp)
+              ) {
+                Text(
+                  text = stringResource(R.string.leftover_badge),
+                  fontFamily = BodyFont,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 10.sp,
+                  color = InkBlack,
+                  softWrap = false,
+                  maxLines = 1
+                )
+              }
+            }
+            Text(
+              text = storageAgeText,
+              modifier = Modifier.padding(vertical = 3.dp),
+              fontFamily = MonoFont,
+              fontWeight = FontWeight.Medium,
+              fontSize = 10.sp,
+              color = InkBlack.copy(alpha = 0.65f),
+              softWrap = false,
+              maxLines = 1
+            )
+          }
+
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
+            NeoBrutalistButton(
+              onClick = onDecrement,
+              modifier = Modifier.size(32.dp).semantics { contentDescription = minusCd },
+              containerColor = if (item.quantity <= 1 || isWeightLeftover) Color(0xFFFFD6DF) else SurfaceWhite,
+              cornerRadius = 8.dp,
+              borderWidth = 2.dp,
+              shadowOffset = 2.dp,
+              contentPadding = PaddingValues(0.dp)
+            ) {
+              Text(
+                text = "−",
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                lineHeight = 16.sp,
+                color = InkBlack
+              )
+            }
+
+            Text(
+              text = when {
+                isWeightLeftover -> stringResource(R.string.bento_leftover_remaining)
+                item.unit.isNullOrBlank() -> "${item.quantity}"
+                else -> stringResource(R.string.bento_qty_unit_fmt, item.quantity, item.unit)
+              },
+              fontFamily = if (isWeightLeftover) BodyFont else MonoFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = if (isWeightLeftover) 12.sp else 13.sp,
+              color = InkBlack,
+              softWrap = false,
+              maxLines = 1
+            )
+
+            NeoBrutalistButton(
+              onClick = onIncrement,
+              modifier = Modifier.size(32.dp).semantics { contentDescription = plusCd },
+              containerColor = LimeFresh,
+              cornerRadius = 8.dp,
+              borderWidth = 2.dp,
+              shadowOffset = 2.dp,
+              contentPadding = PaddingValues(0.dp)
+            ) {
+              Text(
+                text = "+",
+                fontFamily = MonoFont,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                lineHeight = 16.sp,
+                color = InkBlack
+              )
+            }
+          }
         }
       }
     }
@@ -5499,7 +5999,7 @@ private fun FoodBentoCard(
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/bento/ItemSheets.kt` (848 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/bento/ItemSheets.kt` (866 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.bento
@@ -5510,6 +6010,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -5559,6 +6061,7 @@ import com.truong.fridgezero.domain.ConfigurableShelfLifeRepository
 import com.truong.fridgezero.domain.DisplayItem
 import com.truong.fridgezero.domain.Freshness
 import com.truong.fridgezero.domain.StorageZone
+import com.truong.fridgezero.domain.formattedExpiryDate
 import com.truong.fridgezero.domain.zoneForCompartment
 import com.truong.fridgezero.ui.icons.EmojiIconRepository
 import com.truong.fridgezero.ui.icons.FoodGroup
@@ -5583,7 +6086,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
-private val UNITS = listOf("cái", "gói", "hộp", "kg", "chai", "quả")
+private val UNITS = listOf("g", "kg", "cái", "gói", "hộp", "chai", "quả")
 private val QUICK_EXPIRY_CHIPS = listOf(
   3 to R.string.quick_add_3d,
   7 to R.string.quick_add_7d,
@@ -6056,7 +6559,7 @@ fun QuickAddItemSheet(
 /**
  * Item Detail, Edit, Compartment Move & 1-Tap Direct Delete Sheet.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ItemDetailSheet(
   item: DisplayItem,
@@ -6079,11 +6582,16 @@ fun ItemDetailSheet(
     Freshness.SOON -> LemonWarn
     Freshness.OK -> LimeFresh
   }
-  val expiryBadgeText = when {
+  val baseExpiryText = when {
     item.minDaysLeft < 0 -> stringResource(R.string.days_overdue_fmt, -item.minDaysLeft)
     item.minDaysLeft == 0 -> stringResource(R.string.days_today)
     else -> stringResource(R.string.days_left_fmt, item.minDaysLeft)
   }
+  val expiryBadgeText = stringResource(
+    R.string.expiry_with_date_fmt,
+    baseExpiryText,
+    item.formattedExpiryDate()
+  )
 
   ModalBottomSheet(
     onDismissRequest = onDismiss,
@@ -6125,9 +6633,19 @@ fun ItemDetailSheet(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
           )
-          Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+          FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
             StickerBadge(text = item.group.labelVi, containerColor = SurfaceWhite, tiltDegrees = 0f)
             StickerBadge(text = expiryBadgeText, containerColor = badgeColor, tiltDegrees = -1.5f, mono = true)
+            if (item.isOpened) {
+              StickerBadge(
+                text = stringResource(R.string.leftover_badge),
+                containerColor = ButterSoft,
+                tiltDegrees = 0f
+              )
+            }
           }
         }
       }
@@ -9417,11 +9935,20 @@ object EmojiIconRepository : IconRepository {
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/CulinaryGuideScreen.kt` (508 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/CulinaryGuideScreen.kt` (546 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.recipes
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9468,6 +9995,7 @@ import com.truong.fridgezero.domain.CompartmentUi
 import com.truong.fridgezero.domain.CulinaryFilter
 import com.truong.fridgezero.domain.CulinaryGuideEngine
 import com.truong.fridgezero.domain.Freshness
+import com.truong.fridgezero.domain.MatchedIngredient
 import com.truong.fridgezero.domain.RecipeCategory
 import com.truong.fridgezero.domain.RecipeIngredient
 import com.truong.fridgezero.domain.RecipeRecommendation
@@ -9497,7 +10025,7 @@ fun CulinaryGuideScreen(
   compartments: List<CompartmentUi>,
   initialRecipeId: String? = null,
   onBack: () -> Unit,
-  onConsumeRecipe: (RecipeRecommendation) -> Unit,
+  onCompleteCook: (usedUp: List<MatchedIngredient>, leftovers: List<MatchedIngredient>) -> Unit,
   modifier: Modifier = Modifier
 ) {
   val allItems = remember(compartments) { compartments.flatMap { it.items } }
@@ -9522,14 +10050,24 @@ fun CulinaryGuideScreen(
   val activeDetail = remember(allRecommendations, selectedRecipeId) {
     selectedRecipeId?.let { id -> allRecommendations.firstOrNull { it.recipe.id == id } }
   }
+  val lastDetailRef = remember { object { var value: RecipeRecommendation? = activeDetail } }
+  if (activeDetail != null) {
+    lastDetailRef.value = activeDetail
+  }
+  val displayedDetail = activeDetail ?: lastDetailRef.value
 
-  Column(
-    modifier = modifier
-      .fillMaxSize()
-      .dotGridBackground()
-      .statusBarsPadding()
-      .navigationBarsPadding()
-  ) {
+  BackHandler(enabled = activeDetail != null) {
+    selectedRecipeId = null
+  }
+
+  Box(modifier = modifier.fillMaxSize()) {
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .dotGridBackground()
+        .statusBarsPadding()
+        .navigationBarsPadding()
+    ) {
     // Top Bar: square ← button | "CẨM NANG ẨM THỰC" | Ready count badge
     Row(
       modifier = Modifier
@@ -9644,14 +10182,32 @@ fun CulinaryGuideScreen(
         }
       }
     }
-  }
+    }
 
-  if (activeDetail != null) {
-    RecipeDetailSheet(
-      recommendation = activeDetail,
-      onCooked = { onConsumeRecipe(activeDetail) },
-      onDismiss = { selectedRecipeId = null }
-    )
+    AnimatedVisibility(
+      visible = activeDetail != null,
+      modifier = Modifier.fillMaxSize(),
+      enter = slideInVertically(
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        initialOffsetY = { it / 12 }
+      ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+      exit = slideOutVertically(
+        animationSpec = tween(durationMillis = 180, easing = FastOutLinearInEasing),
+        targetOffsetY = { it / 12 }
+      ) + fadeOut(animationSpec = tween(durationMillis = 180))
+    ) {
+      displayedDetail?.let { detail ->
+        RecipeDetailSheet(
+          recommendation = detail,
+          onCompleteCook = { usedUp, leftovers ->
+            if (selectedRecipeId == detail.recipe.id) {
+              onCompleteCook(usedUp, leftovers)
+            }
+          },
+          onDismiss = { selectedRecipeId = null }
+        )
+      }
+    }
   }
 }
 
@@ -9929,7 +10485,7 @@ internal fun ingredientGlyph(ingredient: RecipeIngredient): String {
 }
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/RecipeDetailSheet.kt` (493 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/ui/recipes/RecipeDetailSheet.kt` (872 lines)
 
 ```kotlin
 package com.truong.fridgezero.ui.recipes
@@ -9944,30 +10500,44 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.truong.fridgezero.R
+import com.truong.fridgezero.domain.CulinaryGuideEngine
 import com.truong.fridgezero.domain.Freshness
 import com.truong.fridgezero.domain.MatchTier
 import com.truong.fridgezero.domain.MatchedIngredient
@@ -9975,6 +10545,7 @@ import com.truong.fridgezero.domain.RecipeDifficulty
 import com.truong.fridgezero.domain.RecipeIngredient
 import com.truong.fridgezero.domain.RecipeRecommendation
 import com.truong.fridgezero.ui.theme.BodyFont
+import com.truong.fridgezero.ui.theme.ButterSoft
 import com.truong.fridgezero.ui.theme.CoralUrgent
 import com.truong.fridgezero.ui.theme.DisplayFont
 import com.truong.fridgezero.ui.theme.InkBlack
@@ -9987,249 +10558,291 @@ import com.truong.fridgezero.ui.theme.PaperCream
 import com.truong.fridgezero.ui.theme.SkyPale
 import com.truong.fridgezero.ui.theme.StickerBadge
 import com.truong.fridgezero.ui.theme.SurfaceWhite
+import com.truong.fridgezero.ui.theme.dotGridBackground
 
 /**
- * Detailed recipe sheet separating in-fridge items, missing items, pantry staples,
- * cooking steps, original culinary citation link, and 1-tap inventory deduction.
+ * Full-screen Neo-Brutalist recipe detail view separating in-fridge items, missing items,
+ * measured seasonings, cooking steps, original culinary citation link, and post-cook confirmation.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RecipeDetailSheet(
   recommendation: RecipeRecommendation,
-  onCooked: () -> Unit,
-  onDismiss: () -> Unit
+  onCompleteCook: (usedUp: List<MatchedIngredient>, leftovers: List<MatchedIngredient>) -> Unit,
+  onDismiss: () -> Unit,
+  modifier: Modifier = Modifier
 ) {
   val recipe = recommendation.recipe
-  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   val uriHandler = LocalUriHandler.current
   val context = LocalContext.current
   val openErrorText = stringResource(R.string.recipe_open_source_error)
-  val cookedToastText = if (recommendation.matchedCount > 0) {
-    stringResource(R.string.recipe_cooked_toast_fmt, recommendation.matchedCount)
-  } else {
-    stringResource(R.string.recipe_cooked_toast_empty)
-  }
+  val backCd = stringResource(R.string.recipe_detail_back_cd)
+  val cookedEmptyToastText = stringResource(R.string.recipe_cooked_toast_empty)
+  val scrollState = rememberScrollState()
+  LaunchedEffect(recipe.id) { scrollState.scrollTo(0) }
+  var cookedTriggered by remember(recipe.id) { mutableStateOf(false) }
+  var showCookConfirmDialog by remember(recipe.id) { mutableStateOf(false) }
 
-  ModalBottomSheet(
-    onDismissRequest = onDismiss,
-    sheetState = sheetState,
-    containerColor = PaperCream,
-    dragHandle = null
+  Column(
+    modifier = modifier
+      .fillMaxSize()
+      .dotGridBackground()
+      .statusBarsPadding()
+      .navigationBarsPadding()
+      .semantics(mergeDescendants = false) { isTraversalGroup = true }
+      .pointerInput(Unit) {}
   ) {
-    Column(
+    // Top Bar: square ← button | recipe title | source badge
+    Row(
       modifier = Modifier
         .fillMaxWidth()
-        .navigationBarsPadding()
-        .padding(horizontal = 16.dp, vertical = 16.dp),
-      verticalArrangement = Arrangement.spacedBy(12.dp)
+        .padding(horizontal = 16.dp, vertical = 10.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-      // Scrollable body
-      Column(
+      NeoBrutalistButton(
+        onClick = onDismiss,
         modifier = Modifier
-          .weight(1f, fill = false)
-          .fillMaxWidth()
-          .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+          .size(44.dp)
+          .semantics { contentDescription = backCd },
+        containerColor = SurfaceWhite,
+        cornerRadius = 12.dp,
+        borderWidth = 2.5.dp,
+        shadowOffset = 3.dp,
+        contentPadding = PaddingValues(0.dp)
       ) {
-        // Header: Emoji + Title + Summary + Meta badges
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Text(
+          text = stringResource(R.string.bento_back_symbol),
+          fontFamily = DisplayFont,
+          fontWeight = FontWeight.ExtraBold,
+          fontSize = 20.sp,
+          color = InkBlack
+        )
+      }
+
+      Text(
+        text = recipe.title,
+        modifier = Modifier.weight(1f),
+        fontFamily = DisplayFont,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 17.sp,
+        color = InkBlack,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+      )
+
+      StickerBadge(
+        text = recipe.sourceName,
+        containerColor = SkyPale,
+        tiltDegrees = 0f
+      )
+    }
+
+    // Scrollable body
+    Column(
+      modifier = Modifier
+        .weight(1f)
+        .fillMaxWidth()
+        .verticalScroll(scrollState)
+        .padding(horizontal = 16.dp, vertical = 8.dp),
+      verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+      // Header: Emoji + Title + Summary + Meta badges
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+      ) {
+        Box(
+          modifier = Modifier
+            .size(54.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(SurfaceWhite)
+            .border(2.5.dp, InkBlack, RoundedCornerShape(14.dp)),
+          contentAlignment = Alignment.Center
         ) {
-          Box(
-            modifier = Modifier
-              .size(54.dp)
-              .clip(RoundedCornerShape(14.dp))
-              .background(SurfaceWhite)
-              .border(2.5.dp, InkBlack, RoundedCornerShape(14.dp)),
-            contentAlignment = Alignment.Center
-          ) {
-            Text(text = recipe.emoji, fontSize = 30.sp)
-          }
-          Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-          ) {
-            Text(
-              text = recipe.title,
-              fontFamily = DisplayFont,
-              fontWeight = FontWeight.ExtraBold,
-              fontSize = 19.sp,
-              lineHeight = 23.sp,
-              color = InkBlack
-            )
-            Text(
-              text = recipe.summary,
-              fontFamily = BodyFont,
-              fontWeight = FontWeight.Medium,
-              fontSize = 12.sp,
-              lineHeight = 16.sp,
-              color = InkBlack.copy(alpha = 0.78f)
-            )
-          }
+          Text(text = recipe.emoji, fontSize = 30.sp)
         }
-
-        FlowRow(
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-          verticalArrangement = Arrangement.spacedBy(6.dp)
+        Column(
+          modifier = Modifier.weight(1f),
+          verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-          StickerBadge(
-            text = stringResource(R.string.recipe_prep_time_long_fmt, recipe.cookMinutes),
-            containerColor = SurfaceWhite,
-            tiltDegrees = 0f,
-            mono = true
-          )
-          StickerBadge(
-            text = stringResource(
-              if (recipe.difficulty == RecipeDifficulty.EASY) {
-                R.string.recipe_difficulty_easy
-              } else {
-                R.string.recipe_difficulty_medium
-              }
-            ),
-            containerColor = if (recipe.difficulty == RecipeDifficulty.EASY) LimeFresh else LemonWarn,
-            tiltDegrees = 0f
-          )
-          StickerBadge(
-            text = recipe.sourceName,
-            containerColor = SkyPale,
-            tiltDegrees = 0f
-          )
-        }
-
-        // Section 1: In Fridge
-        RecipeSectionHeader(stringResource(R.string.recipe_section_in_fridge))
-        if (recommendation.matchedIngredients.isEmpty()) {
-          NeoBrutalistCard(
-            modifier = Modifier.fillMaxWidth(),
-            containerColor = SurfaceWhite,
-            cornerRadius = 12.dp,
-            borderWidth = 2.dp,
-            shadowOffset = 2.dp
-          ) {
-            Text(
-              text = stringResource(R.string.recipe_section_in_fridge_empty),
-              modifier = Modifier.padding(12.dp),
-              fontFamily = BodyFont,
-              fontWeight = FontWeight.Medium,
-              fontSize = 13.sp,
-              color = InkBlack.copy(alpha = 0.72f)
-            )
-          }
-        } else {
-          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            recommendation.matchedIngredients.forEach { matched ->
-              MatchedIngredientRow(matched = matched)
-            }
-          }
-        }
-
-        // Section 2: Missing Fridge Ingredients
-        RecipeSectionHeader(stringResource(R.string.recipe_section_missing))
-        if (recommendation.missingIngredients.isEmpty()) {
-          NeoBrutalistCard(
-            modifier = Modifier.fillMaxWidth(),
-            containerColor = LimeFresh,
-            cornerRadius = 12.dp,
-            borderWidth = 2.dp,
-            shadowOffset = 2.dp
-          ) {
-            Text(
-              text = stringResource(R.string.recipe_section_missing_none),
-              modifier = Modifier.padding(12.dp),
-              fontFamily = BodyFont,
-              fontWeight = FontWeight.ExtraBold,
-              fontSize = 13.sp,
-              color = InkBlack
-            )
-          }
-        } else {
-          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            recommendation.missingIngredients.forEach { missing ->
-              MissingIngredientRow(ingredient = missing)
-            }
-          }
-        }
-
-        // Section 3: Pantry Staples
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-          RecipeSectionHeader(stringResource(R.string.recipe_section_pantry))
           Text(
-            text = stringResource(R.string.recipe_section_pantry_hint),
-            fontFamily = MonoFont,
-            fontWeight = FontWeight.Medium,
-            fontSize = 10.sp,
-            color = InkBlack.copy(alpha = 0.65f)
+            text = recipe.title,
+            fontFamily = DisplayFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 19.sp,
+            lineHeight = 23.sp,
+            color = InkBlack
           )
-          FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-          ) {
-            recipe.pantryStaples.forEach { staple ->
-              Box(
-                modifier = Modifier
-                  .clip(RoundedCornerShape(8.dp))
-                  .background(SurfaceWhite)
-                  .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp))
-                  .padding(horizontal = 9.dp, vertical = 4.dp)
-              ) {
-                Text(
-                  text = staple,
-                  fontFamily = BodyFont,
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 12.sp,
-                  color = InkBlack
-                )
-              }
-            }
-          }
+          Text(
+            text = recipe.summary,
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.Medium,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            color = InkBlack.copy(alpha = 0.78f)
+          )
         }
+      }
 
-        // Section 4: Cooking Steps inside NeoBrutalistCard
-        RecipeSectionHeader(stringResource(R.string.recipe_section_steps))
+      FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+      ) {
+        StickerBadge(
+          text = stringResource(
+            R.string.recipe_prep_cook_time_fmt,
+            recipe.prepMinutes,
+            recipe.cookMinutes
+          ),
+          containerColor = SurfaceWhite,
+          tiltDegrees = 0f,
+          mono = true
+        )
+        StickerBadge(
+          text = stringResource(R.string.recipe_servings_fmt, recipe.servingsLabel),
+          containerColor = ButterSoft,
+          tiltDegrees = 0f
+        )
+        StickerBadge(
+          text = stringResource(
+            if (recipe.difficulty == RecipeDifficulty.EASY) {
+              R.string.recipe_difficulty_easy
+            } else {
+              R.string.recipe_difficulty_medium
+            }
+          ),
+          containerColor = if (recipe.difficulty == RecipeDifficulty.EASY) LimeFresh else LemonWarn,
+          tiltDegrees = 0f
+        )
+        StickerBadge(
+          text = stringResource(
+            R.string.recipe_match_ratio_fmt,
+            recommendation.matchedCount,
+            recommendation.totalFridgeIngredients
+          ),
+          containerColor = if (recommendation.isReadyToCook) LimeFresh else LemonWarn,
+          tiltDegrees = 0f,
+          mono = true
+        )
+      }
+
+      // Section 1: Reference matches / similar items in fridge
+      Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        RecipeSectionHeader(stringResource(R.string.recipe_section_in_fridge))
+        Text(
+          text = stringResource(R.string.recipe_section_in_fridge_hint),
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.Medium,
+          fontSize = 10.sp,
+          color = InkBlack.copy(alpha = 0.65f)
+        )
+      }
+      if (recommendation.matchedIngredients.isEmpty()) {
         NeoBrutalistCard(
           modifier = Modifier.fillMaxWidth(),
           containerColor = SurfaceWhite,
-          cornerRadius = 16.dp,
-          borderWidth = 2.5.dp,
+          cornerRadius = 12.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 2.dp
+        ) {
+          Text(
+            text = stringResource(R.string.recipe_section_in_fridge_empty),
+            modifier = Modifier.padding(12.dp),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.Medium,
+            fontSize = 13.sp,
+            color = InkBlack.copy(alpha = 0.72f)
+          )
+        }
+      } else {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          recommendation.matchedIngredients.forEach { matched ->
+            MatchedIngredientRow(matched = matched)
+          }
+        }
+      }
+
+      // Section 2: Missing Fridge Ingredients
+      RecipeSectionHeader(stringResource(R.string.recipe_section_missing))
+      if (recommendation.missingIngredients.isEmpty()) {
+        NeoBrutalistCard(
+          modifier = Modifier.fillMaxWidth(),
+          containerColor = LimeFresh,
+          cornerRadius = 12.dp,
+          borderWidth = 2.dp,
+          shadowOffset = 2.dp
+        ) {
+          Text(
+            text = stringResource(R.string.recipe_section_missing_none),
+            modifier = Modifier.padding(12.dp),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 13.sp,
+            color = InkBlack
+          )
+        }
+      } else {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          recommendation.missingIngredients.forEach { missing ->
+            MissingIngredientRow(ingredient = missing)
+          }
+        }
+      }
+
+      // Section 3: Measured Seasonings Table
+      Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        RecipeSectionHeader(stringResource(R.string.recipe_section_pantry))
+        Text(
+          text = stringResource(R.string.recipe_section_pantry_hint),
+          fontFamily = MonoFont,
+          fontWeight = FontWeight.Medium,
+          fontSize = 10.sp,
+          color = InkBlack.copy(alpha = 0.65f)
+        )
+        NeoBrutalistCard(
+          modifier = Modifier.fillMaxWidth(),
+          containerColor = SurfaceWhite,
+          cornerRadius = 14.dp,
+          borderWidth = 2.dp,
           shadowOffset = 3.dp
         ) {
           Column(
             modifier = Modifier
               .fillMaxWidth()
-              .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+              .padding(horizontal = 12.dp, vertical = 8.dp)
           ) {
-            recipe.steps.forEachIndexed { index, stepText ->
+            recipe.seasonings.forEachIndexed { index, spec ->
               Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
               ) {
-                Box(
-                  modifier = Modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .background(InkBlack),
-                  contentAlignment = Alignment.Center
-                ) {
-                  Text(
-                    text = "${index + 1}",
-                    fontFamily = MonoFont,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 12.sp,
-                    color = LimeFresh
-                  )
-                }
                 Text(
-                  text = stepText,
+                  text = spec.name,
                   modifier = Modifier.weight(1f),
                   fontFamily = BodyFont,
-                  fontWeight = FontWeight.Medium,
+                  fontWeight = FontWeight.Bold,
                   fontSize = 13.sp,
-                  lineHeight = 18.sp,
                   color = InkBlack
+                )
+                Text(
+                  text = spec.amount,
+                  fontFamily = MonoFont,
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 12.sp,
+                  color = InkBlack.copy(alpha = 0.85f)
+                )
+              }
+              if (index < recipe.seasonings.lastIndex) {
+                Box(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(InkBlack.copy(alpha = 0.14f))
                 )
               }
             }
@@ -10237,9 +10850,75 @@ fun RecipeDetailSheet(
         }
       }
 
-      // Bottom Action Row: Source Link | 1-Tap Cook Deduction
-      Row(
+      // Section 4: Cooking Steps inside NeoBrutalistCard
+      RecipeSectionHeader(stringResource(R.string.recipe_section_steps))
+      NeoBrutalistCard(
         modifier = Modifier.fillMaxWidth(),
+        containerColor = SurfaceWhite,
+        cornerRadius = 16.dp,
+        borderWidth = 2.5.dp,
+        shadowOffset = 3.dp
+      ) {
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(14.dp),
+          verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+          recipe.steps.forEachIndexed { index, stepText ->
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              verticalAlignment = Alignment.Top,
+              horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+              Box(
+                modifier = Modifier
+                  .size(24.dp)
+                  .clip(RoundedCornerShape(7.dp))
+                  .background(InkBlack),
+                contentAlignment = Alignment.Center
+              ) {
+                Text(
+                  text = "${index + 1}",
+                  fontFamily = MonoFont,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 12.sp,
+                  color = LimeFresh
+                )
+              }
+              Text(
+                text = stepText,
+                modifier = Modifier.weight(1f),
+                fontFamily = BodyFont,
+                fontWeight = FontWeight.Medium,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                color = InkBlack
+              )
+            }
+          }
+        }
+      }
+
+      Spacer(Modifier.height(8.dp))
+    }
+
+    // Pinned Bottom Action Bar: Source Link | 1-Tap Cook Deduction
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .background(SurfaceWhite)
+    ) {
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(2.5.dp)
+          .background(InkBlack)
+      )
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
       ) {
         NeoBrutalistButton(
@@ -10270,9 +10949,15 @@ fun RecipeDetailSheet(
 
         NeoBrutalistButton(
           onClick = {
-            onCooked()
-            Toast.makeText(context, cookedToastText, Toast.LENGTH_SHORT).show()
-            onDismiss()
+            if (recommendation.matchedIngredients.isEmpty()) {
+              if (!cookedTriggered) {
+                cookedTriggered = true
+                Toast.makeText(context, cookedEmptyToastText, Toast.LENGTH_SHORT).show()
+                onDismiss()
+              }
+            } else {
+              showCookConfirmDialog = true
+            }
           },
           modifier = Modifier.weight(1.15f),
           containerColor = LimeFresh,
@@ -10291,6 +10976,256 @@ fun RecipeDetailSheet(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
           )
+        }
+      }
+    }
+  }
+
+  if (showCookConfirmDialog && recommendation.matchedIngredients.isNotEmpty()) {
+    CookCompletionConfirmDialog(
+      recipeId = recipe.id,
+      matchedIngredients = recommendation.matchedIngredients,
+      onConfirm = { usedUp, leftovers ->
+        if (!cookedTriggered) {
+          cookedTriggered = true
+          onCompleteCook(usedUp, leftovers)
+          val toastMsg = when {
+            usedUp.isNotEmpty() && leftovers.isNotEmpty() ->
+              context.getString(R.string.cook_toast_mixed_fmt, usedUp.size, leftovers.size)
+            leftovers.isNotEmpty() ->
+              context.getString(R.string.cook_toast_leftover_only_fmt, leftovers.size)
+            else ->
+              context.getString(R.string.cook_toast_used_only_fmt, usedUp.size)
+          }
+          Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+          showCookConfirmDialog = false
+          onDismiss()
+        }
+      },
+      onCancel = { showCookConfirmDialog = false }
+    )
+  }
+}
+
+@Composable
+private fun CookCompletionConfirmDialog(
+  recipeId: String,
+  matchedIngredients: List<MatchedIngredient>,
+  onConfirm: (usedUp: List<MatchedIngredient>, leftovers: List<MatchedIngredient>) -> Unit,
+  onCancel: () -> Unit
+) {
+  val leftoverByIndex = remember(recipeId, matchedIngredients) {
+    mutableStateMapOf<Int, Boolean>()
+  }
+  val hasAnyLeftover = matchedIngredients.indices.any { leftoverByIndex[it] == true }
+
+  Dialog(onDismissRequest = onCancel) {
+    NeoBrutalistCard(
+      modifier = Modifier.fillMaxWidth(),
+      containerColor = PaperCream,
+      cornerRadius = 16.dp,
+      borderWidth = 2.5.dp,
+      shadowOffset = 4.dp
+    ) {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+      ) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+          Text(
+            text = stringResource(R.string.cook_confirm_title),
+            fontFamily = DisplayFont,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 18.sp,
+            color = InkBlack
+          )
+          Text(
+            text = stringResource(R.string.cook_confirm_subtitle),
+            fontFamily = BodyFont,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+            color = InkBlack.copy(alpha = 0.78f)
+          )
+        }
+
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 280.dp)
+            .verticalScroll(rememberScrollState()),
+          verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          matchedIngredients.forEachIndexed { index, matched ->
+            val isLeftover = leftoverByIndex[index] == true
+            val isWeightLeftover =
+              matched.item.isOpened && CulinaryGuideEngine.isWeightBasedUnit(matched.item.unit)
+            val qtyLabel = when {
+              isWeightLeftover -> stringResource(R.string.bento_leftover_remaining)
+              matched.item.unit.isNullOrBlank() ->
+                stringResource(R.string.cook_confirm_qty_only_fmt, matched.item.quantity)
+              else ->
+                stringResource(R.string.bento_qty_unit_fmt, matched.item.quantity, matched.item.unit)
+            }
+
+            Column(
+              modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(SurfaceWhite)
+                .border(2.dp, InkBlack, RoundedCornerShape(12.dp))
+                .padding(10.dp),
+              verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+              ) {
+                Box(
+                  modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(PaperCream)
+                    .border(1.5.dp, InkBlack, RoundedCornerShape(8.dp)),
+                  contentAlignment = Alignment.Center
+                ) {
+                  Text(text = ingredientGlyph(matched.ingredient), fontSize = 17.sp)
+                }
+                Column(
+                  modifier = Modifier.weight(1f),
+                  verticalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                  Text(
+                    text = matched.item.name,
+                    fontFamily = BodyFont,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 13.sp,
+                    color = InkBlack,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                  )
+                  Text(
+                    text = qtyLabel,
+                    fontFamily = MonoFont,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = InkBlack.copy(alpha = 0.72f)
+                  )
+                }
+              }
+
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+              ) {
+                NeoBrutalistButton(
+                  onClick = { leftoverByIndex[index] = false },
+                  modifier = Modifier.weight(1f),
+                  containerColor = if (!isLeftover) LimeFresh else SurfaceWhite,
+                  cornerRadius = 9.dp,
+                  borderWidth = 2.dp,
+                  shadowOffset = if (!isLeftover) 3.dp else 1.dp,
+                  contentPadding = PaddingValues(horizontal = 8.dp, vertical = 7.dp)
+                ) {
+                  Text(
+                    text = stringResource(R.string.cook_confirm_used_up),
+                    fontFamily = BodyFont,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 12.sp,
+                    color = InkBlack,
+                    softWrap = false,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                  )
+                }
+
+                NeoBrutalistButton(
+                  onClick = { leftoverByIndex[index] = true },
+                  modifier = Modifier.weight(1f),
+                  containerColor = if (isLeftover) ButterSoft else SurfaceWhite,
+                  cornerRadius = 9.dp,
+                  borderWidth = 2.dp,
+                  shadowOffset = if (isLeftover) 3.dp else 1.dp,
+                  contentPadding = PaddingValues(horizontal = 8.dp, vertical = 7.dp)
+                ) {
+                  Text(
+                    text = stringResource(R.string.cook_confirm_leftover),
+                    fontFamily = BodyFont,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 12.sp,
+                    color = InkBlack,
+                    softWrap = false,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                  )
+                }
+              }
+            }
+          }
+        }
+
+        if (hasAnyLeftover) {
+          Text(
+            text = stringResource(R.string.cook_confirm_leftover_hint),
+            fontFamily = MonoFont,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            color = InkBlack.copy(alpha = 0.75f)
+          )
+        }
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+          NeoBrutalistButton(
+            onClick = onCancel,
+            modifier = Modifier.weight(1f),
+            containerColor = SurfaceWhite,
+            cornerRadius = 12.dp,
+            borderWidth = 2.dp,
+            shadowOffset = 3.dp,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)
+          ) {
+            Text(
+              text = stringResource(R.string.cook_confirm_cancel),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 13.sp,
+              color = InkBlack,
+              softWrap = false,
+              maxLines = 1
+            )
+          }
+
+          NeoBrutalistButton(
+            onClick = {
+              val usedUp = mutableListOf<MatchedIngredient>()
+              val leftovers = mutableListOf<MatchedIngredient>()
+              matchedIngredients.forEachIndexed { idx, entry ->
+                if (leftoverByIndex[idx] == true) leftovers.add(entry) else usedUp.add(entry)
+              }
+              onConfirm(usedUp, leftovers)
+            },
+            modifier = Modifier.weight(1.1f),
+            containerColor = LimeFresh,
+            cornerRadius = 12.dp,
+            borderWidth = 2.5.dp,
+            shadowOffset = 4.dp,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)
+          ) {
+            Text(
+              text = stringResource(R.string.cook_confirm_apply),
+              fontFamily = BodyFont,
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 13.sp,
+              color = InkBlack,
+              softWrap = false,
+              maxLines = 1
+            )
+          }
         }
       }
     }
@@ -10360,7 +11295,7 @@ private fun MatchedIngredientRow(matched: MatchedIngredient) {
       val subtitle = if (matched.tier == MatchTier.GROUP_FALLBACK) {
         stringResource(R.string.recipe_substitute_fmt, matched.item.name)
       } else {
-        "${matched.item.name} (${matched.item.quantity})"
+        stringResource(R.string.recipe_exact_match_fmt, matched.item.name, matched.item.quantity)
       }
       Text(
         text = subtitle,
@@ -10823,7 +11758,7 @@ val NeoBrutalistTypography = Typography(
 val FridgeTypography: Typography = NeoBrutalistTypography
 ```
 
-### `app/src/main/kotlin/com/truong/fridgezero/vm/FridgeViewModel.kt` (292 lines)
+### `app/src/main/kotlin/com/truong/fridgezero/vm/FridgeViewModel.kt` (313 lines)
 
 ```kotlin
 package com.truong.fridgezero.vm
@@ -11022,21 +11957,42 @@ class FridgeViewModel(
 
   fun markItemStatus(id: Long, status: ItemStatus) = markItemStatus(listOf(id), status)
 
-  fun consumeRecipeIngredients(matched: List<MatchedIngredient>) {
-    if (matched.isEmpty()) return
+  fun consumeRecipeIngredients(matched: List<MatchedIngredient>) =
+    completeRecipeCook(usedUp = matched, leftovers = emptyList())
+
+  fun completeRecipeCook(
+    usedUp: List<MatchedIngredient>,
+    leftovers: List<MatchedIngredient>
+  ) {
+    if (usedUp.isEmpty() && leftovers.isEmpty()) return
+    val today = LocalDate.now().toEpochDay()
+    val maxLeftoverExpiry = today + CulinaryGuideEngine.LEFTOVER_MAX_DAYS_LEFT.toLong()
     viewModelScope.launch {
-      val uniqueIds = matched.flatMap { it.item.itemIds }.distinct()
-      val entitiesById = uniqueIds.mapNotNull { id ->
-        repository.getFoodItem(id)?.let { id to it }
-      }.toMap()
-      val deductions = CulinaryGuideEngine.planDeductions(matched, entitiesById)
-      deductions.forEach { deduction ->
-        val entity = entitiesById[deduction.itemId] ?: return@forEach
-        if (deduction.remainingQuantity <= 0) {
-          repository.updateItemStatus(deduction.itemId, ItemStatus.USED_UP)
-        } else {
-          repository.upsertFoodItem(entity.copy(quantity = deduction.remainingQuantity))
+      val usedUpIds = if (usedUp.isNotEmpty()) {
+        val uniqueIds = usedUp.flatMap { it.item.itemIds }.distinct()
+        val entitiesById = uniqueIds.mapNotNull { id ->
+          repository.getFoodItem(id)?.let { id to it }
+        }.toMap()
+        val deductions = CulinaryGuideEngine.planDeductions(usedUp, entitiesById)
+        deductions.forEach { deduction ->
+          val entity = entitiesById[deduction.itemId] ?: return@forEach
+          if (deduction.remainingQuantity <= 0) {
+            repository.updateItemStatus(deduction.itemId, ItemStatus.USED_UP)
+          } else {
+            repository.upsertFoodItem(entity.copy(quantity = deduction.remainingQuantity))
+          }
         }
+        uniqueIds.toSet()
+      } else {
+        emptySet()
+      }
+
+      val leftoverIds = leftovers
+        .flatMap { it.item.itemIds }
+        .distinct()
+        .filter { it !in usedUpIds }
+      if (leftoverIds.isNotEmpty()) {
+        repository.markItemsLeftover(leftoverIds, maxLeftoverExpiry)
       }
     }
   }
@@ -11119,7 +12075,7 @@ class FridgeViewModel(
 }
 ```
 
-### `app/src/test/kotlin/com/truong/fridgezero/domain/LodAndFreshnessTest.kt` (490 lines)
+### `app/src/test/kotlin/com/truong/fridgezero/domain/LodAndFreshnessTest.kt` (703 lines)
 
 ```kotlin
 package com.truong.fridgezero.domain
@@ -11168,7 +12124,7 @@ class LodAndFreshnessTest {
 
   @Test
   fun toDisplayAggregatesDuplicatesTracksAllIdsAndSortsByExpiry() {
-    val today = 20_000L
+    val today = java.time.LocalDate.of(2026, 11, 20).toEpochDay()
     val items = listOf(
       FoodItemEntity(
         id = 1L,
@@ -11177,7 +12133,7 @@ class LodAndFreshnessTest {
         iconKey = "milk",
         group = "SUA_TRUNG",
         quantity = 1,
-        addedAtEpochDay = today,
+        addedAtEpochDay = today - 3,
         expiresAtEpochDay = today + 5
       ),
       FoodItemEntity(
@@ -11187,7 +12143,7 @@ class LodAndFreshnessTest {
         iconKey = "milk",
         group = "SUA_TRUNG",
         quantity = 2,
-        addedAtEpochDay = today,
+        addedAtEpochDay = today - 1,
         expiresAtEpochDay = today + 2
       ),
       FoodItemEntity(
@@ -11206,11 +12162,19 @@ class LodAndFreshnessTest {
     assertEquals("Thịt gà", display[0].name)
     assertEquals(1, display[0].minDaysLeft)
     assertEquals(listOf(3L), display[0].itemIds)
+    assertEquals(today + 1, display[0].earliestExpiryEpochDay)
+    assertEquals(today, display[0].earliestAddedEpochDay)
+    assertEquals("21/11", display[0].formattedExpiryDate(today))
+    assertEquals(0, display[0].daysSinceAdded(today))
 
     assertEquals(2L, display[1].primaryId)
     assertEquals(listOf(1L, 2L), display[1].itemIds)
     assertEquals(3, display[1].quantity)
     assertEquals(2, display[1].minDaysLeft)
+    assertEquals(today + 2, display[1].earliestExpiryEpochDay)
+    assertEquals(today - 3, display[1].earliestAddedEpochDay)
+    assertEquals("22/11", display[1].formattedExpiryDate(today))
+    assertEquals(3, display[1].daysSinceAdded(today))
   }
 
   @Test
@@ -11270,8 +12234,15 @@ class LodAndFreshnessTest {
   @Test
   fun culinaryCatalogCoversAll32IconKeysAndMeetsRecipeMetadataSpec() {
     val recipes = CulinaryGuideRepository.recipes
-    assertEquals(36, recipes.size)
-    assertEquals(36, recipes.map { it.id }.toSet().size)
+    assertEquals(32, recipes.size)
+    assertEquals(32, recipes.map { it.id }.toSet().size)
+
+    val bannedArtificialIds = setOf(
+      "salad_ca_hoi_dua_muoi",
+      "banh_bao_chien_sot_ca_dua_muoi",
+      "kem_sua_chua_cam_tuoi"
+    )
+    assertTrue(recipes.none { it.id in bannedArtificialIds })
 
     val coveredKeys = recipes
       .flatMap { it.fridgeIngredients }
@@ -11281,11 +12252,23 @@ class LodAndFreshnessTest {
     assertTrue("Missing icon keys: ${allIconKeys - coveredKeys}", coveredKeys.containsAll(allIconKeys))
 
     recipes.forEach { recipe ->
+      assertTrue("${recipe.id} must have prepMinutes > 0", recipe.prepMinutes > 0)
+      assertTrue("${recipe.id} must have cookMinutes > 0", recipe.cookMinutes > 0)
+      assertTrue("${recipe.id} must declare servingsLabel", recipe.servingsLabel.isNotBlank())
       assertTrue("${recipe.id} must have 1..4 fridge ingredients", recipe.fridgeIngredients.size in 1..4)
-      assertTrue("${recipe.id} must declare pantry staples", recipe.pantryStaples.isNotEmpty())
-      assertTrue("${recipe.id} must have 4..5 steps", recipe.steps.size in 4..5)
+      assertTrue("${recipe.id} must declare measured seasonings", recipe.seasonings.isNotEmpty())
+      recipe.seasonings.forEach { spec ->
+        assertTrue("${recipe.id} seasoning name blank", spec.name.isNotBlank())
+        assertTrue("${recipe.id} seasoning amount blank", spec.amount.isNotBlank())
+      }
+      assertTrue("${recipe.id} must have 5..6 steps", recipe.steps.size in 5..6)
       assertTrue("${recipe.id} must cite sourceName", recipe.sourceName.isNotBlank())
       assertTrue("${recipe.id} must cite https sourceUrl", recipe.sourceUrl.startsWith("https://"))
+      val hostAndPath = recipe.sourceUrl.removePrefix("https://")
+      assertTrue(
+        "${recipe.id} sourceUrl must target a dish-specific path or query",
+        hostAndPath.contains('?') || hostAndPath.trimEnd('/').contains('/')
+      )
       assertEquals(
         "${recipe.id} QUICK_15 tag must align with cookMinutes <= 15",
         recipe.cookMinutes <= 15,
@@ -11304,16 +12287,27 @@ class LodAndFreshnessTest {
 
     val seedDisplay = Seed.foodItems(20_000L).toDisplay(20_000L)
     val readyNow = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.READY_NOW)
-    assertTrue("Expected at least 10 seed-ready recipes, found ${readyNow.size}", readyNow.size >= 10)
+    assertTrue("Expected at least 8 seed-ready recipes, found ${readyNow.size}", readyNow.size >= 8)
 
     val rescueUrgent = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.RESCUE_URGENT)
     assertTrue(rescueUrgent.isNotEmpty())
     assertTrue(rescueUrgent.all { it.hasUrgentMatch })
 
-    val topOverall = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ALL).first()
+    val allFeed = CulinaryGuideEngine.recommend(seedDisplay, CulinaryFilter.ALL)
+    val topOverall = allFeed.first()
     assertTrue(topOverall.isReadyToCook)
     assertTrue(topOverall.hasUrgentMatch)
     assertTrue(topOverall.matchedIngredients.all { it.tier == MatchTier.EXACT_ICON })
+
+    val topSixCounts = allFeed
+      .take(CulinaryGuideEngine.DEFAULT_FEED_DIVERSITY_WINDOW)
+      .mapNotNull { it.recipe.fridgeIngredients.firstOrNull()?.iconKeys?.firstOrNull() }
+      .groupingBy { it }
+      .eachCount()
+    assertTrue(
+      "Top 6 ALL feed exceeded diversity cap: $topSixCounts",
+      topSixCounts.values.all { it <= CulinaryGuideEngine.DEFAULT_FEED_MAX_PER_PRIMARY_KEY }
+    )
   }
 
   @Test
@@ -11323,7 +12317,9 @@ class LodAndFreshnessTest {
       title = "Test 3-layer recipe",
       emoji = "🍳",
       summary = "Test",
+      prepMinutes = 8,
       cookMinutes = 15,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15),
       fridgeIngredients = listOf(
         RecipeIngredient("Thịt gà", listOf("chicken"), listOf("thịt gà", "gà"), FoodGroup.THIT, "200g"),
@@ -11331,10 +12327,10 @@ class LodAndFreshnessTest {
         RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "1 củ"),
         RecipeIngredient("Bơ", listOf("butter"), listOf("bơ"), FoodGroup.SUA_TRUNG, "10g")
       ),
-      pantryStaples = listOf("Muối"),
-      steps = listOf("B1", "B2", "B3", "B4"),
+      seasonings = listOf(SeasoningSpec("Muối", "1/2 muỗng cà phê")),
+      steps = listOf("B1", "B2", "B3", "B4", "B5"),
       sourceName = "VnExpress Ẩm Thực",
-      sourceUrl = "https://vnexpress.net/doi-song/cooking"
+      sourceUrl = "https://timkiem.vnexpress.net/?q=ga+xao"
     )
     val fridge = listOf(
       DisplayItem(10L, listOf(10L), "fresh", "Ức gà tươi", "chicken", FoodGroup.THIT, 1, minDaysLeft = 5),
@@ -11367,16 +12363,18 @@ class LodAndFreshnessTest {
       title = "Anti steal",
       emoji = "🥗",
       summary = "Test",
+      prepMinutes = 5,
       cookMinutes = 10,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15),
       fridgeIngredients = listOf(
         RecipeIngredient("Cà rốt", listOf("carrot"), listOf("cà rốt"), FoodGroup.RAU, "1 củ"),
         RecipeIngredient("Xà lách", listOf("lettuce"), listOf("xà lách"), FoodGroup.RAU, "1 bó")
       ),
-      pantryStaples = listOf("Muối"),
-      steps = listOf("B1", "B2", "B3", "B4"),
+      seasonings = listOf(SeasoningSpec("Muối", "1/2 muỗng cà phê")),
+      steps = listOf("B1", "B2", "B3", "B4", "B5"),
       sourceName = "Cooky",
-      sourceUrl = "https://www.cooky.vn/cach-lam"
+      sourceUrl = "https://www.cooky.vn/tim-kiem?q=salad"
     )
     val antiStealEval = CulinaryGuideEngine.evaluate(
       antiStealRecipe,
@@ -11415,15 +12413,17 @@ class LodAndFreshnessTest {
       title = id,
       emoji = "🍽️",
       summary = id,
+      prepMinutes = 8,
       cookMinutes = cookMinutes,
+      servingsLabel = "2 người ăn",
       categories = categories,
       fridgeIngredients = keys.map { (k, g) ->
         RecipeIngredient(k, listOf(k), listOf(k), g, "1 phần")
       },
-      pantryStaples = listOf("Muối"),
-      steps = listOf("B1", "B2", "B3", "B4"),
+      seasonings = listOf(SeasoningSpec("Muối", "1/2 muỗng cà phê")),
+      steps = listOf("B1", "B2", "B3", "B4", "B5"),
       sourceName = "Savoury Days",
-      sourceUrl = "https://www.savourydays.com/"
+      sourceUrl = "https://www.savourydays.com/?s=$id"
     )
 
     val twoUrgentReady = makeRecipe(
@@ -11464,21 +12464,85 @@ class LodAndFreshnessTest {
   }
 
   @Test
+  fun culinaryEngineDiversityCapLimitsPrimaryIngredientInTopSix() {
+    fun makeDish(id: String, primaryKey: String, primaryGroup: FoodGroup, secondaryKey: String? = null) =
+      CulinaryRecipe(
+        id = id,
+        title = id,
+        emoji = "🍽️",
+        summary = id,
+        prepMinutes = 5,
+        cookMinutes = 10,
+        servingsLabel = "2 người ăn",
+        categories = setOf(CulinaryFilter.QUICK_15),
+        fridgeIngredients = buildList {
+          add(RecipeIngredient(primaryKey, listOf(primaryKey), listOf(primaryKey), primaryGroup, "200g"))
+          if (secondaryKey != null) {
+            add(RecipeIngredient(secondaryKey, listOf(secondaryKey), listOf(secondaryKey), FoodGroup.RAU, "100g"))
+          }
+        },
+        seasonings = listOf(SeasoningSpec("Muối", "1/2 muỗng cà phê")),
+        steps = listOf("B1", "B2", "B3", "B4", "B5"),
+        sourceName = "Cooky",
+        sourceUrl = "https://www.cooky.vn/tim-kiem?q=$id"
+      )
+
+    val subset = listOf(
+      makeDish("salmon_1", "salmon", FoodGroup.CA_HAI_SAN, "lettuce"), // 15+6+8=29
+      makeDish("salmon_2", "salmon", FoodGroup.CA_HAI_SAN, "lettuce"), // 29
+      makeDish("salmon_3", "salmon", FoodGroup.CA_HAI_SAN, "lettuce"), // 29 (deferred past top 6)
+      makeDish("salmon_4", "salmon", FoodGroup.CA_HAI_SAN, "lettuce"), // 29 (deferred past top 6)
+      makeDish("chicken_1", "chicken", FoodGroup.THIT),                 // 6+8=14
+      makeDish("shrimp_1", "shrimp", FoodGroup.CA_HAI_SAN),            // 14
+      makeDish("egg_1", "egg", FoodGroup.SUA_TRUNG),                   // 14
+      makeDish("meat_1", "meat", FoodGroup.THIT)                       // 14
+    )
+    val fridge = listOf(
+      DisplayItem(1L, listOf(1L), "freezer", "Cá hồi", "salmon", FoodGroup.CA_HAI_SAN, 1, minDaysLeft = 0),
+      DisplayItem(2L, listOf(2L), "crisper", "Xà lách", "lettuce", FoodGroup.RAU, 1, minDaysLeft = 3),
+      DisplayItem(3L, listOf(3L), "fresh", "Thịt gà", "chicken", FoodGroup.THIT, 1, minDaysLeft = 4),
+      DisplayItem(4L, listOf(4L), "freezer", "Tôm", "shrimp", FoodGroup.CA_HAI_SAN, 1, minDaysLeft = 10),
+      DisplayItem(5L, listOf(5L), "fresh", "Trứng", "egg", FoodGroup.SUA_TRUNG, 1, minDaysLeft = 12),
+      DisplayItem(6L, listOf(6L), "fresh", "Thịt bò", "meat", FoodGroup.THIT, 1, minDaysLeft = 5)
+    )
+
+    val allFeed = CulinaryGuideEngine.recommend(fridge, CulinaryFilter.ALL, subset)
+    assertEquals(subset.size, allFeed.size)
+    val top6Ids = allFeed.take(6).map { it.recipe.id }
+    val salmonInTop6 = allFeed.take(6).count { it.recipe.fridgeIngredients.first().iconKeys.first() == "salmon" }
+    assertEquals(2, salmonInTop6)
+    assertEquals(listOf("salmon_1", "salmon_2", "chicken_1", "egg_1", "meat_1", "shrimp_1"), top6Ids)
+    assertEquals(listOf("salmon_3", "salmon_4"), allFeed.drop(6).map { it.recipe.id })
+
+    // Category filters keep pure score ranking without cross-feed diversity deferrals.
+    val urgentOnly = CulinaryGuideEngine.recommend(fridge, CulinaryFilter.RESCUE_URGENT, subset)
+    assertEquals(listOf("salmon_1", "salmon_2", "salmon_3", "salmon_4"), urgentOnly.map { it.recipe.id })
+  }
+
+  @Test
   fun culinaryEnginePantryStaplesNeverBlockReadiness() {
     val recipe = CulinaryRecipe(
       id = "pantry_only_test",
       title = "Trứng chiên nước mắm tỏi",
       emoji = "🥚",
-      summary = "Gia vị cơ bản không bao giờ chặn trạng thái đủ đồ.",
+      summary = "Gia vị đo lường sẵn trong bếp không bao giờ chặn trạng thái đủ đồ.",
+      prepMinutes = 5,
       cookMinutes = 10,
+      servingsLabel = "2 người ăn",
       categories = setOf(CulinaryFilter.QUICK_15, CulinaryFilter.VIET_HOME),
       fridgeIngredients = listOf(
-        RecipeIngredient("Trứng gà", listOf("egg"), listOf("trứng"), FoodGroup.SUA_TRUNG, "2 quả")
+        RecipeIngredient("Trứng gà", listOf("egg"), listOf("trứng"), FoodGroup.SUA_TRUNG, "3 quả")
       ),
-      pantryStaples = listOf("Tỏi băm", "Nước mắm", "Dầu ăn", "Tiêu xay", "Muối", "Đường"),
-      steps = listOf("Đánh trứng.", "Phi thơm tỏi.", "Chiên trứng.", "Chan nước mắm đường và rắc tiêu."),
+      seasonings = listOf(
+        SeasoningSpec("Nước mắm ngon", "1,5 muỗng canh"),
+        SeasoningSpec("Tỏi băm", "2 tép (1 muỗng cà phê)"),
+        SeasoningSpec("Tiêu đen xay", "1/2 muỗng cà phê"),
+        SeasoningSpec("Đường", "1 muỗng cà phê"),
+        SeasoningSpec("Dầu ăn", "1,5 muỗng canh")
+      ),
+      steps = listOf("Đánh trứng.", "Phi thơm tỏi.", "Chiên trứng.", "Pha mắm đường.", "Chan sốt và rắc tiêu."),
       sourceName = "VnExpress Ẩm Thực",
-      sourceUrl = "https://vnexpress.net/doi-song/cooking"
+      sourceUrl = "https://timkiem.vnexpress.net/?q=trung+chien+nuoc+mam"
     )
     val fridgeWithOnlyEgg = listOf(
       DisplayItem(1L, listOf(1L), "fresh", "Trứng", "egg", FoodGroup.SUA_TRUNG, 2, minDaysLeft = 5)
@@ -11609,6 +12673,111 @@ class LodAndFreshnessTest {
     assertEquals(1.5f, DotGridSpec.DOT_RADIUS_DP, 0.0001f)
     assertEquals(PaperCream, DotGridSpec.paperColor)
     assertEquals(DotGridInk, DotGridSpec.dotColor)
+  }
+
+  @Test
+  fun culinaryEngineLeftoverUpdateKeepsActiveMarksOpenedAndClampsExpiryToTwoDays() {
+    val today = 20_000L
+    val freshMeat = FoodItemEntity(
+      id = 201L,
+      compartmentId = "fresh",
+      name = "Thịt thăn bò",
+      iconKey = "meat",
+      group = FoodGroup.THIT.name,
+      quantity = 300,
+      unit = "g",
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 6,
+      isOpened = false,
+      status = ItemStatus.ACTIVE
+    )
+    val urgentSalmon = FoodItemEntity(
+      id = 202L,
+      compartmentId = "fresh",
+      name = "Cá hồi",
+      iconKey = "salmon",
+      group = FoodGroup.CA_HAI_SAN.name,
+      quantity = 1,
+      unit = "gói",
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 1,
+      isOpened = false,
+      status = ItemStatus.ACTIVE
+    )
+
+    val leftovers = listOf(
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Thịt bò", listOf("meat"), listOf("thịt bò"), FoodGroup.THIT, "200g"),
+        item = listOf(freshMeat).toDisplay(today).single(),
+        tier = MatchTier.EXACT_ICON
+      ),
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Cá hồi", listOf("salmon"), listOf("cá hồi"), FoodGroup.CA_HAI_SAN, "250g"),
+        item = listOf(urgentSalmon).toDisplay(today).single(),
+        tier = MatchTier.EXACT_ICON
+      )
+    )
+    val entitiesById = mapOf(201L to freshMeat, 202L to urgentSalmon)
+    val updated = CulinaryGuideEngine.planLeftoverUpdates(leftovers, entitiesById, today).associateBy { it.id }
+
+    assertEquals(2, updated.size)
+    val updatedMeat = updated.getValue(201L)
+    assertEquals(ItemStatus.ACTIVE, updatedMeat.status)
+    assertTrue(updatedMeat.isOpened)
+    assertEquals(today + CulinaryGuideEngine.LEFTOVER_MAX_DAYS_LEFT, updatedMeat.expiresAtEpochDay)
+
+    val updatedSalmon = updated.getValue(202L)
+    assertEquals(ItemStatus.ACTIVE, updatedSalmon.status)
+    assertTrue(updatedSalmon.isOpened)
+    // Already expiring sooner than 2 days -> keep tighter existing expiry.
+    assertEquals(today + 1, updatedSalmon.expiresAtEpochDay)
+  }
+
+  @Test
+  fun culinaryEnginePlanDeductionsMarksWeightBasedItemsUsedUpInOneCook() {
+    val today = 20_000L
+    val beef500g = FoodItemEntity(
+      id = 301L,
+      compartmentId = "fresh",
+      name = "Thịt bò",
+      iconKey = "meat",
+      group = FoodGroup.THIT.name,
+      quantity = 500,
+      unit = "g",
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 3,
+      status = ItemStatus.ACTIVE
+    )
+    val eggs = FoodItemEntity(
+      id = 302L,
+      compartmentId = "fresh",
+      name = "Trứng gà",
+      iconKey = "egg",
+      group = FoodGroup.SUA_TRUNG.name,
+      quantity = 4,
+      unit = "quả",
+      addedAtEpochDay = today,
+      expiresAtEpochDay = today + 10,
+      status = ItemStatus.ACTIVE
+    )
+
+    val matched = listOf(
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Thịt bò", listOf("meat"), listOf("bò"), FoodGroup.THIT, "250g", unitsToConsume = 1),
+        item = listOf(beef500g).toDisplay(today).single(),
+        tier = MatchTier.EXACT_ICON
+      ),
+      MatchedIngredient(
+        ingredient = RecipeIngredient("Trứng gà", listOf("egg"), listOf("trứng"), FoodGroup.SUA_TRUNG, "2 quả", unitsToConsume = 1),
+        item = listOf(eggs).toDisplay(today).single(),
+        tier = MatchTier.EXACT_ICON
+      )
+    )
+    val entitiesById = mapOf(301L to beef500g, 302L to eggs)
+    val deductions = CulinaryGuideEngine.planDeductions(matched, entitiesById).associateBy { it.itemId }
+
+    assertEquals(0, deductions[301L]?.remainingQuantity)
+    assertEquals(3, deductions[302L]?.remainingQuantity)
   }
 }
 ```

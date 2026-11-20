@@ -214,7 +214,7 @@ class MainActivity : ComponentActivity() {
                       compartments = uiState.compartments,
                       initialRecipeId = recipesRoute.initialRecipeId,
                       onBack = { route = RootRoute.Home },
-                      onConsumeRecipe = { rec -> vm.consumeRecipeIngredients(rec.matchedIngredients) }
+                      onCompleteCook = { usedUp, leftovers -> vm.completeRecipeCook(usedUp, leftovers) }
                     )
                   }
                   route is RootRoute.Bento -> {

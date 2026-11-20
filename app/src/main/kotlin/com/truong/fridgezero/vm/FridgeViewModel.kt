@@ -194,21 +194,42 @@ class FridgeViewModel(
 
   fun markItemStatus(id: Long, status: ItemStatus) = markItemStatus(listOf(id), status)
 
-  fun consumeRecipeIngredients(matched: List<MatchedIngredient>) {
-    if (matched.isEmpty()) return
+  fun consumeRecipeIngredients(matched: List<MatchedIngredient>) =
+    completeRecipeCook(usedUp = matched, leftovers = emptyList())
+
+  fun completeRecipeCook(
+    usedUp: List<MatchedIngredient>,
+    leftovers: List<MatchedIngredient>
+  ) {
+    if (usedUp.isEmpty() && leftovers.isEmpty()) return
+    val today = LocalDate.now().toEpochDay()
+    val maxLeftoverExpiry = today + CulinaryGuideEngine.LEFTOVER_MAX_DAYS_LEFT.toLong()
     viewModelScope.launch {
-      val uniqueIds = matched.flatMap { it.item.itemIds }.distinct()
-      val entitiesById = uniqueIds.mapNotNull { id ->
-        repository.getFoodItem(id)?.let { id to it }
-      }.toMap()
-      val deductions = CulinaryGuideEngine.planDeductions(matched, entitiesById)
-      deductions.forEach { deduction ->
-        val entity = entitiesById[deduction.itemId] ?: return@forEach
-        if (deduction.remainingQuantity <= 0) {
-          repository.updateItemStatus(deduction.itemId, ItemStatus.USED_UP)
-        } else {
-          repository.upsertFoodItem(entity.copy(quantity = deduction.remainingQuantity))
+      val usedUpIds = if (usedUp.isNotEmpty()) {
+        val uniqueIds = usedUp.flatMap { it.item.itemIds }.distinct()
+        val entitiesById = uniqueIds.mapNotNull { id ->
+          repository.getFoodItem(id)?.let { id to it }
+        }.toMap()
+        val deductions = CulinaryGuideEngine.planDeductions(usedUp, entitiesById)
+        deductions.forEach { deduction ->
+          val entity = entitiesById[deduction.itemId] ?: return@forEach
+          if (deduction.remainingQuantity <= 0) {
+            repository.updateItemStatus(deduction.itemId, ItemStatus.USED_UP)
+          } else {
+            repository.upsertFoodItem(entity.copy(quantity = deduction.remainingQuantity))
+          }
         }
+        uniqueIds.toSet()
+      } else {
+        emptySet()
+      }
+
+      val leftoverIds = leftovers
+        .flatMap { it.item.itemIds }
+        .distinct()
+        .filter { it !in usedUpIds }
+      if (leftoverIds.isNotEmpty()) {
+        repository.markItemsLeftover(leftoverIds, maxLeftoverExpiry)
       }
     }
   }

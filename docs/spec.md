@@ -130,43 +130,48 @@ Hiển thị khi người dùng mở app lần đầu (hoặc bấm nút `⚙️
   3. **`📷 Quét AI` (nổi bật nền `#C084FC` + sticker nghiêng `GĐ2`):** Điểm vào luồng CameraX quét hóa đơn AI. Ở GĐ1 mở `CameraAiPreviewSheet` (đã khai báo sẵn quyền/giao diện khung ngắm để sẵn sàng nối API OCR ở GĐ2).
   4. **`⚙️ Đổi dáng` (nền `#FFFFFF`):** Quay lại Màn 1 (`FridgeDesignerScreen`) để chỉnh sửa dáng tủ, màu vỏ hoặc số ngăn.
 
-### 3.3. Màn 3 — Khoang Thực phẩm Bento Grid 2 Cột (`ui/bento/CompartmentBentoScreen.kt`)
+### 3.3. Màn 3 — Khoang Thực phẩm Thẻ Ngang Full-Width (`ui/bento/CompartmentBentoScreen.kt`)
 - **Top Bar:**
   - Trái: Nút quay lại **`← Tủ 3D`**.
   - Giữa: Tên ngăn viết hoa (`NGĂN MÁT`) + sticker tổng số món (`7 MÓN`, nền `#FACC15`).
   - Phải: Nút **`+ Thêm`** (`#A3E635`) mở `QuickAddSheet` gắn sẵn ngăn hiện tại.
 - **Thanh chuyển ngăn nhanh (`LazyRow`):** Các chip tên từng ngăn trong tủ kèm số món để chuyển qua lại giữa các ngăn mà không cần thoát ra tủ 3D.
 - **Dải chip lọc (`LazyRow`):** `Tất cả`, `Sắp hết hạn`, `Rau củ`, `Thịt cá`, `Sữa trứng`, `Đồ uống`.
-- **Lưới thẻ Bento 2 cột (`LazyVerticalGrid(GridCells.Fixed(2))`, khoảng cách `12.dp`):**
+- **Danh sách thẻ ngang 1 cột (`LazyColumn`, `spacedBy(10.dp)`):**
   - Sắp xếp ưu tiên món sắp hết hạn lên đầu (`expiryEpochDay ASC`).
-  - **Cấu trúc từng thẻ Bento (`minHeight = 158.dp`):**
-    - *Hàng trên:* Khung icon `48.dp` bo góc chứa Emoji/Icon `32.dp` bên trái + Sticker hạn dùng nghiêng `-2°` bên phải (`Quá hạn Nd` / `Hôm nay` nền `#FB7185`, `Còn 1d` nền `#FACC15`, `≥ 2d` nền `#A3E635`).
-    - *Phần giữa:* Tên thực phẩm tối đa 2 dòng (`maxLines = 2`, không cắt chữ giữa từ) + tag nhóm thực phẩm (`item.group.labelVi`).
-    - *Hàng đáy:* Bộ đếm nhanh **`−` `[qty]` `+`** ngay trên mặt thẻ; bấm `−` khi số lượng $\le 1$ sẽ xóa trực tiếp món khỏi ngăn chỉ với 1 chạm (gọi `onMarkStatus(itemIds, ItemStatus.USED_UP)`) mà không mở hộp thoại xác nhận.
+  - **Cấu trúc thẻ ngang 3 vùng Auto-Layout (`cornerRadius = 14.dp`, `borderWidth = 2.5.dp`, `shadowOffset = 4.dp`):**
+    - *Vùng trái cố định:* Dải màu trạng thái dọc rộng `5.dp` sát mép trái (`#A3E635` / `#FACC15` / `#FB7185`) kết hợp ô icon `50.dp × 50.dp` ghim đỉnh trên (`Alignment.Top`) để không bị kéo giãn khi tên món nhiều dòng.
+    - *Hàng tiêu đề trên:* Tên món chiếm phần còn lại (`Modifier.weight(1f)`, tối đa `2` dòng, `Ellipsis`) + pill hạn dùng góc phải hiển thị đồng thời đếm ngược và ngày `dd/MM` (`"Còn 1d · 21/11"`, `"Hôm nay · 20/11"`, `"Quá hạn 1d · 19/11"`).
+    - *Hàng đáy:* Bên trái là `FlowRow` tự xuống dòng chứa tag nhóm (`item.group.labelVi`), pill **`🥡 Dùng dở`** (`#FEF08A`, viền `1.5.dp`) khi `item.isOpened == true`, và thời gian cất (`"Cất hôm nay"` / `"Cất Nd trước"`); bên phải ghim đáy (`Alignment.Bottom`) là cụm nút **`−` `32.dp` / `[qty]` / `+` `32.dp`**. Bấm `−` khi số lượng $\le 1$ hoặc món cân nặng `"g"` / `"kg"` đang `🥡 Dùng dở` sẽ ghi nhận `ItemStatus.USED_UP` 1 chạm (hiển thị **`~ Còn lại`** thay cho khối lượng gốc).
 
 ### 3.4. Hệ thống 4 Bottom Sheet (`ui/sheets/`)
 1. **`ItemDetailSheet` (Chi tiết, Sửa, Chuyển ngăn & Xóa nhanh 1 chạm):**
-   - Hiển thị icon lớn, tên món, nhóm, badge hạn dùng.
+   - Hiển thị icon lớn, tên món, nhóm, badge hạn dùng kèm ngày `dd/MM` và huy hiệu **`🥡 Dùng dở`** (`#FEF08A`) nếu món đang mở/dùng dở (`isOpened == true`).
    - Bộ đếm số lượng `−` / `+`, chỉnh sửa tên và số ngày hạn dùng.
    - **Chuyển ngăn bảo quản:** Danh sách chip các ngăn khác trong tủ; khi chuyển giữa ngăn mát và ngăn đông sẽ tự điều chỉnh hạn dùng phù hợp.
    - **Xóa món 1 chạm:** Bấm `🗑️ Xóa khỏi tủ` sẽ ghi nhận `ItemStatus.USED_UP` và đóng sheet ngay lập tức.
 2. **`QuickAddSheet` (Thêm nhanh thực phẩm):**
    - Hàng chip gợi ý món quen chạm 1 lần điền sẵn icon, tên, nhóm, chọn ngăn phù hợp và tự động điền số ngày hạn dùng theo chuẩn USDA/FDA (tự cập nhật khi đổi ngăn nếu người dùng chưa chọn mốc hạn thủ công, kèm chú thích `✓ Gợi ý theo chuẩn USDA/FDA (<vùng ngăn>)`).
-   - Ô nhập tên thực phẩm + dải chip chọn ngăn cất + bộ đếm số lượng + 4 chip hạn dùng nhanh (`+3 ngày`, `+1 tuần`, `+2 tuần`, `+1 tháng`) kèm DatePicker tùy chọn.
+   - Ô nhập tên thực phẩm + dải chip chọn ngăn cất + bộ đếm số lượng kèm đơn vị (`"g"`, `"kg"`, `"cái"`, `"gói"`, `"hộp"`, `"chai"`, `"quả"`) + 4 chip hạn dùng nhanh (`+3 ngày`, `+1 tuần`, `+2 tuần`, `+1 tháng`) kèm DatePicker tùy chọn.
 3. **`UrgentItemsBottomSheet` (Trung tâm cảnh báo sắp hết hạn & Gợi ý món):**
    - Mở khi chạm Banner Trợ lý trên Dashboard Màn 2; hiển thị thẻ gợi ý **`🍳 TỐI NAY NẤU GÌ?`** nối thẳng với `topRecommendation` (chạm để mở thẳng `RecipeDetailSheet` tương ứng ở Màn 4), liệt kê các món sắp hết hạn kèm nút xóa nhanh **`✓ Dùng hết`** (1 chạm) và nút **`Mở ngăn →`** nhảy thẳng tới đúng ngăn đó ở Màn 3.
 4. **`CameraAiPreviewSheet` (Cổng CameraX Quét Hóa đơn — Giai đoạn 2):**
    - Mở khi chạm `📷 Quét AI` trên Task Bar; hiển thị khung ngắm CameraX với 4 góc định vị hóa đơn, tia quét laser xanh `#A3E635`, nút đèn Flash, nút chụp và chọn ảnh thư viện (sẵn sàng nối luồng AI OCR ở GĐ2).
 
 ### 3.5. Màn 4 — Cẩm nang Ẩm thực & Giải cứu Hạn dùng (`ui/recipes/CulinaryGuideScreen.kt`, `RecipeDetailSheet.kt`)
+- **Bộ công thức tham khảo chuẩn (`CulinaryGuideRepository`):**
+  - Gồm **32 công thức cơm nhà Việt & Eat-Clean kinh điển** có nguồn kiểm chứng (*Điện máy XANH Vào Bếp*, *Savoury Days*, *VnExpress Ẩm Thực*, *Cooky*, *Serious Eats*) kèm URL tra cứu trực tiếp theo từng món, phủ đủ 32 `iconKey` của `EmojiIconRepository`.
+  - Mỗi công thức có đầy đủ khẩu phần (`servingsLabel`), thời gian `prepMinutes` + `cookMinutes`, định lượng gram/ml/quả cho nguyên liệu chính, bảng gia vị có định lượng muỗng/gram (`SeasoningSpec`), và **5–6 bước chế biến chi tiết**.
+  - Ở tab mặc định `Tất cả`, `CulinaryGuideEngine` áp dụng giới hạn đa dạng hóa top 6: tối đa **2 món cho cùng 1 nguyên liệu chính đầu tiên** để tránh một món sắp hết hạn làm lặp danh sách đầu trang.
 - **Top Bar:** Nút quay lại `←`, tiêu đề `CẨM NANG ẨM THỰC` và sticker `#A3E635` hiển thị số món đủ đồ nấu ngay.
 - **Lưới công thức Bento 2 cột (`LazyVerticalGrid`):**
   - Thẻ Hero toàn chiều rộng **`🔥 MÓN CỨU TỦ HÔM NAY`** làm nổi bật công thức có điểm giải cứu cao nhất.
   - Hàng chip lọc ngang (`Tất cả`, `Đủ đồ nấu ngay`, `Cứu đồ gấp`, `Nhanh ≤ 15p`, `Cơm nhà Việt`, `Eat-Clean`).
   - Thẻ Bento 2 cột hiển thị emoji món, tỷ lệ khớp nguyên liệu (`#A3E635` khi đủ đồ, `#FACC15` khi còn thiếu), hàng emoji nguyên liệu tô màu theo hạn dùng, thời gian nấu và `sourceName`. Tự động mở `RecipeDetailSheet` khi điều hướng kèm `initialRecipeId`.
-- **`RecipeDetailSheet`:**
-  - Hiển thị tiêu đề, thời gian nấu, độ khó (`Dễ` / `Vừa`) và nhãn nguồn uy tín; phân tách rõ **`✓ Đã có trong tủ`** (tô màu `#FB7185` / `#FACC15` cho món sắp hết hạn), **`🛒 Cần chuẩn bị thêm`** và **`🧂 Gia vị bếp cơ bản`**.
-  - Liệt kê các bước nấu đánh số trong `NeoBrutalistCard` và 2 nút đáy: **`🔗 Xem bài gốc`** (`LocalUriHandler.openUri` bọc `runCatching`) và **`🎉 Đã nấu xong`** (gọi `FridgeViewModel.consumeRecipeIngredients` để trừ `unitsToConsume` / chuyển `USED_UP` trong Room, hiện Toast và đóng sheet).
+- **`RecipeDetailSheet` (Màn chi tiết toàn màn hình trong `CulinaryGuideScreen`):**
+  - Render trực tiếp bên trong root `Box` của `CulinaryGuideScreen` qua `AnimatedVisibility` (~`180ms` slide/fade) trên nền `dotGridBackground()` kèm `BackHandler` để mở/đóng tức thì không độ trễ `Dialog` window hay giật kéo.
+  - Top bar Neo-Brutalist gồm nút quay lại vuông `44.dp` `←`, tên món và nhãn nguồn; phần thân cuộn độc lập (`weight(1f)`) hiển thị `prepMinutes` + `cookMinutes`, khẩu phần `servingsLabel`, độ khó (`Dễ` / `Vừa`), tỷ lệ khớp và phân tách rõ **`✓ Nguyên liệu tương tự đang có trong tủ`** (tô màu `#FB7185` / `#FACC15` cho món sắp hết hạn), **`🛒 Nguyên liệu chính cần chuẩn bị thêm`**, **`🧂 Gia vị & định lượng chuẩn`** (dạng bảng 2 cột tên gia vị — định lượng) cùng **5–6 bước nấu** đánh số trong `NeoBrutalistCard`.
+  - Thanh hành động đáy ghim cố định với 2 nút: **`🔗 Xem bài gốc`** (`LocalUriHandler.openUri` bọc `runCatching`) và **`🎉 Đã nấu xong`** — khi có nguyên liệu khớp trong tủ sẽ mở hộp thoại Neo-Brutalist cho phép chọn **`✓ Dùng hết`** (mặc định) hoặc **`🥡 Dùng dở`** cho từng nguyên liệu trước khi gọi `FridgeViewModel.completeRecipeCook` (trừ hết món cân nặng `g`/`kg` hoặc đếm đơn vị với `usedUp`; giữ `ACTIVE`, đặt `isOpened = true` và giới hạn hạn dùng $\le 2$ ngày với `leftovers`).
 
 ---
 
